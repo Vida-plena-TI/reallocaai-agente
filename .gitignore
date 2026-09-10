@@ -1,0 +1,44 @@
+# ---- Ambiente e segredos ----
+.env
+.env.*
+!.env.example
+credentials/
+*service-account*.json
+*service_account*.json
+client_secret*.json
+*.pem
+*.key
+token.json
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# ---- Ambientes virtuais ----
+.venv/
+venv/
+env/
+
+# ---- Testes e ferramentas ----
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# ---- Editores e SO ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
