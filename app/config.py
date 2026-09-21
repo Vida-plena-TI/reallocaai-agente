@@ -26,6 +26,11 @@ class Settings(BaseSettings):
 
     # Integração com IA (app/ai)
     openai_api_key: str = ""
+    #: Sem valor padrão: qual modelo usar em produção ainda não foi decidido, e
+    #: um default chutado no código esconderia essa decisão pendente. Só é lido
+    #: por `criar_chat_model` (Fase 5b) e pelo script manual de chat — a suíte
+    #: de testes automatizados nunca chama `get_settings()`.
+    openai_model: str
 
     # Fonte de dados: Google Sheets (app/data_sources)
     google_sheets_credentials_path: str = ""
