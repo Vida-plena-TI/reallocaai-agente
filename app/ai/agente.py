@@ -22,7 +22,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from app.ai.prompts import PROMPT_SISTEMA
 from app.ai.tools import criar_tools
-from app.config import get_settings
+from app.config import exigir, get_settings
 from app.data_sources.base import ScheduleDataSource
 from app.data_sources.continuidade import ContinuidadeDataSource
 
@@ -51,7 +51,12 @@ def criar_chat_model() -> BaseChatModel:
     agente sem rede injeta outro `BaseChatModel` direto em `criar_agente`.
     """
     settings = get_settings()
-    return ChatOpenAI(model=settings.openai_model, api_key=settings.openai_api_key)
+    # `openai_api_key`/`openai_model` são `None` em `Settings` até aqui — validados
+    # só neste ponto de uso, não na classe, para `Settings()` continuar construível
+    # sem `.env` nenhum (ver `exigir`).
+    api_key = exigir(settings.openai_api_key, "OPENAI_API_KEY")
+    model = exigir(settings.openai_model, "OPENAI_MODEL")
+    return ChatOpenAI(model=model, api_key=api_key)
 
 
 def criar_agente(

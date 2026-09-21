@@ -1,0 +1,47 @@
+"""Fixtures compartilhadas dos testes da API HTTP (Fase 6a).
+
+`client` sobrescreve `obter_fonte`/`obter_continuidade`/`get_settings` via
+`app.dependency_overrides`, então nenhum teste aqui toca o `lifespan` real
+(que constrói `GoogleSheetsDataSource`) nem exige `INTERNAL_API_KEY` real.
+"""
+
+from collections.abc import Iterator
+
+import pytest
+from fastapi.testclient import TestClient
+
+from app.api.dependencies import obter_continuidade, obter_fonte
+from app.config import Settings, get_settings
+from app.main import app
+from tests.support.fake_continuidade_data_source import FakeContinuidadeDataSource
+from tests.support.fake_schedule_data_source import FakeScheduleDataSource
+
+#: Chave usada nos testes — nunca a `INTERNAL_API_KEY` real do `.env`.
+API_KEY = "chave-de-teste"
+
+HEADERS_AUTENTICADOS = {"X-API-Key": API_KEY}
+
+
+@pytest.fixture
+def fonte() -> FakeScheduleDataSource:
+    return FakeScheduleDataSource()
+
+
+@pytest.fixture
+def continuidade() -> FakeContinuidadeDataSource:
+    return FakeContinuidadeDataSource()
+
+
+@pytest.fixture
+def client(
+    fonte: FakeScheduleDataSource, continuidade: FakeContinuidadeDataSource
+) -> Iterator[TestClient]:
+    app.dependency_overrides[obter_fonte] = lambda: fonte
+    app.dependency_overrides[obter_continuidade] = lambda: continuidade
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        openai_model="gpt-4o-mini", internal_api_key=API_KEY
+    )
+    try:
+        yield TestClient(app)
+    finally:
+        app.dependency_overrides.clear()
