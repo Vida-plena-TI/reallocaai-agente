@@ -1,10 +1,10 @@
 """Configuração central da aplicação, carregada a partir de variáveis de ambiente."""
 
 from functools import lru_cache
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -34,7 +34,10 @@ class Settings(BaseSettings):
     # Envio de relatórios por e-mail (app/reports)
     resend_api_key: str = ""
     report_email_from: str = ""
-    report_email_to: list[str] = Field(default_factory=list)
+    # `NoDecode` desliga o parsing JSON que o pydantic-settings aplicaria a campos de lista
+    # antes dos validadores: sem isso, `REPORT_EMAIL_TO=a@b.com,c@d.com` quebraria a leitura
+    # do `.env` e o validador abaixo nunca seria chamado.
+    report_email_to: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
     @field_validator("report_email_to", mode="before")
     @classmethod

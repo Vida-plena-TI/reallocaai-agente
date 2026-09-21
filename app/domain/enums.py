@@ -17,3 +17,16 @@ class Especialidade(StrEnum):
     PSICOMOTRICIDADE = auto()
     PSICOPEDAGOGIA = auto()
     MUSICOTERAPIA = auto()
+
+
+class Convenio(StrEnum):
+    """Quem paga o atendimento.
+
+    Na planilha o convênio não é uma coluna: ele é codificado pela **cor da
+    fonte** da célula do paciente (veja `CORES_CONVENIO`).
+    """
+
+    KLINI_SAUDE = auto()
+    PARTICULAR = auto()
+    UNIMED = auto()
+    SULAMERICA = auto()

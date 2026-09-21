@@ -29,7 +29,7 @@ dev = [
 [tool.ruff]
 line-length = 100
 target-version = "py314"
-src = ["app", "tests"]
+src = ["app", "tests", "scripts"]
 
 [tool.ruff.lint]
 select = [
@@ -66,6 +66,6 @@ addopts = "-q"
 
 [tool.mypy]
 python_version = "3.14"
-files = ["app", "tests"]
+files = ["app", "tests", "scripts"]
 strict = true
 plugins = ["pydantic.mypy"]

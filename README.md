@@ -85,6 +85,30 @@ curl http://127.0.0.1:8000/health
 
 Documentação interativa em `http://127.0.0.1:8000/docs`.
 
+## Scripts exploratórios
+
+`scripts/` fica **fora** do pacote `app`: são ferramentas pontuais de investigação, não parte
+da aplicação. Nada em `app/` importa daqui.
+
+### `scripts/inspect_sheet.py`
+
+Conecta na planilha real da agenda (via `gspread` + service account) e imprime, para cada aba:
+nome, dimensões do conteúdo real (ignorando linhas/colunas vazias no fim), as primeiras 40
+linhas de valores em formato de tabela e a lista de intervalos de células mescladas.
+
+Serve para conhecer a estrutura real da planilha antes de escrever o parser definitivo em
+`app/data_sources`.
+
+```bash
+uv run python scripts/inspect_sheet.py
+```
+
+Pré-requisitos: `GOOGLE_SHEETS_CREDENTIALS_PATH` e `GOOGLE_SHEETS_SPREADSHEET_ID` no `.env`, e a
+planilha compartilhada com o e-mail da service account (basta permissão de leitura).
+
+O relatório é impresso no terminal e salvo em `scripts/output/sheet_inspection.txt`. Essa pasta
+é git-ignorada — o output contém dados reais de pacientes e profissionais.
+
 ## Qualidade
 
 ```bash

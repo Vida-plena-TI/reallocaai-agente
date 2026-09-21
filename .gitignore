@@ -10,6 +10,9 @@ client_secret*.json
 *.key
 token.json
 
+# ---- Saída de scripts exploratórios (contém dados reais da agenda) ----
+scripts/output/
+
 # ---- Python ----
 __pycache__/
 *.py[cod]

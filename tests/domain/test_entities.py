@@ -6,9 +6,11 @@ import pytest
 from pydantic import ValidationError
 
 from app.domain import (
+    HORARIO_PREFERENCIAL_PADRAO,
     Atendimento,
     AtendimentoComBuracoError,
     AtendimentoEmDiasDiferentesError,
+    Convenio,
     Especialidade,
     ItemSolicitacao,
     Paciente,
@@ -26,10 +28,10 @@ def slot(hora: time, data: date = DIA) -> Slot:
     return Slot(data=data, hora_inicio=hora)
 
 
-def atendimento(slots: list[Slot]) -> Atendimento:
+def atendimento(slots: list[Slot], paciente_ids: list[str] | None = None) -> Atendimento:
     return Atendimento(
         id="at-1",
-        paciente_id="pac-1",
+        paciente_ids=paciente_ids if paciente_ids is not None else ["pac-1"],
         profissional_id="prof-1",
         sala_id="sala-1",
         especialidade=Especialidade.FONOAUDIOLOGIA,
@@ -64,10 +66,35 @@ def test_sala_com_capacidade_invalida_falha(capacidade: int) -> None:
 
 def test_paciente_com_convenio_opcional() -> None:
     sem_convenio = Paciente(id="pac-1", nome="João")
-    com_convenio = Paciente(id="pac-2", nome="Maria", convenio="Unimed")
+    com_convenio = Paciente(id="pac-2", nome="Maria", convenio=Convenio.UNIMED)
 
     assert sem_convenio.convenio is None
-    assert com_convenio.convenio == "Unimed"
+    assert com_convenio.convenio is Convenio.UNIMED
+
+
+def test_paciente_com_convenio_desconhecido_falha() -> None:
+    with pytest.raises(ValidationError):
+        Paciente(id="pac-1", nome="João", convenio="amil")
+
+
+def test_atendimento_em_grupo_tem_mais_de_um_paciente() -> None:
+    resultado = atendimento([slot(time(9, 0))], paciente_ids=["pac-1", "pac-2"])
+
+    assert resultado.paciente_ids == ["pac-1", "pac-2"]
+
+
+def test_atendimento_sem_paciente_falha() -> None:
+    with pytest.raises(ValidationError):
+        atendimento([slot(time(9, 0))], paciente_ids=[])
+
+
+def test_atendimento_com_paciente_vazio_falha() -> None:
+    with pytest.raises(ValidationError):
+        atendimento([slot(time(9, 0))], paciente_ids=["pac-1", ""])
+
+
+def test_atendimento_nao_aguarda_autorizacao_por_padrao() -> None:
+    assert atendimento([slot(time(9, 0))]).aguardando_autorizacao is False
 
 
 def test_atendimento_com_slots_contiguos_calcula_duracao() -> None:
@@ -139,3 +166,65 @@ def test_solicitacao_com_item_de_duracao_zero_falha() -> None:
 def test_solicitacao_sem_itens_falha() -> None:
     with pytest.raises(ValidationError):
         SolicitacaoAtendimento(paciente_id="pac-1", data=DIA, itens=[])
+
+
+def test_item_solicitacao_sem_profissional_id_por_padrao() -> None:
+    item = ItemSolicitacao(especialidade=Especialidade.FONOAUDIOLOGIA, duracao_em_slots=1)
+
+    assert item.profissional_id is None
+
+
+def test_item_solicitacao_aceita_profissional_id_para_continuidade() -> None:
+    item = ItemSolicitacao(
+        especialidade=Especialidade.FONOAUDIOLOGIA, duracao_em_slots=1, profissional_id="prof-1"
+    )
+
+    assert item.profissional_id == "prof-1"
+
+
+def test_solicitacao_tem_horario_minimo_preferencial_por_padrao() -> None:
+    solicitacao = SolicitacaoAtendimento(
+        paciente_id="pac-1",
+        data=DIA,
+        itens=[ItemSolicitacao(especialidade=Especialidade.PSICOLOGIA, duracao_em_slots=1)],
+    )
+
+    assert solicitacao.horario_minimo == HORARIO_PREFERENCIAL_PADRAO
+    assert solicitacao.horario_desejado is None
+
+
+def test_solicitacao_aceita_horario_minimo_e_desejado_explicitos() -> None:
+    solicitacao = SolicitacaoAtendimento(
+        paciente_id="pac-1",
+        data=DIA,
+        itens=[ItemSolicitacao(especialidade=Especialidade.PSICOLOGIA, duracao_em_slots=1)],
+        horario_minimo=time(7, 0),
+        horario_desejado=time(10, 0),
+    )
+
+    assert solicitacao.horario_minimo == time(7, 0)
+    assert solicitacao.horario_desejado == time(10, 0)
+
+
+@pytest.mark.parametrize("horario_minimo", [time(6, 30), time(18, 30)])
+def test_solicitacao_com_horario_minimo_fora_do_expediente_falha(horario_minimo: time) -> None:
+    with pytest.raises(ValidationError):
+        SolicitacaoAtendimento(
+            paciente_id="pac-1",
+            data=DIA,
+            itens=[ItemSolicitacao(especialidade=Especialidade.PSICOLOGIA, duracao_em_slots=1)],
+            horario_minimo=horario_minimo,
+        )
+
+
+@pytest.mark.parametrize("horario_desejado", [time(6, 30), time(18, 30)])
+def test_solicitacao_com_horario_desejado_fora_do_expediente_falha(
+    horario_desejado: time,
+) -> None:
+    with pytest.raises(ValidationError):
+        SolicitacaoAtendimento(
+            paciente_id="pac-1",
+            data=DIA,
+            itens=[ItemSolicitacao(especialidade=Especialidade.PSICOLOGIA, duracao_em_slots=1)],
+            horario_desejado=horario_desejado,
+        )
