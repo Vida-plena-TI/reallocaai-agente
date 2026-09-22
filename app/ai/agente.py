@@ -105,6 +105,28 @@ def criar_agente(
     return create_agent(model=chat_model, tools=tools, system_prompt=prompt)
 
 
+def _extrair_texto_da_resposta(mensagem: BaseMessage) -> str:
+    """Normaliza `mensagem.content` para o texto que vai para o usuário.
+
+    `content` pode ser uma `str` (caso comum) ou uma lista de blocos
+    estruturados — formato usado por alguns provedores/modelos (visto com
+    `ChatGoogleGenerativeAI`) para carregar, junto do texto, metadados
+    internos (ex: blocos de assinatura) que não fazem sentido devolver ao
+    usuário. Só os blocos com `"type": "text"` viram texto; qualquer outro
+    bloco é ignorado silenciosamente.
+    """
+    content = mensagem.content
+    if isinstance(content, str):
+        return content
+
+    textos = [
+        bloco["text"]
+        for bloco in content
+        if isinstance(bloco, dict) and bloco.get("type") == "text"
+    ]
+    return "\n".join(textos)
+
+
 def perguntar(agente: Agente, historico_mensagens: list[BaseMessage]) -> str:
     """Roda `agente` sobre o histórico completo e devolve o texto da resposta final.
 
@@ -112,4 +134,4 @@ def perguntar(agente: Agente, historico_mensagens: list[BaseMessage]) -> str:
     completo da conversa a cada turno (decisão já tomada nesta fase).
     """
     resultado = agente.invoke({"messages": historico_mensagens})
-    return str(resultado["messages"][-1].content)
+    return _extrair_texto_da_resposta(resultado["messages"][-1])

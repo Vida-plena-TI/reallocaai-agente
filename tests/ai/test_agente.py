@@ -18,7 +18,7 @@ from typing import Any
 import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from app.ai.agente import criar_agente, criar_chat_model, perguntar
+from app.ai.agente import _extrair_texto_da_resposta, criar_agente, criar_chat_model, perguntar
 from app.config import Settings
 from app.data_sources.base import EntradaGrade
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
@@ -74,6 +74,90 @@ def test_perguntar_executa_o_ciclo_de_tool_call_e_retorna_o_texto_final() -> Non
                 ],
             ),
             AIMessage(content="Não há nenhuma escala registrada para hoje."),
+        ]
+    )
+
+    agente = criar_agente(origem, continuidade, fake_model, DIA)
+    resposta = perguntar(agente, [HumanMessage("Como está a ocupação hoje?")])
+
+    assert resposta == "Não há nenhuma escala registrada para hoje."
+
+
+def test_extrair_texto_da_resposta_com_content_string() -> None:
+    mensagem = AIMessage(content="Não há nenhuma escala registrada para hoje.")
+
+    assert _extrair_texto_da_resposta(mensagem) == "Não há nenhuma escala registrada para hoje."
+
+
+def test_extrair_texto_da_resposta_com_content_lista_de_um_bloco_de_texto() -> None:
+    """Formato usado por alguns provedores (ex: Gemini): `content` vira lista de blocos.
+
+    Sem a normalização, o resultado seria a `repr` do dicionário/lista Python
+    (com chaves e colchetes) em vez do texto puro — daí a asserção explícita
+    de que nenhum desses caracteres de estrutura sobra na resposta.
+    """
+    mensagem = AIMessage(content=[{"type": "text", "text": "A ocupação está estável hoje."}])
+
+    resultado = _extrair_texto_da_resposta(mensagem)
+
+    assert resultado == "A ocupação está estável hoje."
+    assert "{" not in resultado
+    assert "[" not in resultado
+
+
+def test_extrair_texto_da_resposta_ignora_bloco_que_nao_e_de_texto() -> None:
+    mensagem = AIMessage(
+        content=[
+            {"type": "text", "text": "A ocupação está estável hoje."},
+            {"extras": {"signature": "assinatura-interna-do-provedor"}},
+        ]
+    )
+
+    resultado = _extrair_texto_da_resposta(mensagem)
+
+    assert resultado == "A ocupação está estável hoje."
+    assert "assinatura-interna-do-provedor" not in resultado
+
+
+def test_extrair_texto_da_resposta_concatena_multiplos_blocos_de_texto() -> None:
+    mensagem = AIMessage(
+        content=[
+            {"type": "text", "text": "A ocupação está estável hoje."},
+            {"type": "text", "text": "Nenhuma sala vaga no período da tarde."},
+        ]
+    )
+
+    resultado = _extrair_texto_da_resposta(mensagem)
+
+    assert "A ocupação está estável hoje." in resultado
+    assert "Nenhuma sala vaga no período da tarde." in resultado
+
+
+def test_extrair_texto_da_resposta_sem_bloco_de_texto_devolve_string_vazia() -> None:
+    mensagem = AIMessage(content=[{"extras": {"signature": "assinatura-interna-do-provedor"}}])
+
+    assert _extrair_texto_da_resposta(mensagem) == ""
+
+
+def test_perguntar_com_content_estruturado_devolve_so_o_texto() -> None:
+    """Ponta a ponta via `perguntar`, com o "modelo" simulando o formato do Gemini."""
+    origem = FakeScheduleDataSource()
+    continuidade = SemHistoricoContinuidadeDataSource()
+
+    fake_model = FakeToolCallingChatModel(
+        responses=[
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {"name": "consultar_ocupacao", "args": {"data": "2026-09-08"}, "id": "call-1"}
+                ],
+            ),
+            AIMessage(
+                content=[
+                    {"type": "text", "text": "Não há nenhuma escala registrada para hoje."},
+                    {"extras": {"signature": "assinatura-interna-do-provedor"}},
+                ]
+            ),
         ]
     )
 
