@@ -5,7 +5,7 @@ diretamente como resposta HTTP, para a API não quebrar toda vez que um
 detalhe interno do domínio mudar.
 """
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SlotDisponivelResponse(BaseModel):
@@ -39,3 +39,39 @@ class OcupacaoResponse(BaseModel):
     data: str
     por_sala: list[OcupacaoItemResponse]
     por_especialidade: list[OcupacaoItemResponse]
+
+
+class ChatRequest(BaseModel):
+    """Corpo de `POST /agenda/chat`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    conversa_id: str | None = Field(
+        default=None, description="Id de uma conversa já existente. Omitido para iniciar uma nova."
+    )
+    mensagem: str = Field(min_length=1, description="Mensagem do usuário para o agente.")
+
+    @field_validator("mensagem")
+    @classmethod
+    def _rejeitar_mensagem_em_branco(cls, valor: str) -> str:
+        if not valor.strip():
+            raise ValueError("mensagem não pode conter só espaços em branco.")
+        return valor
+
+
+class ChatResponse(BaseModel):
+    """Resposta de `POST /agenda/chat`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    conversa_id: str
+    resposta: str
+
+
+class MensagemHistoricoResponse(BaseModel):
+    """Uma mensagem do histórico bruto de uma conversa (`GET /agenda/chat/{conversa_id}`)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    papel: str
+    conteudo: str

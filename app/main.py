@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
+from app.api.sessoes import ArmazenamentoConversas
 from app.config import exigir, get_settings
 from app.data_sources.cache import CacheadoScheduleDataSource
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
@@ -39,6 +40,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         fonte_real, ttl_segundos=settings_atual.cache_ttl_segundos
     )
     app.state.continuidade = SemHistoricoContinuidadeDataSource()
+    app.state.conversas = ArmazenamentoConversas()
     yield
 
 

@@ -85,6 +85,51 @@ curl http://127.0.0.1:8000/health
 
 Documentação interativa em `http://127.0.0.1:8000/docs`.
 
+## Endpoints da API
+
+Todos os endpoints abaixo (exceto `/health`) exigem o header `X-API-Key`, com o valor de
+`INTERNAL_API_KEY` (`.env`). Requisição sem a chave, ou com a chave errada, recebe `401`.
+
+| Endpoint | Método | Descrição |
+| --- | --- | --- |
+| `/health` | GET | Verificação de disponibilidade do serviço. Público, sem `X-API-Key`. |
+| `/agenda/disponibilidade` | GET | Slots livres de um dia, com filtros opcionais de especialidade, profissional e sala. |
+| `/agenda/ocupacao` | GET | Ocupação de um dia, agregada por sala e por especialidade. |
+| `/agenda/chat` | POST | Envia uma mensagem ao agente de IA e devolve a resposta. Ver detalhes abaixo. |
+| `/agenda/chat/{conversa_id}` | GET | Histórico bruto de uma conversa (útil para depuração). |
+
+### `POST /agenda/chat`
+
+Corpo da requisição:
+
+```json
+{
+  "conversa_id": null,
+  "mensagem": "Tem vaga de psicologia hoje à tarde?"
+}
+```
+
+- `conversa_id`: omitido (ou `null`) para iniciar uma conversa nova. Para continuar uma
+  conversa existente, envie o `conversa_id` devolvido numa resposta anterior — o histórico
+  completo do diálogo é reaproveitado automaticamente.
+- `mensagem`: texto da pergunta ao agente (não pode ser vazia nem conter só espaços).
+
+Resposta:
+
+```json
+{
+  "conversa_id": "3f1b1e4a-...",
+  "resposta": "Sim, há um horário às 14h com a Dra. Ana na Sala 2."
+}
+```
+
+Conversas ficam **em memória** (perdidas num restart do processo) e expiram após um período
+de inatividade. Um `conversa_id` inexistente ou expirado devolve `404`; um erro inesperado ao
+rodar o agente (rede, modelo) devolve `502`, sem vazar detalhes internos na resposta.
+
+A documentação interativa completa (`/docs`) descreve o schema exato de cada endpoint,
+incluindo os campos de `/agenda/disponibilidade` e `/agenda/ocupacao`.
+
 ## Scripts exploratórios
 
 `scripts/` fica **fora** do pacote `app`: são ferramentas pontuais de investigação, não parte
