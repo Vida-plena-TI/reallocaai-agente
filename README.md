@@ -166,6 +166,22 @@ explícito (ex.: "manda o relatório de hoje").
 A documentação interativa completa (`/docs`) descreve o schema exato de cada endpoint,
 incluindo os campos de `/agenda/disponibilidade` e `/agenda/ocupacao`.
 
+## Provedores de IA (`app/ai`)
+
+O agente (`app/ai/agente.py`) suporta dois provedores de chat model, escolhidos pela
+variável `AI_PROVIDER` — não há um provedor "padrão" fixado no código:
+
+- **`AI_PROVIDER=openai`** (`langchain-openai`): exige `OPENAI_API_KEY` e `OPENAI_MODEL`.
+  Provedor pretendido para produção; o modelo definitivo ainda não foi decidido.
+- **`AI_PROVIDER=google`** (`langchain-google-genai`, Gemini): exige `GOOGLE_API_KEY` e
+  `GOOGLE_MODEL`. Útil para testar o agente de ponta a ponta **sem custo**, com uma chave
+  gratuita do [Google AI Studio](https://aistudio.google.com), antes de decidir o modelo
+  definitivo da OpenAI para produção.
+
+Um `AI_PROVIDER` ausente, com valor diferente de `"openai"`/`"google"`, ou sem as
+variáveis exigidas pelo provedor escolhido, faz `criar_chat_model()` levantar um erro
+claro — só é validado no momento de uso, nunca em `Settings()` (ver `.env.example`).
+
 ## Scripts exploratórios
 
 `scripts/` fica **fora** do pacote `app`: são ferramentas pontuais de investigação, não parte
@@ -207,7 +223,11 @@ Veja `.env.example`. Resumo:
 | Variável | Camada | Descrição |
 | --- | --- | --- |
 | `APP_ENV` | — | `development` (padrão), `staging` ou `production` |
+| `AI_PROVIDER` | `app/ai` | Provedor de chat model: `openai` ou `google` (sem padrão) |
 | `OPENAI_API_KEY` | `app/ai` | Chave da OpenAI usada pelo `langchain-openai` |
+| `OPENAI_MODEL` | `app/ai` | Modelo da OpenAI, exigido quando `AI_PROVIDER=openai` |
+| `GOOGLE_API_KEY` | `app/ai` | Chave do Google AI Studio, exigida quando `AI_PROVIDER=google` |
+| `GOOGLE_MODEL` | `app/ai` | Modelo Gemini, exigido quando `AI_PROVIDER=google` |
 | `GOOGLE_SHEETS_CREDENTIALS_PATH` | `app/data_sources` | Caminho do JSON da service account do Google |
 | `GOOGLE_SHEETS_SPREADSHEET_ID` | `app/data_sources` | ID da planilha da agenda |
 | `RESEND_API_KEY` | `app/reports` | Chave da API do Resend |

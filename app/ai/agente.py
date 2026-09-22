@@ -9,6 +9,13 @@ invoca-se com `.invoke({"messages": [...]})` e o resultado é
 `{"messages": [...]}` — a mesma lista de entrada mais as mensagens que o
 agente gerou (incluindo as chamadas de tool e os retornos delas). A resposta
 final do turno é sempre a última mensagem dessa lista.
+
+`ChatGoogleGenerativeAI` (inspecionada em `langchain-google-genai==4.4.0`, via
+`help(langchain_google_genai.ChatGoogleGenerativeAI)`): mesmo padrão de
+`ChatOpenAI` — construtor recebe `model` e `api_key` (a chave também pode vir
+da variável de ambiente `GOOGLE_API_KEY`, mas aqui é sempre passada
+explicitamente, junto com `model`, para manter a mesma validação de
+configuração dos dois provedores).
 """
 
 from datetime import date
@@ -17,6 +24,7 @@ from typing import Any
 from langchain.agents import create_agent
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
 
@@ -44,19 +52,37 @@ _DIAS_DA_SEMANA = (
 
 
 def criar_chat_model() -> BaseChatModel:
-    """Chat model real da OpenAI, a partir de `OPENAI_API_KEY`/`OPENAI_MODEL`.
+    """Chat model real, escolhido por `AI_PROVIDER` ("openai" ou "google").
+
+    Dois provedores suportados, sem padrão hardcoded — `AI_PROVIDER` precisa
+    estar configurado explicitamente (ver `.env.example`). "google" existe
+    para testar o agente de ponta a ponta sem custo, no tier gratuito do
+    Google AI Studio, antes de decidir o modelo definitivo da OpenAI para
+    produção.
 
     Nunca é chamada pela suíte de testes automatizados: exige credencial e
-    modelo reais configurados (ver `.env.example`). Quem precisa testar o
-    agente sem rede injeta outro `BaseChatModel` direto em `criar_agente`.
+    modelo reais configurados. Quem precisa testar o agente sem rede injeta
+    outro `BaseChatModel` direto em `criar_agente`.
     """
     settings = get_settings()
-    # `openai_api_key`/`openai_model` são `None` em `Settings` até aqui — validados
-    # só neste ponto de uso, não na classe, para `Settings()` continuar construível
-    # sem `.env` nenhum (ver `exigir`).
-    api_key = exigir(settings.openai_api_key, "OPENAI_API_KEY")
-    model = exigir(settings.openai_model, "OPENAI_MODEL")
-    return ChatOpenAI(model=model, api_key=api_key)
+    # Os campos de credencial/modelo são `None` em `Settings` até aqui —
+    # validados só neste ponto de uso, não na classe, para `Settings()`
+    # continuar construível sem `.env` nenhum (ver `exigir`).
+    provider = exigir(settings.ai_provider, 'AI_PROVIDER ("openai" ou "google")')
+
+    if provider == "openai":
+        api_key = exigir(settings.openai_api_key, "OPENAI_API_KEY")
+        model = exigir(settings.openai_model, "OPENAI_MODEL")
+        return ChatOpenAI(model=model, api_key=api_key)
+
+    if provider == "google":
+        google_api_key = exigir(settings.google_api_key, "GOOGLE_API_KEY")
+        google_model = exigir(settings.google_model, "GOOGLE_MODEL")
+        return ChatGoogleGenerativeAI(model=google_model, api_key=google_api_key)
+
+    raise ValueError(
+        f'AI_PROVIDER="{provider}" não reconhecido. Valores aceitos: "openai" ou "google".'
+    )
 
 
 def criar_agente(

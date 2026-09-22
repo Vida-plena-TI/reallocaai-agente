@@ -45,8 +45,13 @@ class Settings(BaseSettings):
     #: nenhum, e `import app.main` nunca exige segredo. Validado por `exigir`
     #: dentro de `criar_chat_model` (Fase 5b), o único lugar que precisa dele
     #: de verdade; a suíte de testes automatizados nunca chama essa função.
+    #: `ai_provider` escolhe entre "openai" e "google" — sem padrão hardcoded
+    #: aqui: `criar_chat_model` exige um valor explícito.
+    ai_provider: str | None = None
     openai_api_key: str | None = None
     openai_model: str | None = None
+    google_api_key: str | None = None
+    google_model: str | None = None
 
     # Fonte de dados: Google Sheets (app/data_sources)
     #: Mesma lógica de `openai_model`: `None` por padrão, validado por `exigir`

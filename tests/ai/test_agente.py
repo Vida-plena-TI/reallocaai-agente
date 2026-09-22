@@ -5,13 +5,21 @@ roteiriza as respostas do "modelo": a primeira emite uma chamada de tool
 simulada, a segunda devolve o texto final — validando que a fiação entre
 `create_agent`, as tools (Parte B) e o prompt de sistema (Parte C) está
 correta, independente de qualquer qualidade de modelo real.
+
+Os testes de `criar_chat_model` (suporte a dois provedores de IA, Fase 8)
+validam só a lógica de seleção/validação de configuração, via monkeypatch em
+`app.ai.agente.get_settings` — nunca constroem um chat model de verdade nem
+fazem chamada de rede, mesmo padrão já usado em `tests/reports/test_envio.py`.
 """
 
 from datetime import date, time
+from typing import Any
 
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from app.ai.agente import criar_agente, perguntar
+from app.ai.agente import criar_agente, criar_chat_model, perguntar
+from app.config import Settings
 from app.data_sources.base import EntradaGrade
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
 from app.domain import Atendimento, Especialidade, Profissional, Slot
@@ -19,6 +27,24 @@ from tests.support.fake_chat_model import FakeToolCallingChatModel
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 
 DIA = date(2026, 9, 8)
+
+
+def _settings(**overrides: Any) -> Settings:
+    """`Settings` com os campos de IA em branco, sobrepostos por `overrides`.
+
+    Precisa zerar `ai_provider`/`openai_*`/`google_*` explicitamente: sem
+    isso, valores presentes no `.env` local (lido pela config real) vazariam
+    para os testes, mascarando os cenários "variável não configurada".
+    """
+    base: dict[str, Any] = {
+        "ai_provider": None,
+        "openai_api_key": None,
+        "openai_model": None,
+        "google_api_key": None,
+        "google_model": None,
+    }
+    base.update(overrides)
+    return Settings(**base)
 
 
 def grade_completa(
@@ -101,3 +127,69 @@ def test_agente_chama_a_tool_real_com_os_argumentos_da_llm() -> None:
     ]
     assert len(mensagens_de_tool) == 1
     assert "abaixo da meta de 80%" in mensagens_de_tool[0].content
+
+
+def test_criar_chat_model_sem_ai_provider_levanta_erro_claro(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.ai.agente.get_settings", lambda: _settings())
+
+    with pytest.raises(ValueError, match="AI_PROVIDER"):
+        criar_chat_model()
+
+
+def test_criar_chat_model_openai_sem_api_key_levanta_erro_claro(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.ai.agente.get_settings",
+        lambda: _settings(ai_provider="openai", openai_model="gpt-4o-mini"),
+    )
+
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        criar_chat_model()
+
+
+def test_criar_chat_model_openai_sem_model_levanta_erro_claro(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.ai.agente.get_settings",
+        lambda: _settings(ai_provider="openai", openai_api_key="sk-fake"),
+    )
+
+    with pytest.raises(ValueError, match="OPENAI_MODEL"):
+        criar_chat_model()
+
+
+def test_criar_chat_model_google_sem_api_key_levanta_erro_claro(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.ai.agente.get_settings",
+        lambda: _settings(ai_provider="google", google_model="gemini-2.5-flash"),
+    )
+
+    with pytest.raises(ValueError, match="GOOGLE_API_KEY"):
+        criar_chat_model()
+
+
+def test_criar_chat_model_google_sem_model_levanta_erro_claro(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "app.ai.agente.get_settings",
+        lambda: _settings(ai_provider="google", google_api_key="fake-key"),
+    )
+
+    with pytest.raises(ValueError, match="GOOGLE_MODEL"):
+        criar_chat_model()
+
+
+def test_criar_chat_model_provider_invalido_levanta_erro_claro(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("app.ai.agente.get_settings", lambda: _settings(ai_provider="azure"))
+
+    with pytest.raises(ValueError, match='"openai" ou "google"'):
+        criar_chat_model()
