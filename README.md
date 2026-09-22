@@ -97,6 +97,7 @@ Todos os endpoints abaixo (exceto `/health`) exigem o header `X-API-Key`, com o 
 | `/agenda/ocupacao` | GET | Ocupação de um dia, agregada por sala e por especialidade. |
 | `/agenda/chat` | POST | Envia uma mensagem ao agente de IA e devolve a resposta. Ver detalhes abaixo. |
 | `/agenda/chat/{conversa_id}` | GET | Histórico bruto de uma conversa (útil para depuração). |
+| `/relatorio/enviar` | POST | Envia por e-mail o relatório de ocupação de um dia (por sala e por especialidade). Ver detalhes abaixo. |
 
 ### `POST /agenda/chat`
 
@@ -126,6 +127,41 @@ Resposta:
 Conversas ficam **em memória** (perdidas num restart do processo) e expiram após um período
 de inatividade. Um `conversa_id` inexistente ou expirado devolve `404`; um erro inesperado ao
 rodar o agente (rede, modelo) devolve `502`, sem vazar detalhes internos na resposta.
+
+### `POST /relatorio/enviar`
+
+Corpo da requisição (ambos os campos opcionais):
+
+```json
+{
+  "data": null,
+  "destinatarios": null
+}
+```
+
+- `data`: omitida (ou `null`) para usar a data de hoje.
+- `destinatarios`: omitida para usar a lista padrão configurada em `REPORT_EMAIL_TO`; uma
+  lista explícita substitui esse padrão.
+
+O relatório contém **apenas a ocupação por sala/especialidade** (mesmo dado de
+`/agenda/ocupacao`) — sem lista de atendimentos aguardando autorização nem sugestões de
+desfragmentação, que ficam fora do escopo desta fase.
+
+Resposta:
+
+```json
+{
+  "enviado": true,
+  "destinatarios": ["coordenacao@suaclinica.com.br"]
+}
+```
+
+Falha no envio (Resend fora do ar, credencial inválida etc.) devolve `502`, sem detalhar o
+erro interno do Resend na resposta.
+
+O mesmo envio também pode ser disparado **por conversa com o agente** (`/agenda/chat`),
+através da tool `enviar_relatorio` — o agente só a aciona quando o pedido for claro e
+explícito (ex.: "manda o relatório de hoje").
 
 A documentação interativa completa (`/docs`) descreve o schema exato de cada endpoint,
 incluindo os campos de `/agenda/disponibilidade` e `/agenda/ocupacao`.

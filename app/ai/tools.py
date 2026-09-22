@@ -30,12 +30,14 @@ from app.ai.servico_agenda import (
     consultar_ocupacao_do_dia,
     sugerir_realocacao_por_id,
 )
+from app.config import get_settings
 from app.data_sources.base import ScheduleDataSource
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import DURACAO_SLOT_MINUTOS, Convenio, Especialidade, normalizar_id
 from app.domain.constants import HORARIO_PREFERENCIAL_PADRAO
 from app.engine.encaixe import CenarioSugestao, OpcaoEncaixe
 from app.engine.ocupacao import OcupacaoAgregada
+from app.reports.envio import enviar_relatorio_por_email
 
 _ROTULOS_CENARIO: dict[CenarioSugestao, str] = {
     CenarioSugestao.MELHOR_PARA_CLINICA: "Melhor opção para a agenda da clínica",
@@ -170,11 +172,32 @@ class ArgsSugerirRealocacao(BaseModel):
     )
 
 
-def criar_tools(fonte: ScheduleDataSource, continuidade: ContinuidadeDataSource) -> list[BaseTool]:
+class ArgsEnviarRelatorio(BaseModel):
+    data: date | None = Field(
+        default=None,
+        description=(
+            "Data do relatório, no formato AAAA-MM-DD. Deixe em branco para usar a data "
+            "de referência da conversa (hoje)."
+        ),
+    )
+    destinatarios: list[str] | None = Field(
+        default=None,
+        description=(
+            "Lista de e-mails destinatários. Deixe em branco para usar a lista padrão "
+            "já configurada na clínica."
+        ),
+    )
+
+
+def criar_tools(
+    fonte: ScheduleDataSource, continuidade: ContinuidadeDataSource, data_referencia: date
+) -> list[BaseTool]:
     """Tools do agente RealocAI, já fechadas sobre `fonte` e `continuidade`.
 
     A LLM nunca decide qual fonte de dados ou de continuidade usar — isso é
     fixado aqui, em código, no momento em que as tools são construídas.
+    `data_referencia` é a data "hoje" da conversa (ver `criar_agente`), usada
+    como padrão por `enviar_relatorio` quando a LLM não informar uma data.
     """
 
     @tool("buscar_paciente", args_schema=ArgsBuscarPaciente)
@@ -376,10 +399,35 @@ def criar_tools(fonte: ScheduleDataSource, continuidade: ContinuidadeDataSource)
             )
         return "Nova opção de horário:\n" + _formatar_opcao_encaixe(fonte, data, opcao)
 
+    @tool("enviar_relatorio", args_schema=ArgsEnviarRelatorio)
+    def enviar_relatorio_tool(
+        data: date | None = None, destinatarios: list[str] | None = None
+    ) -> str:
+        """Envia por e-mail o relatório de ocupação do dia (por sala e por especialidade).
+
+        Só use quando o pedido for claro e explícito sobre mandar o relatório
+        por e-mail (ex.: "manda o relatório de hoje"). Nunca aciona o envio
+        por conta própria, nem como parte de outra resposta.
+        """
+        data_efetiva = data if data is not None else data_referencia
+        try:
+            enviar_relatorio_por_email(fonte, data_efetiva, destinatarios)
+        except Exception as erro:
+            return f"Erro ao enviar relatório: {erro}"
+
+        destinatarios_efetivos = (
+            destinatarios if destinatarios is not None else get_settings().report_email_to
+        )
+        return (
+            f"Relatório de ocupação de {data_efetiva.strftime('%d/%m/%Y')} enviado para "
+            f"{len(destinatarios_efetivos)} destinatário(s)."
+        )
+
     return [
         buscar_paciente_tool,
         buscar_encaixe_tool,
         consultar_disponibilidade_tool,
         consultar_ocupacao_tool,
         sugerir_realocacao_tool,
+        enviar_relatorio_tool,
     ]

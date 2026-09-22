@@ -71,7 +71,7 @@ def criar_agente(
     produção é o resultado de `criar_chat_model()`; em teste, um chat model
     falso que não faz nenhuma chamada de rede (ver `tests/ai/test_agente.py`).
     """
-    tools = criar_tools(fonte, continuidade)
+    tools = criar_tools(fonte, continuidade, data_referencia)
     prompt = PROMPT_SISTEMA.format(
         data_referencia=data_referencia.strftime("%d/%m/%Y"),
         dia_da_semana=_DIAS_DA_SEMANA[data_referencia.weekday()],

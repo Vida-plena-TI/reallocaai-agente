@@ -6,13 +6,16 @@ Cada tool é chamada diretamente via `.invoke(...)` contra os dublês de
 
 from dataclasses import dataclass, field
 from datetime import date, time
+from typing import Any
 
+import pytest
 from langchain_core.tools import BaseTool
 
 from app.ai.tools import criar_tools
 from app.data_sources.base import EntradaGrade
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import Atendimento, Especialidade, Paciente, Profissional, Sala, Slot
+from app.reports.exceptions import ReportsEnvioError
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 
 DIA = date(2026, 9, 8)
@@ -34,9 +37,14 @@ def _continuidade_vazia() -> ContinuidadeDataSource:
 
 
 def _tool(
-    fonte: FakeScheduleDataSource, continuidade: ContinuidadeDataSource, nome: str
+    fonte: FakeScheduleDataSource,
+    continuidade: ContinuidadeDataSource,
+    nome: str,
+    data_referencia: date = DIA,
 ) -> BaseTool:
-    return next(item for item in criar_tools(fonte, continuidade) if item.name == nome)
+    return next(
+        item for item in criar_tools(fonte, continuidade, data_referencia) if item.name == nome
+    )
 
 
 def entrada(
@@ -287,3 +295,55 @@ def test_sugerir_realocacao_tool_sem_alternativa_disponivel() -> None:
     resultado = tool.invoke({"atendimento_id": "at-original", "data": "2026-09-08"})
 
     assert "Não há horário alternativo" in resultado
+
+
+# ---- enviar_relatorio ----
+
+
+def test_enviar_relatorio_tool_sucesso_confirma_quantidade_de_destinatarios(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chamadas: list[tuple[Any, date, list[str] | None]] = []
+    monkeypatch.setattr(
+        "app.ai.tools.enviar_relatorio_por_email",
+        lambda fonte, data, destinatarios: chamadas.append((fonte, data, destinatarios)),
+    )
+    origem = FakeScheduleDataSource()
+    tool = _tool(origem, _continuidade_vazia(), "enviar_relatorio")
+
+    resultado = tool.invoke({"destinatarios": ["a@b.com", "c@d.com"]})
+
+    assert "2" in resultado
+    assert len(chamadas) == 1
+    assert chamadas[0][2] == ["a@b.com", "c@d.com"]
+
+
+def test_enviar_relatorio_tool_sem_data_usa_data_de_referencia_da_conversa(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chamadas: list[tuple[Any, date, list[str] | None]] = []
+    monkeypatch.setattr(
+        "app.ai.tools.enviar_relatorio_por_email",
+        lambda fonte, data, destinatarios: chamadas.append((fonte, data, destinatarios)),
+    )
+    origem = FakeScheduleDataSource()
+    tool = _tool(origem, _continuidade_vazia(), "enviar_relatorio", data_referencia=DIA)
+
+    tool.invoke({})
+
+    assert chamadas[0][1] == DIA
+
+
+def test_enviar_relatorio_tool_erro_devolve_mensagem_clara(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _levanta_erro(fonte: Any, data: date, destinatarios: list[str] | None) -> None:
+        raise ReportsEnvioError("falha simulada")
+
+    monkeypatch.setattr("app.ai.tools.enviar_relatorio_por_email", _levanta_erro)
+    origem = FakeScheduleDataSource()
+    tool = _tool(origem, _continuidade_vazia(), "enviar_relatorio")
+
+    resultado = tool.invoke({})
+
+    assert "erro" in resultado.lower()

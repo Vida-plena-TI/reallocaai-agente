@@ -5,6 +5,8 @@ diretamente como resposta HTTP, para a API não quebrar toda vez que um
 detalhe interno do domínio mudar.
 """
 
+from datetime import date
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -75,3 +77,32 @@ class MensagemHistoricoResponse(BaseModel):
 
     papel: str
     conteudo: str
+
+
+class EnviarRelatorioRequest(BaseModel):
+    """Corpo de `POST /relatorio/enviar`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    data: date | None = Field(
+        default=None,
+        description="Data do relatório. Omitida (ou `null`) para usar a data de hoje.",
+    )
+    destinatarios: list[str] | None = Field(
+        default=None,
+        description=(
+            "Lista de e-mails destinatários. Omitida para usar a lista padrão "
+            "configurada em REPORT_EMAIL_TO."
+        ),
+    )
+
+
+class EnviarRelatorioResponse(BaseModel):
+    """Resposta de `POST /relatorio/enviar`."""
+
+    model_config = ConfigDict(frozen=True)
+
+    enviado: bool
+    destinatarios: list[str] = Field(
+        description="Destinatários efetivamente usados no envio, já resolvidos."
+    )
