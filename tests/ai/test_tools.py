@@ -11,15 +11,29 @@ from typing import Any
 import pytest
 from langchain_core.tools import BaseTool
 
-from app.ai.tools import criar_tools
-from app.data_sources.base import EntradaGrade
+from app.ai.tools import EnviarRelatorio, criar_tools
 from app.data_sources.continuidade import ContinuidadeDataSource
-from app.domain import Atendimento, Especialidade, Paciente, Profissional, Sala, Slot
+from app.domain import (
+    Atendimento,
+    EntradaGrade,
+    Especialidade,
+    Paciente,
+    Profissional,
+    Sala,
+    ScheduleDataSource,
+    Slot,
+)
 from app.reports.exceptions import ReportsEnvioError
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 
 DIA = date(2026, 9, 8)
 PACIENTE_UM = Paciente(id="paciente-um", nome="Paciente Um")
+
+
+def _enviar_relatorio_nao_usado(fonte: Any, data: date, destinatarios: list[str] | None) -> None:
+    """Padrão para testes que não exercitam a tool `enviar_relatorio`: chamar
+    isto é sempre um erro de teste, nunca um cenário esperado."""
+    raise AssertionError("enviar_relatorio não deveria ter sido chamado neste teste")
 
 
 @dataclass
@@ -37,13 +51,16 @@ def _continuidade_vazia() -> ContinuidadeDataSource:
 
 
 def _tool(
-    fonte: FakeScheduleDataSource,
+    fonte: ScheduleDataSource,
     continuidade: ContinuidadeDataSource,
     nome: str,
     data_referencia: date = DIA,
+    enviar_relatorio: EnviarRelatorio = _enviar_relatorio_nao_usado,
 ) -> BaseTool:
     return next(
-        item for item in criar_tools(fonte, continuidade, data_referencia) if item.name == nome
+        item
+        for item in criar_tools(fonte, continuidade, data_referencia, enviar_relatorio)
+        if item.name == nome
     )
 
 
@@ -211,6 +228,28 @@ def test_consultar_disponibilidade_tool_lista_horarios_livres() -> None:
     assert "Sala 1" in resultado
 
 
+def test_consultar_disponibilidade_tool_nao_mescla_slots_consecutivos() -> None:
+    """4 slots seguidos do mesmo profissional/sala saem um a um, nunca numa faixa só."""
+    horas = [time(7, 0), time(7, 30), time(8, 0), time(8, 30)]
+    origem = FakeScheduleDataSource(
+        salas={DIA: [Sala(id="sala-1", nome="Sala 1")]},
+        grade={
+            DIA: [entrada("sala-1", "prof-1", Especialidade.PSICOLOGIA, hora) for hora in horas]
+        },
+        profissionais={DIA: [profissional("prof-1", "Ana", Especialidade.PSICOLOGIA)]},
+    )
+    tool = _tool(origem, _continuidade_vazia(), "consultar_disponibilidade")
+
+    resultado = tool.invoke({"data": "2026-09-08"})
+
+    assert "07:00 às 07:30" in resultado
+    assert "07:30 às 08:00" in resultado
+    assert "08:00 às 08:30" in resultado
+    assert "08:30 às 09:00" in resultado
+    assert "07:00 às 08:30" not in resultado
+    assert "07:00 às 09:00" not in resultado
+
+
 def test_consultar_disponibilidade_tool_sem_resultado() -> None:
     origem = FakeScheduleDataSource()
     tool = _tool(origem, _continuidade_vazia(), "consultar_disponibilidade")
@@ -300,16 +339,17 @@ def test_sugerir_realocacao_tool_sem_alternativa_disponivel() -> None:
 # ---- enviar_relatorio ----
 
 
-def test_enviar_relatorio_tool_sucesso_confirma_quantidade_de_destinatarios(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_enviar_relatorio_tool_sucesso_confirma_quantidade_de_destinatarios() -> None:
     chamadas: list[tuple[Any, date, list[str] | None]] = []
-    monkeypatch.setattr(
-        "app.ai.tools.enviar_relatorio_por_email",
-        lambda fonte, data, destinatarios: chamadas.append((fonte, data, destinatarios)),
-    )
     origem = FakeScheduleDataSource()
-    tool = _tool(origem, _continuidade_vazia(), "enviar_relatorio")
+    tool = _tool(
+        origem,
+        _continuidade_vazia(),
+        "enviar_relatorio",
+        enviar_relatorio=lambda fonte, data, destinatarios: chamadas.append(
+            (fonte, data, destinatarios)
+        ),
+    )
 
     resultado = tool.invoke({"destinatarios": ["a@b.com", "c@d.com"]})
 
@@ -318,32 +358,96 @@ def test_enviar_relatorio_tool_sucesso_confirma_quantidade_de_destinatarios(
     assert chamadas[0][2] == ["a@b.com", "c@d.com"]
 
 
-def test_enviar_relatorio_tool_sem_data_usa_data_de_referencia_da_conversa(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_enviar_relatorio_tool_sem_data_usa_data_de_referencia_da_conversa() -> None:
     chamadas: list[tuple[Any, date, list[str] | None]] = []
-    monkeypatch.setattr(
-        "app.ai.tools.enviar_relatorio_por_email",
-        lambda fonte, data, destinatarios: chamadas.append((fonte, data, destinatarios)),
-    )
     origem = FakeScheduleDataSource()
-    tool = _tool(origem, _continuidade_vazia(), "enviar_relatorio", data_referencia=DIA)
+    tool = _tool(
+        origem,
+        _continuidade_vazia(),
+        "enviar_relatorio",
+        data_referencia=DIA,
+        enviar_relatorio=lambda fonte, data, destinatarios: chamadas.append(
+            (fonte, data, destinatarios)
+        ),
+    )
 
     tool.invoke({})
 
     assert chamadas[0][1] == DIA
 
 
-def test_enviar_relatorio_tool_erro_devolve_mensagem_clara(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_enviar_relatorio_tool_erro_devolve_mensagem_clara() -> None:
     def _levanta_erro(fonte: Any, data: date, destinatarios: list[str] | None) -> None:
         raise ReportsEnvioError("falha simulada")
 
-    monkeypatch.setattr("app.ai.tools.enviar_relatorio_por_email", _levanta_erro)
     origem = FakeScheduleDataSource()
-    tool = _tool(origem, _continuidade_vazia(), "enviar_relatorio")
+    tool = _tool(origem, _continuidade_vazia(), "enviar_relatorio", enviar_relatorio=_levanta_erro)
 
     resultado = tool.invoke({})
 
     assert "erro" in resultado.lower()
+
+
+# ---- erro inesperado da fonte de dados ----
+
+
+@dataclass
+class FonteQuebrada:
+    """`ScheduleDataSource` que sempre falha, só para provar que nenhuma tool
+    deixa uma exceção da camada de serviço subir e quebrar o turno da conversa."""
+
+    def listar_salas(self, dia: date) -> list[Sala]:
+        raise RuntimeError("falha simulada")
+
+    def listar_profissionais(self, dia: date) -> list[Profissional]:
+        raise RuntimeError("falha simulada")
+
+    def listar_grade(self, dia: date) -> list[EntradaGrade]:
+        raise RuntimeError("falha simulada")
+
+    def listar_atendimentos(self, dia: date) -> list[Atendimento]:
+        raise RuntimeError("falha simulada")
+
+    def listar_pacientes(self, dia: date) -> list[Paciente]:
+        raise RuntimeError("falha simulada")
+
+
+@pytest.mark.parametrize(
+    ("nome_tool", "args", "prefixo_esperado"),
+    [
+        (
+            "buscar_paciente",
+            {"nome_ou_id": "Paciente Um", "data": "2026-09-08"},
+            "Erro ao buscar paciente:",
+        ),
+        (
+            "buscar_encaixe",
+            {
+                "paciente": "Paciente Um",
+                "data": "2026-09-08",
+                "itens": [{"especialidade": "psicologia", "duracao_minutos": 30}],
+            },
+            "Erro ao buscar encaixe:",
+        ),
+        (
+            "consultar_disponibilidade",
+            {"data": "2026-09-08"},
+            "Erro ao consultar disponibilidade:",
+        ),
+        ("consultar_ocupacao", {"data": "2026-09-08"}, "Erro ao consultar ocupação:"),
+        (
+            "sugerir_realocacao",
+            {"atendimento_id": "at-1", "data": "2026-09-08"},
+            "Erro ao sugerir realocação:",
+        ),
+    ],
+)
+def test_tool_converte_excecao_inesperada_da_fonte_em_mensagem_de_erro(
+    nome_tool: str, args: dict[str, Any], prefixo_esperado: str
+) -> None:
+    tool = _tool(FonteQuebrada(), _continuidade_vazia(), nome_tool)
+
+    resultado = tool.invoke(args)
+
+    assert resultado.startswith(prefixo_esperado)
+    assert "falha simulada" in resultado

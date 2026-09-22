@@ -15,6 +15,7 @@ preenche via function calling. `create_agent` (Parte D) espera uma lista de
 """
 
 import math
+from collections.abc import Callable
 from datetime import date, time
 
 from langchain_core.tools import BaseTool, tool
@@ -31,13 +32,23 @@ from app.ai.servico_agenda import (
     sugerir_realocacao_por_id,
 )
 from app.config import get_settings
-from app.data_sources.base import ScheduleDataSource
 from app.data_sources.continuidade import ContinuidadeDataSource
-from app.domain import DURACAO_SLOT_MINUTOS, Convenio, Especialidade, normalizar_id
+from app.domain import (
+    DURACAO_SLOT_MINUTOS,
+    Convenio,
+    Especialidade,
+    ScheduleDataSource,
+    normalizar_id,
+)
 from app.domain.constants import HORARIO_PREFERENCIAL_PADRAO
 from app.engine.encaixe import CenarioSugestao, OpcaoEncaixe
 from app.engine.ocupacao import OcupacaoAgregada
-from app.reports.envio import enviar_relatorio_por_email
+
+#: Assinatura de `enviar_relatorio_por_email` (`app.reports.envio`), recebida
+#: como parâmetro em vez de importada direto: `app.ai` não pode depender de
+#: `app.reports` (ver `tests/test_arquitetura.py`), então quem monta as tools
+#: (a rota `/agenda/chat`) é quem decide qual implementação injetar.
+EnviarRelatorio = Callable[[ScheduleDataSource, date, list[str] | None], None]
 
 _ROTULOS_CENARIO: dict[CenarioSugestao, str] = {
     CenarioSugestao.MELHOR_PARA_CLINICA: "Melhor opção para a agenda da clínica",
@@ -190,14 +201,19 @@ class ArgsEnviarRelatorio(BaseModel):
 
 
 def criar_tools(
-    fonte: ScheduleDataSource, continuidade: ContinuidadeDataSource, data_referencia: date
+    fonte: ScheduleDataSource,
+    continuidade: ContinuidadeDataSource,
+    data_referencia: date,
+    enviar_relatorio: EnviarRelatorio,
 ) -> list[BaseTool]:
     """Tools do agente RealocAI, já fechadas sobre `fonte` e `continuidade`.
 
     A LLM nunca decide qual fonte de dados ou de continuidade usar — isso é
     fixado aqui, em código, no momento em que as tools são construídas.
     `data_referencia` é a data "hoje" da conversa (ver `criar_agente`), usada
-    como padrão por `enviar_relatorio` quando a LLM não informar uma data.
+    como padrão pela tool `enviar_relatorio` quando a LLM não informar uma
+    data. `enviar_relatorio` é a implementação de envio (em produção,
+    `enviar_relatorio_por_email`) — recebida de fora, nunca importada daqui.
     """
 
     @tool("buscar_paciente", args_schema=ArgsBuscarPaciente)
@@ -411,7 +427,7 @@ def criar_tools(
         """
         data_efetiva = data if data is not None else data_referencia
         try:
-            enviar_relatorio_por_email(fonte, data_efetiva, destinatarios)
+            enviar_relatorio(fonte, data_efetiva, destinatarios)
         except Exception as erro:
             return f"Erro ao enviar relatório: {erro}"
 

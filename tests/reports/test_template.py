@@ -7,8 +7,7 @@ aparecem nas duas versões geradas.
 
 from datetime import date, time
 
-from app.data_sources.base import EntradaGrade
-from app.domain import Atendimento, Especialidade, Profissional, Slot
+from app.domain import Atendimento, EntradaGrade, Especialidade, Profissional, Slot
 from app.engine.ocupacao import RelatorioOcupacaoDoDia, construir_relatorio_ocupacao_do_dia
 from app.reports.template import renderizar_relatorio
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource

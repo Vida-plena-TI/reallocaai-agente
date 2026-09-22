@@ -1,8 +1,13 @@
-"""Contrato da fonte de dados da agenda.
+"""Contrato de leitura da agenda.
 
-A engine e os relatórios enxergam a agenda por aqui — nunca pela planilha. Hoje
-existe uma implementação (`GoogleSheetsDataSource`), mas o `Protocol` mantém a
-porta aberta para trocar a origem dos dados sem tocar no resto do sistema.
+A engine, os relatórios e a IA enxergam a agenda por aqui — nunca pela
+planilha diretamente. Hoje existe uma implementação (`GoogleSheetsDataSource`,
+em `app.data_sources`), mas o `Protocol` mantém a porta aberta para trocar a
+origem dos dados sem tocar no resto do sistema. Mora em `app.domain` (não em
+`app.data_sources`, onde vivia até a Fase 8) porque é um contrato que a própria
+engine depende dele — colocá-lo na camada de infraestrutura obrigaria a engine
+a importar `app.data_sources`, invertendo a direção de dependência que o
+projeto quer manter.
 """
 
 from datetime import date
@@ -10,7 +15,9 @@ from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain import Atendimento, Especialidade, Paciente, Profissional, Sala, Slot
+from app.domain.entities import Atendimento, Paciente, Profissional, Sala
+from app.domain.enums import Especialidade
+from app.domain.slot import Slot
 
 
 class EntradaGrade(BaseModel):

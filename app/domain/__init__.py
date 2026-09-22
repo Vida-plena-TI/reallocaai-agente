@@ -34,6 +34,7 @@ from app.domain.exceptions import (
     SlotInvalidoError,
     SlotNaPausaError,
 )
+from app.domain.fonte_agenda import EntradaGrade, ScheduleDataSource
 from app.domain.normalizacao import normalizar_id
 from app.domain.slot import Slot
 
@@ -56,12 +57,14 @@ __all__ = [
     "AtendimentoEmDiasDiferentesError",
     "AtendimentoInvalidoError",
     "Convenio",
+    "EntradaGrade",
     "Especialidade",
     "ItemSolicitacao",
     "Paciente",
     "Profissional",
     "RealocAIDomainError",
     "Sala",
+    "ScheduleDataSource",
     "Slot",
     "SlotForaDoExpedienteError",
     "SlotForaDoGridError",

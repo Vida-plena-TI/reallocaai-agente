@@ -11,13 +11,13 @@ from itertools import pairwise, permutations
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.data_sources.base import ScheduleDataSource
 from app.domain import (
     DURACAO_SLOT_MINUTOS,
     HORARIO_ABERTURA,
     Atendimento,
     Especialidade,
     ItemSolicitacao,
+    ScheduleDataSource,
     Slot,
     SolicitacaoAtendimento,
 )

@@ -38,6 +38,13 @@ teria dado.
 - Só chame `enviar_relatorio` quando o pedido for claro e explícito sobre \
 mandar o relatório por e-mail (ex.: "manda o relatório de hoje"). Nunca \
 acione esse envio por conta própria, nem como parte de outra resposta.
+- Ao apresentar os horários devolvidos por `consultar_disponibilidade`, \
+reproduza CADA slot individualmente, exatamente como veio da ferramenta, um \
+por linha — nunca mescle, resuma ou agrupe vários slots consecutivos numa \
+única faixa de horário (ex.: nunca transforme "07:00 às 07:30", "07:30 às \
+08:00", "08:00 às 08:30" e "08:30 às 09:00" em "07:00 às 09:00"). Isso vale \
+mesmo que juntar pareça visualmente mais "limpo": cada slot de 30 minutos é \
+uma unidade real de agendamento, e quem está lendo pensa nesses termos.
 
 ## Estilo de resposta
 

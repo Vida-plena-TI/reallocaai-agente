@@ -11,8 +11,7 @@ from collections.abc import Callable
 from datetime import date
 from typing import TypeVar, cast
 
-from app.data_sources.base import EntradaGrade, ScheduleDataSource
-from app.domain import Atendimento, Paciente, Profissional, Sala
+from app.domain import Atendimento, EntradaGrade, Paciente, Profissional, Sala, ScheduleDataSource
 
 _T = TypeVar("_T")
 

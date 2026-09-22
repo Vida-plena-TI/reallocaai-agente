@@ -12,12 +12,12 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.data_sources.base import ScheduleDataSource
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import (
     Especialidade,
     ItemSolicitacao,
     Paciente,
+    ScheduleDataSource,
     SolicitacaoAtendimento,
     normalizar_id,
 )

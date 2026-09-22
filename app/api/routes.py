@@ -38,9 +38,8 @@ from app.api.schemas import (
 )
 from app.api.sessoes import ArmazenamentoConversas
 from app.config import Settings, get_settings
-from app.data_sources.base import ScheduleDataSource
 from app.data_sources.continuidade import ContinuidadeDataSource
-from app.domain import Especialidade
+from app.domain import Especialidade, ScheduleDataSource
 from app.engine.ocupacao import OcupacaoAgregada, RelatorioOcupacaoDoDia
 from app.reports.envio import enviar_relatorio_por_email
 from app.reports.exceptions import ReportsEnvioError
@@ -166,7 +165,13 @@ def conversar_com_agente(
         historico = []
         conversa_id = conversas.criar_conversa()
 
-    agente = criar_agente(fonte, continuidade, chat_model, data_referencia=date.today())
+    agente = criar_agente(
+        fonte,
+        continuidade,
+        chat_model,
+        data_referencia=date.today(),
+        enviar_relatorio=enviar_relatorio_por_email,
+    )
     try:
         resposta = perguntar(agente, [*historico, HumanMessage(corpo.mensagem)])
     except Exception as erro:

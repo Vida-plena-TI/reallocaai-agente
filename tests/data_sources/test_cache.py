@@ -5,9 +5,8 @@ from datetime import date
 
 import pytest
 
-from app.data_sources.base import EntradaGrade
 from app.data_sources.cache import CacheadoScheduleDataSource
-from app.domain import Atendimento, Paciente, Profissional, Sala
+from app.domain import Atendimento, EntradaGrade, Paciente, Profissional, Sala
 
 DIA = date(2026, 9, 8)
 OUTRO_DIA = date(2026, 9, 9)

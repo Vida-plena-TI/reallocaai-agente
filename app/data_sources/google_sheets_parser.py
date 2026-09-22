@@ -26,7 +26,6 @@ from typing import Final
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.data_sources.base import EntradaGrade
 from app.domain import (
     COR_AGUARDANDO_AUTORIZACAO,
     CORES_CONVENIO,
@@ -36,6 +35,7 @@ from app.domain import (
     PROFISSIONAIS_IGNORAR,
     Atendimento,
     Convenio,
+    EntradaGrade,
     Especialidade,
     Paciente,
     Profissional,

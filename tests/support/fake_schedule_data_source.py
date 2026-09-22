@@ -8,8 +8,7 @@ só a estrutura de dados que a engine espera.
 from dataclasses import dataclass, field
 from datetime import date
 
-from app.data_sources.base import EntradaGrade
-from app.domain import Atendimento, Paciente, Profissional, Sala
+from app.domain import Atendimento, EntradaGrade, Paciente, Profissional, Sala
 
 
 @dataclass

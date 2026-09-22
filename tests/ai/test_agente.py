@@ -20,13 +20,17 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.ai.agente import _extrair_texto_da_resposta, criar_agente, criar_chat_model, perguntar
 from app.config import Settings
-from app.data_sources.base import EntradaGrade
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
-from app.domain import Atendimento, Especialidade, Profissional, Slot
+from app.domain import Atendimento, EntradaGrade, Especialidade, Profissional, Slot
 from tests.support.fake_chat_model import FakeToolCallingChatModel
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 
 DIA = date(2026, 9, 8)
+
+
+def _enviar_relatorio_nao_usado(fonte: Any, data: date, destinatarios: list[str] | None) -> None:
+    """Nenhum teste deste arquivo exercita a tool `enviar_relatorio`."""
+    raise AssertionError("enviar_relatorio não deveria ter sido chamado neste teste")
 
 
 def _settings(**overrides: Any) -> Settings:
@@ -77,7 +81,7 @@ def test_perguntar_executa_o_ciclo_de_tool_call_e_retorna_o_texto_final() -> Non
         ]
     )
 
-    agente = criar_agente(origem, continuidade, fake_model, DIA)
+    agente = criar_agente(origem, continuidade, fake_model, DIA, _enviar_relatorio_nao_usado)
     resposta = perguntar(agente, [HumanMessage("Como está a ocupação hoje?")])
 
     assert resposta == "Não há nenhuma escala registrada para hoje."
@@ -161,7 +165,7 @@ def test_perguntar_com_content_estruturado_devolve_so_o_texto() -> None:
         ]
     )
 
-    agente = criar_agente(origem, continuidade, fake_model, DIA)
+    agente = criar_agente(origem, continuidade, fake_model, DIA, _enviar_relatorio_nao_usado)
     resposta = perguntar(agente, [HumanMessage("Como está a ocupação hoje?")])
 
     assert resposta == "Não há nenhuma escala registrada para hoje."
@@ -203,7 +207,7 @@ def test_agente_chama_a_tool_real_com_os_argumentos_da_llm() -> None:
         ]
     )
 
-    agente = criar_agente(origem, continuidade, fake_model, DIA)
+    agente = criar_agente(origem, continuidade, fake_model, DIA, _enviar_relatorio_nao_usado)
     resultado = agente.invoke({"messages": [HumanMessage("Como está a ocupação hoje?")]})
 
     mensagens_de_tool = [

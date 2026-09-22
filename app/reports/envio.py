@@ -14,7 +14,7 @@ from datetime import date
 import resend
 
 from app.config import exigir, get_settings
-from app.data_sources.base import ScheduleDataSource
+from app.domain import ScheduleDataSource
 from app.engine.ocupacao import construir_relatorio_ocupacao_do_dia
 from app.reports.exceptions import ReportsEnvioError
 from app.reports.template import renderizar_relatorio

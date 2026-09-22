@@ -4,8 +4,7 @@ from datetime import date, time
 
 from fastapi.testclient import TestClient
 
-from app.data_sources.base import EntradaGrade
-from app.domain import Atendimento, Especialidade, Profissional, Sala, Slot
+from app.domain import Atendimento, EntradaGrade, Especialidade, Profissional, Sala, Slot
 from tests.api.conftest import HEADERS_AUTENTICADOS
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 

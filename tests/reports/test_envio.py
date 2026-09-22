@@ -11,8 +11,7 @@ import pytest
 import resend
 
 from app.config import Settings
-from app.data_sources.base import EntradaGrade
-from app.domain import Especialidade, Profissional, Slot
+from app.domain import EntradaGrade, Especialidade, Profissional, Slot
 from app.reports.envio import enviar_relatorio_por_email
 from app.reports.exceptions import ReportsEnvioError
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource

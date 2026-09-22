@@ -29,10 +29,10 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
 
 from app.ai.prompts import PROMPT_SISTEMA
-from app.ai.tools import criar_tools
+from app.ai.tools import EnviarRelatorio, criar_tools
 from app.config import exigir, get_settings
-from app.data_sources.base import ScheduleDataSource
 from app.data_sources.continuidade import ContinuidadeDataSource
+from app.domain import ScheduleDataSource
 
 #: `create_agent` devolve um `CompiledStateGraph` parametrizado com tipos
 #: internos do LangGraph que não precisamos nomear aqui: usamos `Any` nos
@@ -90,14 +90,17 @@ def criar_agente(
     continuidade: ContinuidadeDataSource,
     chat_model: BaseChatModel,
     data_referencia: date,
+    enviar_relatorio: EnviarRelatorio,
 ) -> Agente:
     """Monta o agente RealocAI: tools da Parte B + prompt de sistema da Parte C.
 
     `chat_model` é sempre recebido de fora, nunca construído aqui — em
     produção é o resultado de `criar_chat_model()`; em teste, um chat model
     falso que não faz nenhuma chamada de rede (ver `tests/ai/test_agente.py`).
+    `enviar_relatorio` é repassado direto para `criar_tools` (ver lá o porquê
+    de não ser importado direto de `app.reports`).
     """
-    tools = criar_tools(fonte, continuidade, data_referencia)
+    tools = criar_tools(fonte, continuidade, data_referencia, enviar_relatorio)
     prompt = PROMPT_SISTEMA.format(
         data_referencia=data_referencia.strftime("%d/%m/%Y"),
         dia_da_semana=_DIAS_DA_SEMANA[data_referencia.weekday()],

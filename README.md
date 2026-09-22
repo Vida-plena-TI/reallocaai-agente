@@ -7,7 +7,23 @@ com **profissionais fixos por sala/dia/turno**. O RealocAI lê essa agenda, iden
 conflitos e oportunidades de remanejamento, e propõe alocações melhores — sempre respeitando as
 regras operacionais da clínica.
 
-> **Status:** bootstrap da estrutura. Ainda não há lógica de negócio implementada.
+## Estado do projeto
+
+Fases 1 a 8 concluídas:
+
+| Fase | Entrega |
+| --- | --- |
+| 1 | Estrutura inicial: esqueleto do projeto em camadas (`domain`/`engine`/`data_sources`/`ai`/`api`/`reports`) e configuração via `pydantic-settings`. |
+| 2 | Domínio: entidades e regras estáticas da clínica (`Sala`, `Profissional`, `Slot`, `Atendimento`, `Paciente`, validação do grid de 30 minutos). |
+| 3 | Fonte de dados: parser da planilha do Google Sheets (blocos, salas mescladas, convênio por cor, normalização de nomes) e o contrato de continuidade terapêutica. |
+| 4a | Motor de disponibilidade e ocupação (`listar_disponibilidade`, `construir_relatorio_ocupacao_do_dia`). |
+| 4b | Motor de encaixe casado e sugestão de realocação (`buscar_melhor_encaixe`, `buscar_alternativas`, `sugerir_realocacao`). |
+| 5a | Camada de serviço da agenda (`app/ai/servico_agenda.py`), ponte entre a engine e a IA. |
+| 5b | Agente LangChain e as tools que ele usa (`app/ai/agente.py`, `app/ai/tools.py`). |
+| 6a | Esqueleto da API HTTP: autenticação por `X-API-Key`, CORS, cache de leitura. |
+| 6b | Endpoint de conversa com o agente (`/agenda/chat`) e sessão em memória. |
+| 7 | Relatório de ocupação por e-mail via Resend. |
+| 8 | Cobertura de testes, teste de integração ponta a ponta, verificação automática das fronteiras arquiteturais (`tests/test_arquitetura.py`) e este fechamento da documentação. |
 
 ## Princípio central: IA sugere, o motor decide
 
@@ -55,7 +71,14 @@ data_sources ─┘
 ```
 
 O `domain` não importa nada das outras camadas. O `engine` não depende de `ai`, de `api` nem de
-`data_sources` — ele recebe dados já carregados e devolve decisões.
+`data_sources` — ele recebe dados já carregados e devolve decisões. O contrato de leitura da
+agenda (`ScheduleDataSource`/`EntradaGrade`) mora em `app/domain` (não em `app/data_sources`)
+justamente para isso — é a engine que depende dele, não o contrário.
+
+Essa direção de dependência, junto com o isolamento de bibliotecas externas por camada
+(`langchain*` só em `app/ai`, `fastapi`/`starlette` só em `app/api`, `gspread`/`google.auth`
+só em `app/data_sources`, `resend` só em `app/reports`), é verificada automaticamente por
+`tests/test_arquitetura.py`, com as poucas exceções aceitas documentadas ali mesmo.
 
 ## Requisitos
 
@@ -215,6 +238,27 @@ uv run ruff check .        # lint
 uv run ruff format .       # formatação
 uv run mypy                # checagem de tipos
 ```
+
+## Limitações conhecidas / próximos passos
+
+Decisões já tomadas ao longo do projeto, documentadas aqui para quem for planejar o que vem
+depois — nenhum destes pontos é um problema em aberto de "esqueceram de fazer":
+
+- **Continuidade terapêutica é um contrato trivial hoje.** `SemHistoricoContinuidadeDataSource`
+  (`app/data_sources/continuidade.py`) sempre devolve `None` — a integração real com o
+  Agendador/API Gateway fica para quando esse sistema estiver em produção.
+- **Realocação é sempre de um atendimento por vez.** `sugerir_realocacao` move um único
+  atendimento; reorganizar vários pacientes de uma vez para destravar espaço (realocação em
+  massa) não foi implementado.
+- **O relatório por e-mail cobre só ocupação por sala/especialidade.** Lista de atendimentos
+  aguardando autorização e sugestões de desfragmentação no relatório foram adiadas para uma
+  feature futura.
+- **A fonte de dados atual (Google Sheets) é temporária.** A migração para o Agendador via API
+  Gateway ainda depende da documentação dessa API estar disponível.
+- **O modelo de IA de produção ainda não foi decidido.** Enquanto isso, o projeto testa via
+  Google Gemini (tier gratuito) — ver [Provedores de IA](#provedores-de-ia-appai).
+- **Correspondência de paciente é por id normalizado exato, sem fuzzy matching.** Grafias
+  diferentes do mesmo paciente na planilha podem gerar registros distintos.
 
 ## Variáveis de ambiente
 

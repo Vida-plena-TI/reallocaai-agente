@@ -11,8 +11,7 @@ from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.data_sources.base import EntradaGrade, ScheduleDataSource
-from app.domain import Especialidade, Profissional
+from app.domain import EntradaGrade, Especialidade, Profissional, ScheduleDataSource
 from app.domain.constants import META_OCUPACAO_POR_SALA
 from app.domain.slot import Slot
 

@@ -2,9 +2,12 @@
 
 from datetime import date, time
 
-from app.data_sources.base import EntradaGrade
+import pytest
+from pydantic import ValidationError
+
 from app.domain import (
     Atendimento,
+    EntradaGrade,
     Especialidade,
     ItemSolicitacao,
     Profissional,
@@ -13,6 +16,7 @@ from app.domain import (
 )
 from app.engine.encaixe import (
     CenarioSugestao,
+    ItemEncaixeResolvido,
     _tentar_a_partir_de,
     buscar_alternativas,
     buscar_melhor_encaixe,
@@ -355,3 +359,105 @@ def test_sugerir_realocacao_retorna_none_sem_opcao_valida() -> None:
     )
 
     assert sugerir_realocacao(origem, original) is None
+
+
+def test_item_encaixe_resolvido_recusa_slots_de_dias_diferentes() -> None:
+    outro_dia = date(2026, 9, 9)
+
+    with pytest.raises(ValidationError, match="mesmo dia"):
+        ItemEncaixeResolvido(
+            especialidade=Especialidade.PSICOLOGIA,
+            profissional_id="prof-1",
+            sala_id="sala-1",
+            slots=[
+                Slot(data=DIA, hora_inicio=time(9, 0)),
+                Slot(data=outro_dia, hora_inicio=time(9, 30)),
+            ],
+        )
+
+
+def test_item_encaixe_resolvido_recusa_slots_nao_contiguos() -> None:
+    with pytest.raises(ValidationError, match="contíguos"):
+        ItemEncaixeResolvido(
+            especialidade=Especialidade.PSICOLOGIA,
+            profissional_id="prof-1",
+            sala_id="sala-1",
+            slots=[
+                Slot(data=DIA, hora_inicio=time(9, 0)),
+                Slot(data=DIA, hora_inicio=time(10, 0)),
+            ],
+        )
+
+
+def test_encaixe_casado_ignora_profissional_que_troca_de_sala_entre_slots() -> None:
+    """Mesmo profissional livre nos dois slots, mas em salas diferentes: não serve.
+
+    O item pede um bloco de 2 slots numa única sala — um profissional que só
+    cobre a duração inteira trocando de sala no meio não é candidato válido.
+    """
+    origem = FakeScheduleDataSource(
+        grade={
+            DIA: [
+                entrada("sala-1", "prof-1", Especialidade.FONOAUDIOLOGIA, time(9, 0)),
+                entrada("sala-2", "prof-1", Especialidade.FONOAUDIOLOGIA, time(9, 30)),
+            ]
+        },
+        profissionais={DIA: [profissional("prof-1", "Ana", Especialidade.FONOAUDIOLOGIA)]},
+    )
+    solicitacao = SolicitacaoAtendimento(
+        paciente_id="pac-1",
+        data=DIA,
+        itens=[ItemSolicitacao(especialidade=Especialidade.FONOAUDIOLOGIA, duracao_em_slots=2)],
+    )
+
+    assert buscar_melhor_encaixe(origem, solicitacao) is None
+
+
+def test_buscar_alternativas_sem_horario_desejado_retorna_lista_vazia() -> None:
+    origem = FakeScheduleDataSource(
+        grade={DIA: grade_completa("sala-1", "prof-1", Especialidade.PSICOLOGIA)},
+        profissionais={DIA: [profissional("prof-1", "Ana", Especialidade.PSICOLOGIA)]},
+    )
+    solicitacao = SolicitacaoAtendimento(
+        paciente_id="pac-1",
+        data=DIA,
+        itens=[ItemSolicitacao(especialidade=Especialidade.PSICOLOGIA, duracao_em_slots=1)],
+    )
+
+    assert buscar_alternativas(origem, solicitacao) == []
+
+
+def test_score_desfragmentacao_ignora_atendimento_excluido() -> None:
+    """Ao realocar um atendimento, o próprio atendimento não deve inflar o
+    score de desfragmentação de uma opção adjacente a ele."""
+    origem = FakeScheduleDataSource(
+        grade={
+            DIA: grade_completa(
+                "sala-1", "prof-1", Especialidade.FONOAUDIOLOGIA, excluir={time(9, 0)}
+            )
+        },
+        profissionais={DIA: [profissional("prof-1", "Ana", Especialidade.FONOAUDIOLOGIA)]},
+        atendimentos={
+            DIA: [
+                atendimento(
+                    "at-1", "prof-1", "sala-1", Especialidade.FONOAUDIOLOGIA, [time(13, 30)]
+                )
+            ]
+        },
+    )
+    solicitacao = SolicitacaoAtendimento(
+        paciente_id="pac-1",
+        data=DIA,
+        itens=[ItemSolicitacao(especialidade=Especialidade.FONOAUDIOLOGIA, duracao_em_slots=1)],
+        horario_desejado=time(9, 0),
+    )
+
+    # Sem exclusão, 13:00 venceria por encostar no atendimento das 13:30 (ver
+    # test_melhor_para_clinica_prefere_opcao_adjacente_a_atendimento_existente).
+    # Excluindo esse mesmo atendimento (caso de `sugerir_realocacao`), ele não
+    # deve mais contar como "ocupado" para efeito de score.
+    cenarios = buscar_alternativas(origem, solicitacao, excluir_atendimento_id="at-1")
+
+    melhor = next(c for c in cenarios if c.cenario is CenarioSugestao.MELHOR_PARA_CLINICA)
+    assert melhor.opcao.horario_inicio != time(13, 0)
+    assert melhor.opcao.horario_inicio == time(8, 0)

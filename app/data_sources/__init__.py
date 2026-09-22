@@ -1,6 +1,9 @@
-"""Fontes de dados da agenda: o contrato e a implementação sobre o Google Sheets."""
+"""Fontes de dados da agenda: a implementação sobre o Google Sheets.
 
-from app.data_sources.base import EntradaGrade, ScheduleDataSource
+O contrato (`ScheduleDataSource`/`EntradaGrade`) mora em `app.domain` (Fase 8):
+é a engine e os relatórios que dependem dele, não o contrário.
+"""
+
 from app.data_sources.continuidade import (
     ContinuidadeDataSource,
     SemHistoricoContinuidadeDataSource,
@@ -16,9 +19,7 @@ from app.data_sources.google_sheets_parser import (
 __all__ = [
     "ContinuidadeDataSource",
     "DadosAgendaDoDia",
-    "EntradaGrade",
     "GoogleSheetsDataSource",
-    "ScheduleDataSource",
     "SemHistoricoContinuidadeDataSource",
     "encontrar_titulo_da_aba",
     "nome_da_aba",

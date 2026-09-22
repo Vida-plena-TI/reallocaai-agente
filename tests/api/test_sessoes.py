@@ -40,6 +40,16 @@ def test_obter_historico_de_id_inexistente_retorna_none() -> None:
     assert armazenamento.obter_historico("id-que-nao-existe") is None
 
 
+def test_registrar_troca_em_conversa_inexistente_e_nao_op() -> None:
+    """Não-op silencioso: quem chama já garantiu a existência da conversa antes
+    de rodar o agente, mas ela pode ter expirado nesse meio-tempo."""
+    armazenamento = ArmazenamentoConversas()
+
+    armazenamento.registrar_troca("id-que-nao-existe", "Oi?", "Resposta")
+
+    assert armazenamento.obter_historico("id-que-nao-existe") is None
+
+
 def test_conversa_expirada_retorna_none_e_e_removida_do_armazenamento_interno(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

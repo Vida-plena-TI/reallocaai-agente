@@ -29,6 +29,7 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage  # noqa
 from app.ai.agente import criar_agente, criar_chat_model, perguntar  # noqa: E402
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource  # noqa: E402
 from app.data_sources.google_sheets import GoogleSheetsDataSource  # noqa: E402
+from app.reports.envio import enviar_relatorio_por_email  # noqa: E402
 
 
 def _data_referencia() -> date:
@@ -41,7 +42,9 @@ def main() -> None:
     data_referencia = _data_referencia()
     fonte = GoogleSheetsDataSource()
     continuidade = SemHistoricoContinuidadeDataSource()
-    agente = criar_agente(fonte, continuidade, criar_chat_model(), data_referencia)
+    agente = criar_agente(
+        fonte, continuidade, criar_chat_model(), data_referencia, enviar_relatorio_por_email
+    )
 
     print(f"RealocAI — conversa manual (referência: {data_referencia.strftime('%d/%m/%Y')})")
     print("Digite 'sair' para encerrar.\n")

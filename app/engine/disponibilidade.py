@@ -10,8 +10,7 @@ from datetime import date
 
 from pydantic import BaseModel, ConfigDict
 
-from app.data_sources.base import ScheduleDataSource
-from app.domain import Especialidade
+from app.domain import Especialidade, ScheduleDataSource
 from app.domain.slot import Slot
 
 

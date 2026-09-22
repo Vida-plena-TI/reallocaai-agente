@@ -2,8 +2,7 @@
 
 from datetime import date, time
 
-from app.data_sources.base import EntradaGrade
-from app.domain import Atendimento, Especialidade, Profissional
+from app.domain import Atendimento, EntradaGrade, Especialidade, Profissional
 from app.domain.slot import Slot
 from app.engine.disponibilidade import SlotDisponivel, listar_disponibilidade
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource

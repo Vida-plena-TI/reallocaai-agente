@@ -17,7 +17,6 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 from app.config import get_settings
-from app.data_sources.base import EntradaGrade
 from app.data_sources.google_sheets_parser import (
     DadosAgendaDoDia,
     encontrar_titulo_da_aba,
@@ -25,7 +24,7 @@ from app.data_sources.google_sheets_parser import (
     parse_worksheet_data,
     rotulo_da_coluna,
 )
-from app.domain import Atendimento, Paciente, Profissional, Sala
+from app.domain import Atendimento, EntradaGrade, Paciente, Profissional, Sala
 
 logger = logging.getLogger(__name__)
 

@@ -407,6 +407,106 @@ def test_duas_grafias_do_mesmo_profissional_viram_um_so(
     assert {entrada.sala_id for entrada in dados.grade} == {"sala-1", "sala-2"}
 
 
+def test_sala_do_mapa_de_fallback_com_nome_fora_do_formato_e_ignorada(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """O mapa de fallback é preenchido à mão: um valor torto não pode derrubar
+    o parser, só a coluna daquele profissional específico."""
+    monkeypatch.setitem(MAPA_SALA_FALLBACK, ("segunda", "jonas"), "Bloco B")
+
+    with caplog.at_level(logging.WARNING):
+        dados = analisar(COLUNAS_SEM_SALA_FICTICIA)
+
+    assert "jonas" not in {item.id for item in dados.profissionais}
+    assert "não está no formato 'Sala N'" in caplog.text
+
+
+def test_convenio_desconhecido_e_atualizado_quando_uma_ocorrencia_seguinte_tem_cor() -> None:
+    """O inverso de `test_convenio_ja_conhecido_nao_e_apagado_por_uma_celula_preta`:
+    paciente visto primeiro sem cor (convênio desconhecido) tem o convênio
+    preenchido assim que uma ocorrência seguinte traz a cor."""
+    aba = AbaFicticia(
+        valores=[
+            ["", "Sala 1", "Sala 2"],
+            ["", "Ivo (Fono)", "Jade (Fono)"],
+            ["09:00", "Paciente Um", ""],
+            ["09:30", "", "Paciente Um"],
+        ],
+        cores={"C4": "#0000FF"},
+    )
+
+    dados = analisar(aba)
+
+    [paciente] = dados.pacientes
+    assert paciente.convenio is Convenio.SULAMERICA
+
+
+def test_cabecalho_de_salas_sem_linhas_de_horario_depois_e_ignorado(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Cabeçalho de sala colado no fim da aba, sem espaço para a linha de
+    profissionais e ao menos uma linha de horário: o bloco é descartado, não o
+    parser inteiro."""
+    aba = AbaFicticia(valores=[["", "Sala 1"], ["", "Ivo (Fono)"]])
+
+    with caplog.at_level(logging.WARNING):
+        dados = analisar(aba)
+
+    assert dados == DadosAgendaDoDia()
+    assert "bloco ignorado" in caplog.text
+
+
+def test_intervalo_mesclado_fora_da_notacao_a1_e_ignorado_com_aviso(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    aba = AbaFicticia(
+        valores=[["", "Sala 1"], ["", "Ivo (Fono)"], ["09:00", "Paciente Um"]],
+        merges=["B2"],
+    )
+
+    with caplog.at_level(logging.WARNING):
+        dados = analisar(aba)
+
+    assert "Intervalo mesclado 'B2' não está em notação A1: ignorado." in caplog.text
+    # O resto do parsing segue normalmente: só o merge quebrado é descartado.
+    assert dados.salas[0].id == "sala-1"
+
+
+def test_linha_de_dados_mais_curta_que_o_cabecalho_e_tratada_como_celula_vazia() -> None:
+    """A API do Sheets omite células vazias no fim da linha: a coluna que
+    sobra numa linha mais curta não pode estourar índice, só valer vazio."""
+    aba = AbaFicticia(
+        valores=[
+            ["", "Sala 1", "Sala 2"],
+            ["", "Ivo (Fono)", "Jade (Fono)"],
+            ["09:00", "Paciente Um"],
+        ]
+    )
+
+    dados = analisar(aba)
+
+    assert atendimento_de(dados, "paciente-um") != []
+    assert time(9, 0) in horarios_na_grade(dados, "sala-2", "jade")
+
+
+def test_horario_fora_do_intervalo_valido_e_tratado_como_linha_sem_dados() -> None:
+    """`_PADRAO_HORA` aceita `\\d{1,2}:\\d{2}`, então `25:00` casa o regex mas
+    não é um horário válido — precisa ser descartado sem quebrar a aba."""
+    aba = AbaFicticia(
+        valores=[
+            ["", "Sala 1"],
+            ["", "Ivo (Fono)"],
+            ["25:00", "Paciente Um"],
+            ["09:00", "Paciente Dois"],
+        ]
+    )
+
+    dados = analisar(aba)
+
+    assert atendimento_de(dados, "paciente-um") == []
+    assert atendimento_de(dados, "paciente-dois") != []
+
+
 def test_sem_alias_as_duas_grafias_seriam_profissionais_diferentes() -> None:
     """Contraprova: é o mapa que junta as duas, não a normalização do nome."""
     dados = analisar(ALIAS_DE_PROFISSIONAL_FICTICIA)

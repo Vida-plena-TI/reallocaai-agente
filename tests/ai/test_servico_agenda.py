@@ -15,9 +15,8 @@ from app.ai.servico_agenda import (
     montar_solicitacao,
     sugerir_realocacao_por_id,
 )
-from app.data_sources.base import EntradaGrade
 from app.data_sources.continuidade import ContinuidadeDataSource
-from app.domain import Atendimento, Especialidade, Paciente, Profissional, Slot
+from app.domain import Atendimento, EntradaGrade, Especialidade, Paciente, Profissional, Slot
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 
 DIA = date(2026, 9, 8)

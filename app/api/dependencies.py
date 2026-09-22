@@ -19,8 +19,8 @@ from langchain_core.language_models import BaseChatModel
 from app.ai.agente import criar_chat_model
 from app.api.sessoes import ArmazenamentoConversas
 from app.config import Settings, exigir, get_settings
-from app.data_sources.base import ScheduleDataSource
 from app.data_sources.continuidade import ContinuidadeDataSource
+from app.domain import ScheduleDataSource
 
 #: Protege a construção do chat model contra dupla inicialização quando duas
 #: requisições concorrentes chegam antes da primeira terminar de construí-lo.

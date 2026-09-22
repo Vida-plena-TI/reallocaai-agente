@@ -4,8 +4,7 @@ from datetime import date, time
 
 import pytest
 
-from app.data_sources.base import EntradaGrade
-from app.domain import Atendimento, Especialidade, Profissional
+from app.domain import Atendimento, EntradaGrade, Especialidade, Profissional
 from app.domain.slot import Slot
 from app.engine.ocupacao import OcupacaoAgregada, construir_relatorio_ocupacao_do_dia
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
@@ -206,3 +205,19 @@ def test_atendimento_sem_grade_correspondente_gera_warning_e_conta_como_ocupado(
     por_sala = relatorio.por_sala()
     assert por_sala["sala-1"].slots_escalados == 1
     assert por_sala["sala-1"].slots_ocupados == 1
+
+
+def test_profissional_presente_so_na_grade_usa_id_e_especialidade_da_grade() -> None:
+    """Profissional escalado mas ausente de `listar_profissionais` (ex.: cadastro
+    incompleto na planilha): nome cai para o id e a especialidade vem da grade.
+    """
+    origem = FakeScheduleDataSource(
+        grade={DIA: [entrada("sala-1", "prof-sem-cadastro", Especialidade.PSICOLOGIA, time(9, 0))]},
+    )
+
+    relatorio = construir_relatorio_ocupacao_do_dia(origem, DIA)
+
+    [ocupacao] = relatorio.por_profissional
+    assert ocupacao.profissional_id == "prof-sem-cadastro"
+    assert ocupacao.nome == "prof-sem-cadastro"
+    assert ocupacao.especialidade is Especialidade.PSICOLOGIA
