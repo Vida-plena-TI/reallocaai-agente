@@ -37,6 +37,7 @@ from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import (
     DURACAO_SLOT_MINUTOS,
     Convenio,
+    EntradaGrade,
     Especialidade,
     ScheduleDataSource,
     Slot,
@@ -44,7 +45,7 @@ from app.domain import (
 )
 from app.domain.constants import HORARIO_PREFERENCIAL_PADRAO
 from app.engine.disponibilidade import SlotDisponivel
-from app.engine.encaixe import CenarioSugestao, OpcaoEncaixe
+from app.engine.encaixe import CenarioSugestao, ItemEncaixeResolvido, OpcaoEncaixe
 from app.engine.ocupacao import OcupacaoAgregada
 
 #: Assinatura de `enviar_relatorio_por_email` (`app.reports.envio`), recebida
@@ -109,13 +110,32 @@ def _resolver_profissional_id(fonte: ScheduleDataSource, dia: date, nome_ou_id: 
     return profissional.id if profissional is not None else None
 
 
+def _sufixo_posto_do_item(grade: list[EntradaGrade], item: ItemEncaixeResolvido) -> str:
+    """` (posto 2)` quando o profissional tem mais de um posto naquela sala nos
+    horários do item — mesma regra de `_sufixo_posto`; vazio sem ambiguidade.
+    """
+    slots_do_item = set(item.slots)
+    postos = {
+        entrada.indice_posto
+        for entrada in grade
+        if entrada.profissional_id == item.profissional_id
+        and entrada.sala_id == item.sala_id
+        and entrada.slot in slots_do_item
+    }
+    if len(postos) <= 1:
+        return ""
+    return f" (posto {item.indice_posto + 1})"
+
+
 def _formatar_opcao_encaixe(fonte: ScheduleDataSource, dia: date, opcao: OpcaoEncaixe) -> str:
+    grade = fonte.listar_grade(dia)
     linhas = [
         f"- {_rotulo_especialidade(item.especialidade)}: "
         f"{item.slots[0].hora_inicio.strftime('%H:%M')} às "
         f"{item.slots[-1].hora_fim.strftime('%H:%M')}, com "
         f"{_nome_profissional(fonte, dia, item.profissional_id)} na "
-        f"{_nome_sala(fonte, dia, item.sala_id)}."
+        f"{_nome_sala(fonte, dia, item.sala_id)}"
+        f"{_sufixo_posto_do_item(grade, item)}."
         for item in opcao.itens
     ]
     return "\n".join(linhas)

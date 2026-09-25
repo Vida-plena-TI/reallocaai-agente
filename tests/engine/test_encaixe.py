@@ -28,14 +28,18 @@ DIA = date(2026, 9, 8)
 
 
 def entrada(
-    sala_id: str, profissional_id: str, especialidade: Especialidade, hora: time
+    sala_id: str,
+    profissional_id: str,
+    especialidade: Especialidade,
+    hora: time,
+    indice_posto: int = 0,
 ) -> EntradaGrade:
     return EntradaGrade(
         sala_id=sala_id,
         profissional_id=profissional_id,
         especialidade=especialidade,
         slot=Slot(data=DIA, hora_inicio=hora),
-        indice_posto=0,
+        indice_posto=indice_posto,
     )
 
 
@@ -44,10 +48,11 @@ def grade_completa(
     profissional_id: str,
     especialidade: Especialidade,
     excluir: set[time] | None = None,
+    indice_posto: int = 0,
 ) -> list[EntradaGrade]:
     horarios_excluidos = excluir or set()
     return [
-        entrada(sala_id, profissional_id, especialidade, slot.hora_inicio)
+        entrada(sala_id, profissional_id, especialidade, slot.hora_inicio, indice_posto)
         for slot in Slot.slots_do_dia(DIA)
         if slot.hora_inicio not in horarios_excluidos
     ]
@@ -64,6 +69,7 @@ def atendimento(
     especialidade: Especialidade,
     horas: list[time],
     paciente_ids: list[str] | None = None,
+    indice_posto: int = 0,
 ) -> Atendimento:
     return Atendimento(
         id=id_,
@@ -72,6 +78,7 @@ def atendimento(
         sala_id=sala_id,
         especialidade=especialidade,
         slots=[Slot(data=DIA, hora_inicio=hora) for hora in horas],
+        indice_posto=indice_posto,
     )
 
 
@@ -370,6 +377,7 @@ def test_item_encaixe_resolvido_recusa_slots_de_dias_diferentes() -> None:
             especialidade=Especialidade.PSICOLOGIA,
             profissional_id="prof-1",
             sala_id="sala-1",
+            indice_posto=0,
             slots=[
                 Slot(data=DIA, hora_inicio=time(9, 0)),
                 Slot(data=outro_dia, hora_inicio=time(9, 30)),
@@ -383,6 +391,7 @@ def test_item_encaixe_resolvido_recusa_slots_nao_contiguos() -> None:
             especialidade=Especialidade.PSICOLOGIA,
             profissional_id="prof-1",
             sala_id="sala-1",
+            indice_posto=0,
             slots=[
                 Slot(data=DIA, hora_inicio=time(9, 0)),
                 Slot(data=DIA, hora_inicio=time(10, 0)),
@@ -462,3 +471,164 @@ def test_score_desfragmentacao_ignora_atendimento_excluido() -> None:
     melhor = next(c for c in cenarios if c.cenario is CenarioSugestao.MELHOR_PARA_CLINICA)
     assert melhor.opcao.horario_inicio != time(13, 0)
     assert melhor.opcao.horario_inicio == time(8, 0)
+
+
+# --- postos: o mesmo profissional em várias colunas da mesma sala ----------
+
+TO = Especialidade.TERAPIA_OCUPACIONAL
+
+
+def _solicitacao_de_to(
+    duracao_em_slots: int, horario_desejado: time | None = None
+) -> SolicitacaoAtendimento:
+    return SolicitacaoAtendimento(
+        paciente_id="pac-1",
+        data=DIA,
+        itens=[ItemSolicitacao(especialidade=TO, duracao_em_slots=duracao_em_slots)],
+        horario_minimo=time(7, 0),
+        horario_desejado=horario_desejado,
+    )
+
+
+def _helena() -> dict[date, list[Profissional]]:
+    return {DIA: [profissional("helena", "Helena", TO)]}
+
+
+def test_item_de_dois_slots_nao_mistura_postos_diferentes() -> None:
+    """Posto 0 livre só às 09:00 e posto 1 livre só às 09:30: juntos cobririam
+    uma hora, mas nenhum posto sozinho cobre — não há encaixe."""
+    origem = FakeScheduleDataSource(
+        grade={
+            DIA: [
+                entrada("sala-5", "helena", TO, time(9, 0), indice_posto=0),
+                entrada("sala-5", "helena", TO, time(9, 30), indice_posto=1),
+            ]
+        },
+        profissionais=_helena(),
+    )
+    solicitacao = _solicitacao_de_to(2)
+
+    assert _tentar_a_partir_de(origem, solicitacao, time(9, 0)) is None
+    assert buscar_melhor_encaixe(origem, solicitacao) is None
+
+
+def test_item_de_dois_slots_fica_no_posto_que_cobre_a_duracao_inteira() -> None:
+    """Mesmo cenário, com o posto 1 livre também às 09:00: só ele serve."""
+    origem = FakeScheduleDataSource(
+        grade={
+            DIA: [
+                entrada("sala-5", "helena", TO, time(9, 0), indice_posto=0),
+                entrada("sala-5", "helena", TO, time(9, 0), indice_posto=1),
+                entrada("sala-5", "helena", TO, time(9, 30), indice_posto=1),
+            ]
+        },
+        profissionais=_helena(),
+    )
+
+    opcao = buscar_melhor_encaixe(origem, _solicitacao_de_to(2))
+
+    assert opcao is not None
+    assert opcao.horario_inicio == time(9, 0)
+    assert opcao.itens[0].indice_posto == 1
+
+
+def test_varios_postos_livres_escolhe_sempre_o_menor() -> None:
+    """Desempate determinístico: com os três postos livres, sai o posto 0 em
+    toda execução, qualquer que seja a ordem da grade."""
+    grade = [
+        item
+        for posto in (2, 0, 1)
+        for item in grade_completa("sala-5", "helena", TO, indice_posto=posto)
+    ]
+
+    postos_escolhidos: set[int] = set()
+    for grade_da_vez in [grade, list(reversed(grade))] * 5:
+        origem = FakeScheduleDataSource(grade={DIA: grade_da_vez}, profissionais=_helena())
+        opcao = buscar_melhor_encaixe(origem, _solicitacao_de_to(2))
+        assert opcao is not None
+        postos_escolhidos.add(opcao.itens[0].indice_posto)
+
+    assert postos_escolhidos == {0}
+
+
+def test_posto_menor_ocupado_cede_para_o_proximo_livre() -> None:
+    origem = FakeScheduleDataSource(
+        grade={
+            DIA: [
+                *grade_completa("sala-5", "helena", TO, indice_posto=0),
+                *grade_completa("sala-5", "helena", TO, indice_posto=1),
+            ]
+        },
+        profissionais=_helena(),
+        atendimentos={
+            DIA: [atendimento("at-1", "helena", "sala-5", TO, [time(7, 30)], indice_posto=0)]
+        },
+    )
+
+    opcao = buscar_melhor_encaixe(origem, _solicitacao_de_to(2))
+
+    assert opcao is not None
+    assert opcao.horario_inicio == time(7, 0)
+    assert opcao.itens[0].indice_posto == 1
+
+
+def _melhor_para_clinica(indice_posto_do_vizinho: int) -> time:
+    """Horário escolhido como MELHOR_PARA_CLINICA com um atendimento às 13:30.
+
+    O posto 0 tem a grade toda (menos 09:00, o horário pedido); o posto 1 só
+    existe às 13:30, onde fica o atendimento vizinho quando ele é do posto 1.
+    """
+    origem = FakeScheduleDataSource(
+        grade={
+            DIA: [
+                *grade_completa("sala-5", "helena", TO, excluir={time(9, 0)}),
+                entrada("sala-5", "helena", TO, time(13, 30), indice_posto=1),
+            ]
+        },
+        profissionais=_helena(),
+        atendimentos={
+            DIA: [
+                atendimento(
+                    "at-1",
+                    "helena",
+                    "sala-5",
+                    TO,
+                    [time(13, 30)],
+                    indice_posto=indice_posto_do_vizinho,
+                )
+            ]
+        },
+    )
+
+    cenarios = buscar_alternativas(origem, _solicitacao_de_to(1, horario_desejado=time(9, 0)))
+    melhor = next(c for c in cenarios if c.cenario is CenarioSugestao.MELHOR_PARA_CLINICA)
+    return melhor.opcao.horario_inicio
+
+
+def test_desfragmentacao_conta_vizinho_do_mesmo_posto() -> None:
+    """Controle: com o vizinho no mesmo posto, 13:00 vence por encostar nele."""
+    assert _melhor_para_clinica(indice_posto_do_vizinho=0) == time(13, 0)
+
+
+def test_desfragmentacao_ignora_vizinho_de_outro_posto() -> None:
+    """O atendimento das 13:30 está no posto 1: a vaga das 13:00 no posto 0
+    continua isolada, então nenhuma opção pontua e vale o primeiro horário."""
+    assert _melhor_para_clinica(indice_posto_do_vizinho=1) == time(7, 0)
+
+
+def test_sala_de_capacidade_um_resolve_no_posto_zero() -> None:
+    origem = FakeScheduleDataSource(
+        grade={DIA: grade_completa("sala-1", "prof-1", Especialidade.FONOAUDIOLOGIA)},
+        profissionais={DIA: [profissional("prof-1", "Ana", Especialidade.FONOAUDIOLOGIA)]},
+    )
+    solicitacao = SolicitacaoAtendimento(
+        paciente_id="pac-1",
+        data=DIA,
+        itens=[ItemSolicitacao(especialidade=Especialidade.FONOAUDIOLOGIA, duracao_em_slots=2)],
+    )
+
+    opcao = buscar_melhor_encaixe(origem, solicitacao)
+
+    assert opcao is not None
+    assert opcao.horario_inicio == time(8, 0)
+    assert [(item.sala_id, item.indice_posto) for item in opcao.itens] == [("sala-1", 0)]

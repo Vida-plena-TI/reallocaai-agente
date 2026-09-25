@@ -160,6 +160,54 @@ def test_buscar_encaixe_tool_retorna_horario_exato_formatado() -> None:
     assert "Ana" in resultado
     assert "Sala 1" in resultado
     assert "Psicologia" in resultado
+    # Sala de posto único: o texto não muda com a introdução dos postos.
+    assert "- Psicologia: 10:00 às 11:00, com Ana na Sala 1." in resultado
+    assert "posto" not in resultado
+
+
+def test_buscar_encaixe_tool_indica_o_posto_em_sala_com_mais_de_um_posto_do_titular() -> None:
+    """Helena tem os postos 1 e 2 da Sala 5; o posto 1 está ocupado às 10:00,
+    então a sugestão cai no posto 2 — e o texto precisa dizer qual."""
+    origem = FakeScheduleDataSource(
+        pacientes={DIA: [PACIENTE_UM]},
+        salas={DIA: [Sala(id="sala-5", nome="Sala 5", capacidade_simultanea=2)]},
+        grade={
+            DIA: [
+                entrada(
+                    "sala-5", "helena", Especialidade.TERAPIA_OCUPACIONAL, slot.hora_inicio, posto
+                )
+                for posto in (0, 1)
+                for slot in Slot.slots_do_dia(DIA)
+            ]
+        },
+        profissionais={DIA: [profissional("helena", "Helena", Especialidade.TERAPIA_OCUPACIONAL)]},
+        atendimentos={
+            DIA: [
+                Atendimento(
+                    id="at-posto-1",
+                    paciente_ids=["pac-2"],
+                    profissional_id="helena",
+                    sala_id="sala-5",
+                    especialidade=Especialidade.TERAPIA_OCUPACIONAL,
+                    slots=[Slot(data=DIA, hora_inicio=time(10, 0))],
+                    indice_posto=0,
+                )
+            ]
+        },
+    )
+    tool = _tool(origem, _continuidade_vazia(), "buscar_encaixe")
+
+    resultado = tool.invoke(
+        {
+            "paciente": "Paciente Um",
+            "data": "2026-09-08",
+            "itens": [{"especialidade": "terapia_ocupacional", "duracao_minutos": 60}],
+            "horario_desejado": "10:00",
+        }
+    )
+
+    assert "Horário encontrado" in resultado
+    assert "- Terapia Ocupacional: 10:00 às 11:00, com Helena na Sala 5 (posto 2)." in resultado
 
 
 def test_buscar_encaixe_tool_retorna_alternativas_quando_nao_ha_vaga_exata() -> None:

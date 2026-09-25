@@ -26,13 +26,18 @@ from app.engine.disponibilidade import listar_disponibilidade
 
 
 class ItemEncaixeResolvido(BaseModel):
-    """Uma especialidade da solicitação já resolvida: profissional, sala e slots."""
+    """Uma especialidade da solicitação já resolvida: profissional, sala, posto e slots.
+
+    Todos os slots ficam no mesmo `indice_posto`: um atendimento não troca de
+    coluna da sala no meio.
+    """
 
     model_config = ConfigDict(frozen=True)
 
     especialidade: Especialidade
     profissional_id: str = Field(min_length=1)
     sala_id: str = Field(min_length=1)
+    indice_posto: int = Field(ge=0)
     slots: list[Slot] = Field(min_length=1)
 
     @field_validator("slots")
@@ -113,7 +118,8 @@ def _resolver_item(
     excluir_atendimento_id: str | None,
 ) -> ItemEncaixeResolvido | None:
     """Encontra um profissional que cubra `slots_necessarios` inteiros numa
-    única sala, respeitando `item.profissional_id` quando informado.
+    única sala e num único posto, respeitando `item.profissional_id` quando
+    informado.
     """
     disponiveis = listar_disponibilidade(
         fonte,
@@ -123,34 +129,32 @@ def _resolver_item(
         excluir_atendimento_id=excluir_atendimento_id,
     )
 
-    sala_por_slot: dict[str, dict[Slot, str]] = {}
+    # O posto entra na chave: o mesmo profissional titular em duas colunas da
+    # sala são duas agendas separadas, e os N slots precisam sair de uma só.
+    slots_livres_por_posto: dict[tuple[str, str, int], set[Slot]] = {}
     for disponivel in disponiveis:
-        sala_por_slot.setdefault(disponivel.profissional_id, {})[disponivel.slot] = (
-            disponivel.sala_id
-        )
+        chave = (disponivel.profissional_id, disponivel.sala_id, disponivel.indice_posto)
+        slots_livres_por_posto.setdefault(chave, set()).add(disponivel.slot)
 
-    candidatos: list[tuple[str, str]] = []
-    for profissional_id, salas_por_slot in sala_por_slot.items():
-        if not all(slot in salas_por_slot for slot in slots_necessarios):
-            continue
-        salas = {salas_por_slot[slot] for slot in slots_necessarios}
-        if len(salas) != 1:
-            continue
-        candidatos.append((profissional_id, next(iter(salas))))
-
+    candidatos = [
+        chave
+        for chave, livres in slots_livres_por_posto.items()
+        if all(slot in livres for slot in slots_necessarios)
+    ]
     if not candidatos:
         return None
 
     # Desempate simples e determinístico (não é regra de negócio, só torna o
-    # resultado reprodutível): entre os profissionais que cobrem os N slots
-    # inteiros, escolhe o de id lexicograficamente menor.
-    candidatos.sort(key=lambda candidato: candidato[0])
-    profissional_id, sala_id = candidatos[0]
+    # resultado reprodutível): entre os postos que cobrem os N slots inteiros,
+    # escolhe o profissional de id lexicograficamente menor e, dentro dele, o
+    # menor posto.
+    profissional_id, sala_id, indice_posto = min(candidatos)
 
     return ItemEncaixeResolvido(
         especialidade=item.especialidade,
         profissional_id=profissional_id,
         sala_id=sala_id,
+        indice_posto=indice_posto,
         slots=slots_necessarios,
     )
 
@@ -270,16 +274,25 @@ def _score_desfragmentacao(
     excluir_atendimento_id: str | None,
 ) -> int:
     """Quantos dos dois slots vizinhos da opção (o anterior ao primeiro item e
-    o posterior ao último, na mesma sala e profissional de cada um) já estão
+    o posterior ao último, no mesmo profissional, sala e posto de cada um) já estão
     ocupados por outro `Atendimento` do dia — quanto maior, mais a opção
     "encosta" em algo já ocupado em vez de deixar um buraco isolado.
     """
-    ocupados: set[tuple[str, str, Slot]] = set()
+    # Um atendimento em outro posto da mesma sala não encosta na opção: é
+    # outra coluna, e o buraco do posto da opção continua lá.
+    ocupados: set[tuple[str, str, int, Slot]] = set()
     for atendimento in fonte.listar_atendimentos(dia):
         if atendimento.id == excluir_atendimento_id:
             continue
         for slot in atendimento.slots:
-            ocupados.add((atendimento.profissional_id, atendimento.sala_id, slot))
+            ocupados.add(
+                (
+                    atendimento.profissional_id,
+                    atendimento.sala_id,
+                    atendimento.indice_posto,
+                    slot,
+                )
+            )
 
     score = 0
 
@@ -292,6 +305,7 @@ def _score_desfragmentacao(
         and (
             primeiro_item.profissional_id,
             primeiro_item.sala_id,
+            primeiro_item.indice_posto,
             slot_anterior,
         )
         in ocupados
@@ -305,6 +319,7 @@ def _score_desfragmentacao(
         and (
             ultimo_item.profissional_id,
             ultimo_item.sala_id,
+            ultimo_item.indice_posto,
             slot_posterior,
         )
         in ocupados
