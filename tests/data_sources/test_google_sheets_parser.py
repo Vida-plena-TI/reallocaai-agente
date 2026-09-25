@@ -23,15 +23,19 @@ from app.domain import (
     Convenio,
     Especialidade,
 )
+from app.engine.disponibilidade import listar_disponibilidade
 from tests.data_sources.fixtures import (
     ALIAS_DE_PROFISSIONAL_FICTICIA,
     COLUNAS_SEM_SALA_FICTICIA,
     ESPECIALIDADE_INVISIVEL_FICTICIA,
+    ESTAGIARIO_DIVIDE_COLUNA_FICTICIA,
+    POSTOS_DO_MESMO_TITULAR_FICTICIA,
     SEGUNDA_FICTICIA,
     TERCA_FICTICIA,
     AbaFicticia,
     aba_de_uma_celula,
 )
+from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 
 SEGUNDA = date(2026, 9, 7)
 TERCA = date(2026, 9, 8)
@@ -124,6 +128,23 @@ def test_estagiaria_e_descartada_ao_dividir_a_coluna(segunda: DadosAgendaDoDia) 
     assert "raissa" not in {item.id for item in segunda.profissionais}
 
 
+def test_estagiario_do_mapa_de_ignorados_some_da_coluna_dividida(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Mesmo mecanismo confirmado para a Raíssa real: qualquer nome em
+    `PROFISSIONAIS_IGNORAR` some da coluna dividida, sobrando só o titular."""
+    monkeypatch.setattr(
+        "app.data_sources.google_sheets_parser.PROFISSIONAIS_IGNORAR",
+        frozenset({"otavia"}),
+    )
+
+    dados = analisar(ESTAGIARIO_DIVIDE_COLUNA_FICTICIA)
+    nadia = next(item for item in dados.profissionais if item.id == "nadia")
+
+    assert nadia.especialidade is Especialidade.TERAPIA_OCUPACIONAL
+    assert "otavia" not in {item.id for item in dados.profissionais}
+
+
 def test_especialidade_e_reaproveitada_do_outro_bloco(segunda: DadosAgendaDoDia) -> None:
     """`Ana Beatriz` só aparece com `(Fono)` no bloco da manhã."""
     ana = next(item for item in segunda.profissionais if item.id == "ana-beatriz")
@@ -208,6 +229,109 @@ def test_sala_mesclada_atende_as_duas_colunas(segunda: DadosAgendaDoDia) -> None
     }
 
     assert profissionais_da_sala_3 == {"carla", "dora"}
+
+
+@pytest.fixture
+def postos(monkeypatch: pytest.MonkeyPatch) -> DadosAgendaDoDia:
+    monkeypatch.setattr(
+        "app.data_sources.google_sheets_parser.PROFISSIONAIS_IGNORAR",
+        frozenset({"iara", "joana"}),
+    )
+    return analisar(POSTOS_DO_MESMO_TITULAR_FICTICIA)
+
+
+def test_mesmo_titular_em_tres_colunas_vira_tres_postos_distintos(
+    postos: DadosAgendaDoDia,
+) -> None:
+    """Sem o posto, as três entradas das 09:00 seriam idênticas."""
+    entradas = [
+        entrada
+        for entrada in postos.grade
+        if entrada.sala_id == "sala-5" and entrada.slot.hora_inicio == time(9, 0)
+    ]
+
+    assert {entrada.profissional_id for entrada in entradas} == {"helena"}
+    assert sorted(entrada.indice_posto for entrada in entradas) == [0, 1, 2]
+
+
+def test_atendimento_leva_o_posto_da_coluna_de_origem(postos: DadosAgendaDoDia) -> None:
+    posto_por_paciente = {
+        paciente: atendimento_de(postos, paciente)[0].indice_posto
+        for paciente in ("paciente-um", "paciente-dois", "paciente-tres")
+    }
+
+    assert posto_por_paciente == {"paciente-um": 0, "paciente-dois": 1, "paciente-tres": 2}
+
+
+def test_sala_de_capacidade_um_fica_sempre_no_posto_zero(postos: DadosAgendaDoDia) -> None:
+    sala_6 = next(sala for sala in postos.salas if sala.id == "sala-6")
+
+    assert sala_6.capacidade_simultanea == 1
+    assert {entrada.indice_posto for entrada in postos.grade if entrada.sala_id == "sala-6"} == {0}
+    assert atendimento_de(postos, "paciente-quatro")[0].indice_posto == 0
+
+
+def test_postos_do_mesmo_titular_viram_vagas_distintas_na_disponibilidade(
+    postos: DadosAgendaDoDia,
+) -> None:
+    """Da aba à disponibilidade: às 09:30 o posto 0 segue com o Paciente Um e os
+    postos 1 e 2 estão livres — nenhum dos dois pode sumir por causa do posto 0."""
+    origem = FakeScheduleDataSource(
+        salas={SEGUNDA: postos.salas},
+        profissionais={SEGUNDA: postos.profissionais},
+        grade={SEGUNDA: postos.grade},
+        atendimentos={SEGUNDA: postos.atendimentos},
+    )
+
+    livres = [
+        (item.slot.hora_inicio, item.indice_posto)
+        for item in listar_disponibilidade(origem, SEGUNDA, sala_id="sala-5")
+    ]
+
+    assert livres == [(time(9, 30), 1), (time(9, 30), 2)]
+
+
+def test_coluna_que_herda_a_sala_do_outro_bloco_herda_tambem_o_posto() -> None:
+    """A tarde não repete o merge `B1:C1`: as colunas herdam sala e posto da manhã."""
+    aba = AbaFicticia(
+        valores=[
+            ["", "Sala 5", "", "Sala 9"],
+            ["", "Lia TO", "Lia TO", "Mel (Fono)"],
+            ["09:00", "", "", ""],
+            ["", "", "", "Sala 9"],
+            ["", "Lia TO", "Lia TO", "Mel (Fono)"],
+            ["13:00", "", "", ""],
+        ],
+        merges=["B1:C1"],
+    )
+
+    dados = analisar(aba)
+    postos_da_tarde = sorted(
+        entrada.indice_posto
+        for entrada in dados.grade
+        if entrada.sala_id == "sala-5" and entrada.slot.hora_inicio == time(13, 0)
+    )
+
+    assert postos_da_tarde == [0, 1]
+
+
+def test_coluna_resgatada_pelo_mapa_de_fallback_fica_no_posto_zero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(MAPA_SALA_FALLBACK, ("segunda", "jonas"), "Sala 12")
+
+    dados = analisar(COLUNAS_SEM_SALA_FICTICIA)
+
+    assert {entrada.indice_posto for entrada in dados.grade if entrada.sala_id == "sala-12"} == {0}
+
+
+def test_estagiaria_vitoria_e_descartada_ao_dividir_a_coluna() -> None:
+    """Mesmo padrão da Raíssa e do Marley, com o nome confirmado pela clínica."""
+    dados = analisar(
+        AbaFicticia(valores=[["", "Sala 1"], ["", "Bruno (TO)/Vitória"], ["09:00", ""]])
+    )
+
+    assert [item.id for item in dados.profissionais] == ["bruno"]
 
 
 # --- atendimentos -----------------------------------------------------------
@@ -348,6 +472,21 @@ def test_sala_do_mapa_de_fallback_resgata_coluna_sem_cabecalho(
     assert sala.capacidade_simultanea == 1
     assert time(9, 0) in horarios_na_grade(dados, "sala-12", "jonas")
     assert atendimento_de(dados, "paciente-dois")[0].sala_id == "sala-12"
+
+
+def test_sala_do_mapa_de_fallback_vale_por_aba(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A chave inclui o nome da aba: o mesmo mecanismo vale pra qualquer dia,
+    não só pra Segunda — é o que permite salas diferentes em dias diferentes
+    pro mesmo profissional."""
+    monkeypatch.setitem(MAPA_SALA_FALLBACK, ("terca", "jonas"), "Sala 12")
+
+    dados = analisar(COLUNAS_SEM_SALA_FICTICIA, TERCA)
+    sala = next(item for item in dados.salas if item.id == "sala-12")
+
+    assert sala.nome == "Sala 12"
+    assert time(9, 0) in horarios_na_grade(dados, "sala-12", "jonas")
 
 
 def test_coluna_sem_sala_fora_do_mapa_continua_sendo_pulada(

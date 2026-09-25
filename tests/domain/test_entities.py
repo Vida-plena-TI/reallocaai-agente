@@ -11,6 +11,7 @@ from app.domain import (
     AtendimentoComBuracoError,
     AtendimentoEmDiasDiferentesError,
     Convenio,
+    EntradaGrade,
     Especialidade,
     ItemSolicitacao,
     Paciente,
@@ -95,6 +96,43 @@ def test_atendimento_com_paciente_vazio_falha() -> None:
 
 def test_atendimento_nao_aguarda_autorizacao_por_padrao() -> None:
     assert atendimento([slot(time(9, 0))]).aguardando_autorizacao is False
+
+
+def test_atendimento_fica_no_posto_zero_por_padrao() -> None:
+    assert atendimento([slot(time(9, 0))]).indice_posto == 0
+
+
+def test_atendimento_com_posto_negativo_falha() -> None:
+    campos = atendimento([slot(time(9, 0))]).model_dump()
+
+    with pytest.raises(ValidationError):
+        Atendimento.model_validate({**campos, "indice_posto": -1})
+
+
+def entrada_de_grade(**campos: object) -> EntradaGrade:
+    return EntradaGrade.model_validate(
+        {
+            "sala_id": "sala-1",
+            "profissional_id": "prof-1",
+            "especialidade": Especialidade.FONOAUDIOLOGIA,
+            "slot": slot(time(9, 0)),
+            **campos,
+        }
+    )
+
+
+def test_entrada_de_grade_exige_o_posto() -> None:
+    with pytest.raises(ValidationError):
+        entrada_de_grade()
+
+
+def test_entrada_de_grade_com_posto_negativo_falha() -> None:
+    with pytest.raises(ValidationError):
+        entrada_de_grade(indice_posto=-1)
+
+
+def test_entradas_de_postos_diferentes_nao_sao_iguais() -> None:
+    assert entrada_de_grade(indice_posto=0) != entrada_de_grade(indice_posto=1)
 
 
 def test_atendimento_com_slots_contiguos_calcula_duracao() -> None:

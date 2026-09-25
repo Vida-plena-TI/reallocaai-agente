@@ -8,14 +8,18 @@ implementação específica.
 
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain import Especialidade, ScheduleDataSource
 from app.domain.slot import Slot
 
 
 class SlotDisponivel(BaseModel):
-    """Um horário livre: sala e profissional escalados, sem atendimento cobrindo."""
+    """Um horário livre: sala, posto e profissional escalados, sem atendimento cobrindo.
+
+    Dois `SlotDisponivel` com o mesmo horário, sala e profissional mas
+    `indice_posto` diferente são vagas distintas, não repetição.
+    """
 
     model_config = ConfigDict(frozen=True)
 
@@ -23,6 +27,7 @@ class SlotDisponivel(BaseModel):
     sala_id: str
     profissional_id: str
     especialidade: Especialidade
+    indice_posto: int = Field(ge=0)
 
 
 def listar_disponibilidade(
@@ -37,15 +42,18 @@ def listar_disponibilidade(
     """Horários livres do dia que casam com os filtros informados.
 
     "Livre" significa: existe uma entrada em `listar_grade` (profissional
-    escalado naquela sala+slot) e não existe nenhum `Atendimento` daquele
-    profissional cobrindo aquele slot. Um atendimento em grupo ocupa o slot
-    normalmente — não abre vaga extra por ter mais de um paciente.
+    escalado naquela sala+posto+slot) e não existe nenhum `Atendimento` do
+    mesmo profissional, na mesma sala e no mesmo posto cobrindo aquele slot. O
+    posto entra na chave porque o mesmo profissional titular pode ocupar várias
+    colunas de uma sala: um posto ocupado não esconde a vaga livre do outro. Um
+    atendimento em grupo ocupa o slot normalmente — não abre vaga extra por ter
+    mais de um paciente.
 
     `excluir_atendimento_id`, quando informado, ignora esse `Atendimento`
     específico ao calcular o que está ocupado — usado para buscar realocação
     de um atendimento sem que ele conflite consigo mesmo.
 
-    O resultado é ordenado por horário e depois por sala, de forma estável e
+    O resultado é ordenado por horário, sala e posto, de forma estável e
     sem nenhuma priorização (isso é Fase 4b).
     """
     grade = origem.listar_grade(dia)
@@ -55,16 +63,24 @@ def listar_disponibilidade(
         for profissional in origem.listar_profissionais(dia)
     }
 
-    slots_ocupados_por_profissional: dict[str, set[Slot]] = {}
+    ocupados: set[tuple[str, str, int, Slot]] = set()
     for atendimento in atendimentos:
         if atendimento.id == excluir_atendimento_id:
             continue
-        ocupados = slots_ocupados_por_profissional.setdefault(atendimento.profissional_id, set())
-        ocupados.update(atendimento.slots)
+        for slot_ocupado in atendimento.slots:
+            ocupados.add(
+                (
+                    atendimento.profissional_id,
+                    atendimento.sala_id,
+                    atendimento.indice_posto,
+                    slot_ocupado,
+                )
+            )
 
     disponiveis: list[SlotDisponivel] = []
     for entrada in grade:
-        if entrada.slot in slots_ocupados_por_profissional.get(entrada.profissional_id, set()):
+        chave = (entrada.profissional_id, entrada.sala_id, entrada.indice_posto, entrada.slot)
+        if chave in ocupados:
             continue
 
         especialidade_do_profissional = especialidade_por_profissional.get(
@@ -83,7 +99,11 @@ def listar_disponibilidade(
                 sala_id=entrada.sala_id,
                 profissional_id=entrada.profissional_id,
                 especialidade=especialidade_do_profissional,
+                indice_posto=entrada.indice_posto,
             )
         )
 
-    return sorted(disponiveis, key=lambda disponivel: (disponivel.slot, disponivel.sala_id))
+    return sorted(
+        disponiveis,
+        key=lambda disponivel: (disponivel.slot, disponivel.sala_id, disponivel.indice_posto),
+    )

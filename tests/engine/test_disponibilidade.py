@@ -15,13 +15,18 @@ def slot(hora: time) -> Slot:
 
 
 def entrada(
-    sala_id: str, profissional_id: str, especialidade: Especialidade, hora: time
+    sala_id: str,
+    profissional_id: str,
+    especialidade: Especialidade,
+    hora: time,
+    indice_posto: int = 0,
 ) -> EntradaGrade:
     return EntradaGrade(
         sala_id=sala_id,
         profissional_id=profissional_id,
         especialidade=especialidade,
         slot=slot(hora),
+        indice_posto=indice_posto,
     )
 
 
@@ -31,14 +36,16 @@ def atendimento(
     especialidade: Especialidade,
     hora: time,
     paciente_ids: list[str] | None = None,
+    indice_posto: int = 0,
 ) -> Atendimento:
     return Atendimento(
-        id=f"at-{profissional_id}-{hora}",
+        id=f"at-{profissional_id}-{hora}-{indice_posto}",
         paciente_ids=paciente_ids if paciente_ids is not None else ["pac-1"],
         profissional_id=profissional_id,
         sala_id=sala_id,
         especialidade=especialidade,
         slots=[slot(hora)],
+        indice_posto=indice_posto,
     )
 
 
@@ -62,6 +69,7 @@ def test_slot_escalado_sem_atendimento_esta_disponivel() -> None:
             sala_id="sala-1",
             profissional_id="prof-1",
             especialidade=Especialidade.FONOAUDIOLOGIA,
+            indice_posto=0,
         )
     ]
 
@@ -185,3 +193,51 @@ def test_resultado_ordenado_por_horario_e_depois_por_sala() -> None:
     disponiveis = listar_disponibilidade(origem, DIA)
 
     assert [d.sala_id for d in disponiveis] == ["sala-1", "sala-2"]
+
+
+# --- postos: o mesmo titular em várias colunas da mesma sala ---------------
+
+
+def _sala_de_tres_postos(atendimentos: list[Atendimento] | None = None) -> FakeScheduleDataSource:
+    """Sala 5 com a mesma TO titular nos três postos, às 09:00."""
+    return FakeScheduleDataSource(
+        grade={
+            DIA: [
+                entrada("sala-5", "helena", Especialidade.TERAPIA_OCUPACIONAL, time(9, 0), posto)
+                for posto in (0, 1, 2)
+            ]
+        },
+        profissionais={DIA: [profissional("helena", "Helena", Especialidade.TERAPIA_OCUPACIONAL)]},
+        atendimentos={DIA: atendimentos or []},
+    )
+
+
+def test_tres_postos_livres_do_mesmo_titular_sao_tres_vagas_distintas() -> None:
+    disponiveis = listar_disponibilidade(_sala_de_tres_postos(), DIA)
+
+    assert [(item.sala_id, item.profissional_id, item.indice_posto) for item in disponiveis] == [
+        ("sala-5", "helena", 0),
+        ("sala-5", "helena", 1),
+        ("sala-5", "helena", 2),
+    ]
+
+
+def test_posto_ocupado_nao_esconde_a_vaga_dos_outros_postos() -> None:
+    """O defeito latente: antes, o atendimento do posto 0 apagava os postos 1 e 2."""
+    origem = _sala_de_tres_postos(
+        [
+            atendimento(
+                "helena", "sala-5", Especialidade.TERAPIA_OCUPACIONAL, time(9, 0), indice_posto=0
+            )
+        ]
+    )
+
+    assert [item.indice_posto for item in listar_disponibilidade(origem, DIA)] == [1, 2]
+
+
+def test_atendimento_de_outra_sala_nao_ocupa_o_posto() -> None:
+    origem = _sala_de_tres_postos(
+        [atendimento("helena", "sala-9", Especialidade.TERAPIA_OCUPACIONAL, time(9, 0))]
+    )
+
+    assert [item.indice_posto for item in listar_disponibilidade(origem, DIA)] == [0, 1, 2]

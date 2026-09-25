@@ -121,6 +121,38 @@ ESPECIALIDADE_INVISIVEL_FICTICIA = AbaFicticia(
     ],
 )
 
+#: Aba com estagiário dividindo a coluna com o profissional titular — mesmo
+#: formato de `Bruno/Raissa` em `SEGUNDA_FICTICIA`, mas com dois nomes
+#: fictícios: nenhum dos dois está em `PROFISSIONAIS_IGNORAR` de produção, é o
+#: teste que estende o conjunto com o nome do estagiário, para exercitar o
+#: mecanismo sem depender de quem a clínica confirmou.
+ESTAGIARIO_DIVIDE_COLUNA_FICTICIA = AbaFicticia(
+    valores=[
+        ["", "Sala 1"],
+        ["", "Nadia/Otavia\nTO"],
+        ["09:00", "Paciente Um"],
+    ],
+)
+
+#: Aba com a mesma profissional titular nas três colunas de uma sala mesclada
+#: (`B1:D1`), cada coluna com uma estagiária diferente (ou nenhuma) — a forma da
+#: Sala 12 da quarta-feira real. Depois que as estagiárias são filtradas as três
+#: colunas viram o mesmo profissional, mas continuam sendo três postos: às 09:00
+#: cada posto tem um paciente diferente e às 09:30 só o posto 0 segue ocupado.
+#: A coluna E é uma sala comum, de capacidade 1, para comparação.
+#:
+#: Os nomes das estagiárias (`Iara`, `Joana`) não estão em
+#: `PROFISSIONAIS_IGNORAR` de produção: o teste estende o conjunto.
+POSTOS_DO_MESMO_TITULAR_FICTICIA = AbaFicticia(
+    valores=[
+        ["", "Sala 5", "", "", "Sala 6"],
+        ["", "Helena/Iara\nTO", "Helena TO", "Helena/Joana\nTO", "Kátia (Fono)"],
+        ["09:00", "Paciente Um", "Paciente Dois", "Paciente Três", "Paciente Quatro"],
+        ["09:30", "Paciente Um", "", "", ""],
+    ],
+    merges=["B1:D1"],
+)
+
 #: Aba com a mesma profissional escrita de duas formas em blocos diferentes
 #: (`Mirna Sousa` e `Mirna Souza`), como acontece na planilha real. Sem o
 #: `MAPA_ALIAS_PROFISSIONAL` ela viraria dois profissionais com metade da

@@ -60,6 +60,7 @@ def grade_completa(
             profissional_id=profissional_id,
             especialidade=especialidade,
             slot=slot,
+            indice_posto=0,
         )
         for slot in Slot.slots_do_dia(DIA)
     ]

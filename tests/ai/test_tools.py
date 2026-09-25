@@ -65,13 +65,18 @@ def _tool(
 
 
 def entrada(
-    sala_id: str, profissional_id: str, especialidade: Especialidade, hora: time
+    sala_id: str,
+    profissional_id: str,
+    especialidade: Especialidade,
+    hora: time,
+    indice_posto: int = 0,
 ) -> EntradaGrade:
     return EntradaGrade(
         sala_id=sala_id,
         profissional_id=profissional_id,
         especialidade=especialidade,
         slot=Slot(data=DIA, hora_inicio=hora),
+        indice_posto=indice_posto,
     )
 
 
@@ -248,6 +253,64 @@ def test_consultar_disponibilidade_tool_nao_mescla_slots_consecutivos() -> None:
     assert "08:30 às 09:00" in resultado
     assert "07:00 às 08:30" not in resultado
     assert "07:00 às 09:00" not in resultado
+
+
+def test_consultar_disponibilidade_tool_distingue_postos_do_mesmo_titular() -> None:
+    """Três colunas da mesma sala com a mesma titular são três vagas, não uma repetida."""
+    origem = FakeScheduleDataSource(
+        salas={DIA: [Sala(id="sala-5", nome="Sala 5", capacidade_simultanea=3)]},
+        grade={
+            DIA: [
+                entrada("sala-5", "helena", Especialidade.TERAPIA_OCUPACIONAL, time(9, 0), posto)
+                for posto in (0, 1, 2)
+            ]
+        },
+        profissionais={DIA: [profissional("helena", "Helena", Especialidade.TERAPIA_OCUPACIONAL)]},
+    )
+    tool = _tool(origem, _continuidade_vazia(), "consultar_disponibilidade")
+
+    resultado = tool.invoke({"data": "2026-09-08"})
+
+    for posto in (1, 2, 3):
+        assert (
+            f"09:00 às 09:30: Terapia Ocupacional com Helena na Sala 5 (posto {posto})."
+            in resultado
+        )
+
+
+def test_consultar_disponibilidade_tool_nao_cita_posto_sem_ambiguidade() -> None:
+    """Sala de capacidade 1 e sala mesclada com profissionais diferentes por
+    coluna saem como antes: o nome do profissional já distingue as vagas."""
+    origem = FakeScheduleDataSource(
+        salas={
+            DIA: [
+                Sala(id="sala-1", nome="Sala 1"),
+                Sala(id="sala-7", nome="Sala 7", capacidade_simultanea=2),
+            ]
+        },
+        grade={
+            DIA: [
+                entrada("sala-1", "prof-1", Especialidade.PSICOLOGIA, time(9, 0)),
+                entrada("sala-7", "bia", Especialidade.PSICOMOTRICIDADE, time(9, 0), 0),
+                entrada("sala-7", "lia", Especialidade.PSICOMOTRICIDADE, time(9, 0), 1),
+            ]
+        },
+        profissionais={
+            DIA: [
+                profissional("prof-1", "Ana", Especialidade.PSICOLOGIA),
+                profissional("bia", "Bia", Especialidade.PSICOMOTRICIDADE),
+                profissional("lia", "Lia", Especialidade.PSICOMOTRICIDADE),
+            ]
+        },
+    )
+    tool = _tool(origem, _continuidade_vazia(), "consultar_disponibilidade")
+
+    resultado = tool.invoke({"data": "2026-09-08"})
+
+    assert "09:00 às 09:30: Psicologia com Ana na Sala 1." in resultado
+    assert "Psicomotricidade com Bia na Sala 7." in resultado
+    assert "Psicomotricidade com Lia na Sala 7." in resultado
+    assert "posto" not in resultado
 
 
 def test_consultar_disponibilidade_tool_sem_resultado() -> None:

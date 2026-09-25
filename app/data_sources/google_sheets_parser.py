@@ -185,8 +185,8 @@ def parse_worksheet_data(
 
     coletor = _Coletor()
     for salas_do_bloco in salas_por_bloco:
-        for sala_do_cabecalho in salas_do_bloco.values():
-            coletor.registrar_sala(sala_do_cabecalho)
+        for posto_do_cabecalho in salas_do_bloco.values():
+            coletor.registrar_sala(posto_do_cabecalho.sala)
 
     # Horários vistos valem para a aba inteira: é assim que a linha 11:30
     # duplicada da quinta-feira é reduzida à primeira ocorrência.
@@ -199,8 +199,8 @@ def parse_worksheet_data(
     ):
         linhas_de_slot = _linhas_de_slot(raw_values, bloco, dia, linhas_por_horario)
         for coluna, analise in sorted(analises.items()):
-            sala = salas_do_bloco.get(coluna) or salas_do_dia.get(coluna)
-            if sala is None:
+            posto = salas_do_bloco.get(coluna) or salas_do_dia.get(coluna)
+            if posto is None:
                 sala = _sala_de_fallback(_normalizar(titulo_da_aba), analise.id)
                 if sala is None:
                     colunas_sem_sala.append(coluna)
@@ -221,6 +221,7 @@ def parse_worksheet_data(
                     sala.nome,
                 )
                 coletor.registrar_sala(sala)
+                posto = _Posto(sala=sala, indice=0)
 
             especialidade = (
                 analise.especialidade
@@ -246,7 +247,7 @@ def parse_worksheet_data(
                 raw_values=raw_values,
                 cores=cores,
                 coluna=coluna,
-                sala=sala,
+                posto=posto,
                 profissional=profissional,
                 linhas_de_slot=linhas_de_slot,
                 coletor=coletor,
@@ -302,6 +303,19 @@ class _Bloco:
     primeira_linha_de_dados: int
     #: Exclusivo, como em `range`.
     fim_das_linhas_de_dados: int
+
+
+@dataclass(frozen=True, slots=True)
+class _Posto:
+    """Onde uma coluna de agendamento cai: a sala e o posto dentro dela.
+
+    `indice` é a posição da coluna dentro do merge do cabeçalho, da esquerda
+    para a direita a partir de 0 — decidido só pela geometria da planilha,
+    nunca por quem está escalado na coluna.
+    """
+
+    sala: Sala
+    indice: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -388,7 +402,7 @@ def _extrair_coluna(
     raw_values: Sequence[Sequence[str]],
     cores: Mapping[str, str],
     coluna: int,
-    sala: Sala,
+    posto: _Posto,
     profissional: Profissional,
     linhas_de_slot: Sequence[tuple[int, Slot]],
     coletor: _Coletor,
@@ -398,7 +412,7 @@ def _extrair_coluna(
 
     def encerrar(sessao: _Sessao | None) -> None:
         if sessao is not None:
-            coletor.atendimentos.append(_montar_atendimento(dia, sessao, sala, profissional))
+            coletor.atendimentos.append(_montar_atendimento(dia, sessao, posto, profissional))
 
     for linha, slot in linhas_de_slot:
         endereco = _endereco_a1(linha, coluna)
@@ -413,10 +427,11 @@ def _extrair_coluna(
 
         coletor.grade.append(
             EntradaGrade(
-                sala_id=sala.id,
+                sala_id=posto.sala.id,
                 profissional_id=profissional.id,
                 especialidade=profissional.especialidade,
                 slot=slot,
+                indice_posto=posto.indice,
             )
         )
 
@@ -448,7 +463,7 @@ def _extrair_coluna(
 
 
 def _montar_atendimento(
-    dia: date, sessao: _Sessao, sala: Sala, profissional: Profissional
+    dia: date, sessao: _Sessao, posto: _Posto, profissional: Profissional
 ) -> Atendimento:
     """Monta o atendimento de uma sessão fechada.
 
@@ -459,10 +474,11 @@ def _montar_atendimento(
         id=f"{dia.isoformat()}-{sessao.primeira_celula}",
         paciente_ids=sessao.pacientes,
         profissional_id=profissional.id,
-        sala_id=sala.id,
+        sala_id=posto.sala.id,
         especialidade=profissional.especialidade,
         slots=sessao.slots,
         aguardando_autorizacao=sessao.aguardando_autorizacao,
+        indice_posto=posto.indice,
     )
 
 
@@ -505,13 +521,14 @@ def _salas_por_coluna(
     raw_values: Sequence[Sequence[str]],
     bloco: _Bloco,
     intervalos: Sequence[tuple[int, int, int, int]],
-) -> dict[int, Sala]:
-    """Mapeia cada coluna do bloco para a sala do cabeçalho que a cobre.
+) -> dict[int, _Posto]:
+    """Mapeia cada coluna do bloco para a sala do cabeçalho que a cobre e o
+    posto que ela representa dentro dessa sala.
 
     A capacidade simultânea sai do merge do cabeçalho: uma sala que ocupa três
-    colunas atende três pacientes ao mesmo tempo.
+    colunas atende três pacientes ao mesmo tempo, nos postos 0, 1 e 2.
     """
-    salas: dict[int, Sala] = {}
+    salas: dict[int, _Posto] = {}
     linha = bloco.linha_das_salas
     largura = len(raw_values[linha]) if linha < len(raw_values) else 0
     for coluna in range(largura):
@@ -526,16 +543,18 @@ def _salas_por_coluna(
             capacidade_simultanea=limite - primeira,
         )
         for coberta in range(primeira, limite):
-            salas[coberta] = sala
+            salas[coberta] = _Posto(sala=sala, indice=coberta - primeira)
     return salas
 
 
-def _salas_por_coluna_no_dia(salas_por_bloco: Sequence[Mapping[int, Sala]]) -> dict[int, Sala]:
-    """Une o mapa coluna -> sala de todos os blocos; o primeiro bloco decide."""
-    unificado: dict[int, Sala] = {}
+def _salas_por_coluna_no_dia(
+    salas_por_bloco: Sequence[Mapping[int, _Posto]],
+) -> dict[int, _Posto]:
+    """Une o mapa coluna -> posto de todos os blocos; o primeiro bloco decide."""
+    unificado: dict[int, _Posto] = {}
     for salas_do_bloco in salas_por_bloco:
-        for coluna, sala in salas_do_bloco.items():
-            unificado.setdefault(coluna, sala)
+        for coluna, posto in salas_do_bloco.items():
+            unificado.setdefault(coluna, posto)
     return unificado
 
 

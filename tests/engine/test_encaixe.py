@@ -35,6 +35,7 @@ def entrada(
         profissional_id=profissional_id,
         especialidade=especialidade,
         slot=Slot(data=DIA, hora_inicio=hora),
+        indice_posto=0,
     )
 
 

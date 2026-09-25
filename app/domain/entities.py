@@ -83,6 +83,9 @@ class Atendimento(BaseModel):
     #: O encaixe já está na agenda, mas ainda depende da confirmação do
     #: responsável (plano de saúde ou família).
     aguardando_autorizacao: bool = False
+    #: Posto (coluna) da sala onde o atendimento acontece — ver `EntradaGrade`.
+    #: 0 cobre a sala de capacidade 1, que é o caso comum.
+    indice_posto: int = Field(default=0, ge=0)
 
     @field_validator("slots")
     @classmethod

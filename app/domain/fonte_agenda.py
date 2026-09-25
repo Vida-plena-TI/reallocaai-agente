@@ -26,6 +26,12 @@ class EntradaGrade(BaseModel):
     É a oferta, não a ocupação: a entrada existe porque aquele profissional está
     escalado naquela sala naquele slot, esteja ela livre ou já com paciente. O
     que **não** existe são os slots marcados como `FECHADO` na planilha.
+
+    `indice_posto` identifica o posto — cada coluna independente dentro da
+    sala, o mesmo conceito do Agendador — da esquerda para a direita, a partir
+    de 0. Sala de capacidade 1 só tem o posto 0. Sem ele, duas colunas da mesma
+    sala com o mesmo profissional titular (estagiárias diferentes filtradas)
+    viram entradas indistinguíveis, embora sejam vagas reais distintas.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -34,6 +40,7 @@ class EntradaGrade(BaseModel):
     profissional_id: str = Field(min_length=1)
     especialidade: Especialidade
     slot: Slot
+    indice_posto: int = Field(ge=0)
 
 
 class ScheduleDataSource(Protocol):

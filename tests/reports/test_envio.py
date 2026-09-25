@@ -28,6 +28,7 @@ def _fonte_com_escala() -> FakeScheduleDataSource:
                     profissional_id="prof-1",
                     especialidade=Especialidade.PSICOLOGIA,
                     slot=Slot(data=DIA, hora_inicio=time(8, 0)),
+                    indice_posto=0,
                 )
             ]
         },

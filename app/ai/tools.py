@@ -15,6 +15,7 @@ preenche via function calling. `create_agent` (Parte D) espera uma lista de
 """
 
 import math
+from collections import Counter
 from collections.abc import Callable
 from datetime import date, time
 
@@ -38,9 +39,11 @@ from app.domain import (
     Convenio,
     Especialidade,
     ScheduleDataSource,
+    Slot,
     normalizar_id,
 )
 from app.domain.constants import HORARIO_PREFERENCIAL_PADRAO
+from app.engine.disponibilidade import SlotDisponivel
 from app.engine.encaixe import CenarioSugestao, OpcaoEncaixe
 from app.engine.ocupacao import OcupacaoAgregada
 
@@ -74,6 +77,23 @@ def _nome_profissional(fonte: ScheduleDataSource, dia: date, profissional_id: st
         (item for item in fonte.listar_profissionais(dia) if item.id == profissional_id), None
     )
     return profissional.nome if profissional is not None else profissional_id
+
+
+def _chave_sem_posto(disponivel: SlotDisponivel) -> tuple[Slot, str, str]:
+    """Horário, sala e profissional de uma vaga — tudo menos o posto."""
+    return disponivel.slot, disponivel.sala_id, disponivel.profissional_id
+
+
+def _sufixo_posto(
+    disponivel: SlotDisponivel, vagas_por_chave: Counter[tuple[Slot, str, str]]
+) -> str:
+    """` (posto 2)` quando a vaga divide horário, sala e profissional com outra;
+    vazio quando não há ambiguidade. O posto é contado a partir de 1 no texto,
+    que é como uma pessoa lê as colunas da sala.
+    """
+    if vagas_por_chave[_chave_sem_posto(disponivel)] <= 1:
+        return ""
+    return f" (posto {disponivel.indice_posto + 1})"
 
 
 def _nome_sala(fonte: ScheduleDataSource, dia: date, sala_id: str) -> str:
@@ -337,12 +357,17 @@ def criar_tools(
                 "filtros informados."
             )
 
+        # Mesmo horário, sala e profissional em mais de um posto são vagas
+        # distintas (colunas diferentes da sala); sem o posto no texto elas
+        # pareceriam a mesma linha repetida.
+        vagas_por_chave = Counter(_chave_sem_posto(disponivel) for disponivel in disponiveis)
         linhas = [
             f"- {disponivel.slot.hora_inicio.strftime('%H:%M')} às "
             f"{disponivel.slot.hora_fim.strftime('%H:%M')}: "
             f"{_rotulo_especialidade(disponivel.especialidade)} com "
             f"{_nome_profissional(fonte, data, disponivel.profissional_id)} na "
-            f"{_nome_sala(fonte, data, disponivel.sala_id)}."
+            f"{_nome_sala(fonte, data, disponivel.sala_id)}"
+            f"{_sufixo_posto(disponivel, vagas_por_chave)}."
             for disponivel in disponiveis
         ]
         return f"Horários livres em {data.strftime('%d/%m/%Y')}:\n" + "\n".join(linhas)

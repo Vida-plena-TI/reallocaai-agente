@@ -55,7 +55,7 @@ COR_AGUARDANDO_AUTORIZACAO: Final[str] = "#000000"
 #: Estagiários que dividem a coluna com o profissional responsável (`Aline/Raíssa`).
 #: Eles não são profissionais alocáveis: a comparação é sempre feita com o nome
 #: normalizado (minúsculo e sem acento).
-PROFISSIONAIS_IGNORAR: Final[frozenset[str]] = frozenset({"raissa"})
+PROFISSIONAIS_IGNORAR: Final[frozenset[str]] = frozenset({"raissa", "marley", "vitoria"})
 
 #: Sala de colunas cujo cabeçalho de merge veio vazio na planilha.
 #:
@@ -70,6 +70,7 @@ PROFISSIONAIS_IGNORAR: Final[frozenset[str]] = frozenset({"raissa"})
 MAPA_SALA_FALLBACK: Final[dict[tuple[str, str], str]] = {
     ("segunda", "aline"): "Sala 12",
     ("terca", "sophia"): "Sala 2",
+    ("terca", "rossana"): "Sala 12",
 }
 
 #: Especialidade de quem nunca aparece com ela escrita na planilha.

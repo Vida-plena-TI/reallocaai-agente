@@ -24,6 +24,7 @@ def _relatorio_com_sala_abaixo_da_meta() -> RelatorioOcupacaoDoDia:
                     profissional_id="prof-1",
                     especialidade=Especialidade.PSICOLOGIA,
                     slot=Slot(data=DIA, hora_inicio=hora),
+                    indice_posto=0,
                 )
                 for hora in (time(8, 0), time(8, 30))
             ]
