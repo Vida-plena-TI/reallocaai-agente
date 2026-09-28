@@ -29,7 +29,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
 
 from app.ai.prompts import PROMPT_SISTEMA
-from app.ai.tools import EnviarRelatorio, criar_tools
+from app.ai.tools import DIAS_DA_SEMANA, EnviarRelatorio, criar_tools
 from app.config import exigir, get_settings
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import ScheduleDataSource
@@ -39,16 +39,6 @@ from app.domain import ScheduleDataSource
 #: quatro parâmetros genéricos (estado, contexto, entrada, saída) porque só
 #: chamamos `.invoke` sobre ele, nunca inspecionamos esses tipos.
 Agente = CompiledStateGraph[Any, Any, Any, Any]
-
-_DIAS_DA_SEMANA = (
-    "segunda-feira",
-    "terça-feira",
-    "quarta-feira",
-    "quinta-feira",
-    "sexta-feira",
-    "sábado",
-    "domingo",
-)
 
 
 def criar_chat_model() -> BaseChatModel:
@@ -103,7 +93,7 @@ def criar_agente(
     tools = criar_tools(fonte, continuidade, data_referencia, enviar_relatorio)
     prompt = PROMPT_SISTEMA.format(
         data_referencia=data_referencia.strftime("%d/%m/%Y"),
-        dia_da_semana=_DIAS_DA_SEMANA[data_referencia.weekday()],
+        dia_da_semana=DIAS_DA_SEMANA[data_referencia.weekday()],
     )
     return create_agent(model=chat_model, tools=tools, system_prompt=prompt)
 

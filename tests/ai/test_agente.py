@@ -19,6 +19,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.ai.agente import _extrair_texto_da_resposta, criar_agente, criar_chat_model, perguntar
+from app.ai.prompts import PROMPT_SISTEMA
 from app.config import Settings
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
 from app.domain import Atendimento, EntradaGrade, Especialidade, Profissional, Slot
@@ -282,3 +283,55 @@ def test_criar_chat_model_provider_invalido_levanta_erro_claro(
 
     with pytest.raises(ValueError, match='"openai" ou "google"'):
         criar_chat_model()
+
+
+def test_encaixe_com_paciente_fora_da_agenda_termina_com_resposta_final() -> None:
+    """Paciente sem atendimento no dia não interrompe o encaixe: a tool devolve
+    a vaga (com a observação informativa) e o ciclo chega à resposta final."""
+    ana = Profissional(id="prof-1", nome="Ana", especialidade=Especialidade.PSICOLOGIA)
+    origem = FakeScheduleDataSource(
+        grade={DIA: grade_completa("sala-1", "prof-1", Especialidade.PSICOLOGIA)},
+        profissionais={DIA: [ana]},
+    )
+    continuidade = SemHistoricoContinuidadeDataSource()
+
+    fake_model = FakeToolCallingChatModel(
+        responses=[
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "buscar_encaixe",
+                        "args": {
+                            "paciente": "Maria Nova",
+                            "data": "2026-09-08",
+                            "itens": [{"especialidade": "psicologia", "duracao_minutos": 60}],
+                            "horario_desejado": "10:00",
+                        },
+                        "id": "call-1",
+                    }
+                ],
+            ),
+            AIMessage(content="Dá para encaixar Maria Nova às 10:00 com Ana."),
+        ]
+    )
+
+    agente = criar_agente(origem, continuidade, fake_model, DIA, _enviar_relatorio_nao_usado)
+    resultado = agente.invoke(
+        {"messages": [HumanMessage("Consigo encaixar a Maria Nova em psicologia às 10h?")]}
+    )
+
+    mensagens_de_tool = [
+        mensagem for mensagem in resultado["messages"] if isinstance(mensagem, ToolMessage)
+    ]
+    assert len(mensagens_de_tool) == 1
+    assert "Horário encontrado" in mensagens_de_tool[0].content
+    assert "não tem atendimentos na agenda" in mensagens_de_tool[0].content
+    assert resultado["messages"][-1].content == "Dá para encaixar Maria Nova às 10:00 com Ana."
+
+
+def test_prompt_de_sistema_diz_que_nao_existe_cadastro_de_pacientes() -> None:
+    prompt = PROMPT_SISTEMA.format(data_referencia="08/09/2026", dia_da_semana="terça-feira")
+
+    assert "Não existe cadastro de pacientes" in prompt
+    assert "Hoje é 08/09/2026, terça-feira." in prompt

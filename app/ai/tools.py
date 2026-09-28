@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from app.ai.servico_agenda import (
     ItemDemandaBruta,
     ResultadoAlternativas,
+    ResultadoBuscaEncaixe,
     ResultadoExato,
     buscar_encaixe,
     buscar_paciente,
@@ -33,7 +34,10 @@ from app.ai.servico_agenda import (
     sugerir_realocacao_por_id,
 )
 from app.config import get_settings
-from app.data_sources.continuidade import ContinuidadeDataSource
+from app.data_sources.continuidade import (
+    ContinuidadeDataSource,
+    SemHistoricoContinuidadeDataSource,
+)
 from app.domain import (
     DURACAO_SLOT_MINUTOS,
     Convenio,
@@ -53,6 +57,24 @@ from app.engine.ocupacao import OcupacaoAgregada
 #: `app.reports` (ver `tests/test_arquitetura.py`), então quem monta as tools
 #: (a rota `/agenda/chat`) é quem decide qual implementação injetar.
 EnviarRelatorio = Callable[[ScheduleDataSource, date, list[str] | None], None]
+
+#: Nome do dia da semana por `date.weekday()` — usado no prompt de sistema
+#: (ver `criar_agente`) e nas mensagens das tools.
+DIAS_DA_SEMANA = (
+    "segunda-feira",
+    "terça-feira",
+    "quarta-feira",
+    "quinta-feira",
+    "sexta-feira",
+    "sábado",
+    "domingo",
+)
+
+#: Id usado na `SolicitacaoAtendimento` quando o pedido de encaixe não cita
+#: paciente (ex.: "consigo encaixar psicologia às 10h?"). A engine não usa o
+#: id do paciente para achar vaga, só a continuidade — que não é consultada
+#: nesse caso. Nunca aparece no texto devolvido ao usuário.
+PACIENTE_NAO_IDENTIFICADO = "paciente-nao-identificado"
 
 _ROTULOS_CENARIO: dict[CenarioSugestao, str] = {
     CenarioSugestao.MELHOR_PARA_CLINICA: "Melhor opção para a agenda da clínica",
@@ -146,6 +168,27 @@ def _formatar_linha_ocupacao(rotulo: str, agregada: OcupacaoAgregada) -> str:
     return f"- {rotulo}: {agregada.percentual:.0%}{aviso}"
 
 
+def _formatar_resultado_encaixe(
+    fonte: ScheduleDataSource, dia: date, resultado: ResultadoBuscaEncaixe
+) -> str:
+    """Texto de `buscar_encaixe` para cada um dos três resultados possíveis."""
+    if isinstance(resultado, ResultadoExato):
+        return "Horário encontrado:\n" + _formatar_opcao_encaixe(fonte, dia, resultado.opcao)
+
+    if isinstance(resultado, ResultadoAlternativas):
+        blocos = [
+            f"{_ROTULOS_CENARIO[opcao_com_cenario.cenario]}:\n"
+            + _formatar_opcao_encaixe(fonte, dia, opcao_com_cenario.opcao)
+            for opcao_com_cenario in resultado.opcoes
+        ]
+        return "Não há vaga exatamente no horário pedido. Alternativas:\n\n" + "\n\n".join(blocos)
+
+    return (
+        f"Nenhum horário disponível em {dia.strftime('%d/%m/%Y')} para essa combinação "
+        "de especialidades."
+    )
+
+
 class ArgsBuscarPaciente(BaseModel):
     nome_ou_id: str = Field(description="Nome (ou parte do nome) ou id do paciente.")
     data: date = Field(description="Data da agenda a consultar, no formato AAAA-MM-DD.")
@@ -174,7 +217,14 @@ class ItemDemandaEntrada(BaseModel):
 
 
 class ArgsBuscarEncaixe(BaseModel):
-    paciente: str = Field(description="Nome ou id do paciente.")
+    paciente: str | None = Field(
+        default=None,
+        description=(
+            "Nome ou id do paciente, quando o pedido citar um. Deixe em branco em "
+            'perguntas de viabilidade sem paciente (ex.: "consigo encaixar psicologia '
+            'às 10h?"). O paciente não precisa ter atendimentos na agenda do dia.'
+        ),
+    )
     data: date = Field(description="Data do atendimento, no formato AAAA-MM-DD.")
     itens: list[ItemDemandaEntrada] = Field(
         min_length=1,
@@ -281,26 +331,41 @@ def criar_tools(
 
     @tool("buscar_encaixe", args_schema=ArgsBuscarEncaixe)
     def buscar_encaixe_tool(
-        paciente: str,
         data: date,
         itens: list[ItemDemandaEntrada],
+        paciente: str | None = None,
         horario_minimo: time | None = None,
         horario_desejado: time | None = None,
     ) -> str:
         """Busca um horário de encaixe, casando uma ou mais especialidades sem buraco entre elas.
 
-        Use para "tem vaga para [paciente] em [data]?" ou para encaixar um
-        atendimento novo. Não use para consultas gerais de disponibilidade
-        sem paciente (para isso use `consultar_disponibilidade`).
+        Use para "tem vaga para [paciente] em [data]?", para encaixar um
+        atendimento novo e para perguntas de viabilidade ("consigo encaixar
+        X às Y?"), com ou sem paciente. É a única fonte de combinações de
+        horário (sessões longas, várias especialidades em sequência,
+        alternativas). O paciente não precisa estar na agenda do dia: a busca
+        é feita do mesmo jeito.
         """
+        nota = ""
         try:
-            encontrado = buscar_paciente(fonte, data, paciente)
-            if encontrado is None:
-                return (
-                    f"Paciente não encontrado com o nome ou id '{paciente}' na agenda "
-                    f"de {data.strftime('%d/%m/%Y')}. Confirme a grafia do nome antes "
-                    "de tentar de novo."
-                )
+            # Paciente sem atendimento no dia (novo, ou que não vem nesse dia
+            # da semana) não bloqueia a busca: a agenda não tem cadastro de
+            # pacientes, e a identidade só serve para consultar continuidade.
+            continuidade_efetiva: ContinuidadeDataSource = SemHistoricoContinuidadeDataSource()
+            if paciente is None:
+                paciente_id = PACIENTE_NAO_IDENTIFICADO
+            else:
+                encontrado = buscar_paciente(fonte, data, paciente)
+                if encontrado is not None:
+                    paciente_id = encontrado.id
+                    continuidade_efetiva = continuidade
+                else:
+                    paciente_id = normalizar_id(paciente) or PACIENTE_NAO_IDENTIFICADO
+                    nota = (
+                        f"\n\nObs.: '{paciente}' não tem atendimentos na agenda de "
+                        f"{DIAS_DA_SEMANA[data.weekday()]} ({data.strftime('%d/%m/%Y')}); "
+                        "a busca foi feita sem considerar histórico de profissional habitual."
+                    )
 
             itens_brutos = [
                 ItemDemandaBruta(
@@ -315,8 +380,8 @@ def criar_tools(
             )
             resultado = buscar_encaixe(
                 fonte,
-                continuidade,
-                encontrado.id,
+                continuidade_efetiva,
+                paciente_id,
                 data,
                 itens_brutos,
                 horario_minimo=horario_minimo_efetivo,
@@ -325,23 +390,7 @@ def criar_tools(
         except Exception as erro:
             return f"Erro ao buscar encaixe: {erro}"
 
-        if isinstance(resultado, ResultadoExato):
-            return "Horário encontrado:\n" + _formatar_opcao_encaixe(fonte, data, resultado.opcao)
-
-        if isinstance(resultado, ResultadoAlternativas):
-            blocos = [
-                f"{_ROTULOS_CENARIO[opcao_com_cenario.cenario]}:\n"
-                + _formatar_opcao_encaixe(fonte, data, opcao_com_cenario.opcao)
-                for opcao_com_cenario in resultado.opcoes
-            ]
-            return "Não há vaga exatamente no horário pedido. Alternativas:\n\n" + "\n\n".join(
-                blocos
-            )
-
-        return (
-            f"Nenhum horário disponível em {data.strftime('%d/%m/%Y')} para essa combinação "
-            "de especialidades."
-        )
+        return _formatar_resultado_encaixe(fonte, data, resultado) + nota
 
     @tool("consultar_disponibilidade", args_schema=ArgsConsultarDisponibilidade)
     def consultar_disponibilidade_tool(

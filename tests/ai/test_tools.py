@@ -50,6 +50,19 @@ def _continuidade_vazia() -> ContinuidadeDataSource:
     return FakeContinuidadeDataSource()
 
 
+@dataclass
+class ContinuidadeRegistrada:
+    """`ContinuidadeDataSource` que registra cada consulta — prova se a tool
+    olhou (ou não) a continuidade do paciente."""
+
+    habitual: dict[tuple[str, Especialidade], str] = field(default_factory=dict)
+    consultas: list[tuple[str, Especialidade]] = field(default_factory=list)
+
+    def profissional_habitual(self, paciente_id: str, especialidade: Especialidade) -> str | None:
+        self.consultas.append((paciente_id, especialidade))
+        return self.habitual.get((paciente_id, especialidade))
+
+
 def _tool(
     fonte: ScheduleDataSource,
     continuidade: ContinuidadeDataSource,
@@ -248,19 +261,91 @@ def test_buscar_encaixe_tool_retorna_nenhum_sem_opcao() -> None:
     assert "Nenhum horário disponível" in resultado
 
 
-def test_buscar_encaixe_tool_devolve_mensagem_clara_para_paciente_inexistente() -> None:
-    origem = FakeScheduleDataSource()
-    tool = _tool(origem, _continuidade_vazia(), "buscar_encaixe")
+def _origem_com_ana_livre() -> FakeScheduleDataSource:
+    return FakeScheduleDataSource(
+        pacientes={DIA: [PACIENTE_UM]},
+        salas={DIA: [Sala(id="sala-1", nome="Sala 1")]},
+        grade={DIA: grade_completa("sala-1", "prof-1", Especialidade.PSICOLOGIA)},
+        profissionais={DIA: [profissional("prof-1", "Ana", Especialidade.PSICOLOGIA)]},
+    )
+
+
+def test_buscar_encaixe_tool_sem_paciente_faz_a_busca_normal_sem_nota() -> None:
+    continuidade = ContinuidadeRegistrada()
+    tool = _tool(_origem_com_ana_livre(), continuidade, "buscar_encaixe")
 
     resultado = tool.invoke(
         {
-            "paciente": "paciente-fantasma",
             "data": "2026-09-08",
-            "itens": [{"especialidade": "psicologia", "duracao_minutos": 30}],
+            "itens": [{"especialidade": "psicologia", "duracao_minutos": 60}],
+            "horario_desejado": "10:00",
         }
     )
 
-    assert "não encontrado" in resultado.lower()
+    assert resultado == ("Horário encontrado:\n- Psicologia: 10:00 às 11:00, com Ana na Sala 1.")
+    assert continuidade.consultas == []
+    assert "paciente" not in resultado.lower()
+    assert "Obs." not in resultado
+
+
+def test_buscar_encaixe_tool_paciente_fora_da_agenda_segue_com_nota_informativa() -> None:
+    continuidade = ContinuidadeRegistrada()
+    tool = _tool(_origem_com_ana_livre(), continuidade, "buscar_encaixe")
+
+    resultado = tool.invoke(
+        {
+            "paciente": "Paciente Novo",
+            "data": "2026-09-08",
+            "itens": [{"especialidade": "psicologia", "duracao_minutos": 60}],
+            "horario_desejado": "10:00",
+        }
+    )
+
+    assert resultado.startswith(
+        "Horário encontrado:\n- Psicologia: 10:00 às 11:00, com Ana na Sala 1."
+    )
+    assert resultado.endswith(
+        "Obs.: 'Paciente Novo' não tem atendimentos na agenda de terça-feira "
+        "(08/09/2026); a busca foi feita sem considerar histórico de profissional habitual."
+    )
+    assert "cadastr" not in resultado.lower()
+    assert continuidade.consultas == []
+
+
+def test_buscar_encaixe_tool_paciente_existente_consulta_a_continuidade() -> None:
+    """Com o paciente na agenda do dia, o profissional habitual vem da
+    continuidade — mesmo havendo outra psicóloga livre no mesmo horário."""
+    origem = FakeScheduleDataSource(
+        pacientes={DIA: [PACIENTE_UM]},
+        salas={DIA: [Sala(id="sala-1", nome="Sala 1"), Sala(id="sala-2", nome="Sala 2")]},
+        grade={
+            DIA: grade_completa("sala-1", "prof-1", Especialidade.PSICOLOGIA)
+            + grade_completa("sala-2", "prof-2", Especialidade.PSICOLOGIA)
+        },
+        profissionais={
+            DIA: [
+                profissional("prof-1", "Ana", Especialidade.PSICOLOGIA),
+                profissional("prof-2", "Bia", Especialidade.PSICOLOGIA),
+            ]
+        },
+    )
+    continuidade = ContinuidadeRegistrada(
+        habitual={(PACIENTE_UM.id, Especialidade.PSICOLOGIA): "prof-2"}
+    )
+    tool = _tool(origem, continuidade, "buscar_encaixe")
+
+    resultado = tool.invoke(
+        {
+            "paciente": "Paciente Um",
+            "data": "2026-09-08",
+            "itens": [{"especialidade": "psicologia", "duracao_minutos": 60}],
+            "horario_desejado": "10:00",
+        }
+    )
+
+    assert continuidade.consultas == [(PACIENTE_UM.id, Especialidade.PSICOLOGIA)]
+    assert "com Bia na Sala 2" in resultado
+    assert "Obs." not in resultado
 
 
 # ---- consultar_disponibilidade ----
