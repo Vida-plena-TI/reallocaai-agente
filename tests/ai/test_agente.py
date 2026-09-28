@@ -335,3 +335,14 @@ def test_prompt_de_sistema_diz_que_nao_existe_cadastro_de_pacientes() -> None:
 
     assert "Não existe cadastro de pacientes" in prompt
     assert "Hoje é 08/09/2026, terça-feira." in prompt
+
+
+def test_prompt_de_sistema_proibe_buscar_paciente_antes_do_encaixe() -> None:
+    """Regressão: o agente travava chamando `buscar_paciente` antes de
+    `buscar_encaixe` para um paciente sem atendimento no dia pedido."""
+    prompt = PROMPT_SISTEMA.format(data_referencia="08/09/2026", dia_da_semana="terça-feira")
+
+    assert "chame `buscar_encaixe` diretamente e NUNCA chame `buscar_paciente` antes" in prompt
+    assert "nunca use esse resultado para interromper um encaixe" in prompt
+    assert "pergunte uma única vez se é a mesma pessoa" in prompt
+    assert "confirmar o nome ou o id" not in prompt

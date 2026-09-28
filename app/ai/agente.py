@@ -126,5 +126,19 @@ def perguntar(agente: Agente, historico_mensagens: list[BaseMessage]) -> str:
     Sem gerenciamento de sessão aqui: quem chama já manda o histórico
     completo da conversa a cada turno (decisão já tomada nesta fase).
     """
+    resposta, _ = perguntar_com_mensagens(agente, historico_mensagens)
+    return resposta
+
+
+def perguntar_com_mensagens(
+    agente: Agente, historico_mensagens: list[BaseMessage]
+) -> tuple[str, list[BaseMessage]]:
+    """Como `perguntar`, mas devolve também a lista completa de mensagens do grafo.
+
+    A lista inclui o histórico de entrada seguido das mensagens geradas no
+    turno (chamadas de tool e seus retornos) — útil para inspecionar quais
+    tools o agente usou (ver `scripts/chat_manual.py --verbose`).
+    """
     resultado = agente.invoke({"messages": historico_mensagens})
-    return _extrair_texto_da_resposta(resultado["messages"][-1])
+    mensagens: list[BaseMessage] = resultado["messages"]
+    return _extrair_texto_da_resposta(mensagens[-1]), mensagens

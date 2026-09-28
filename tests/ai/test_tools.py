@@ -4,6 +4,7 @@ Cada tool é chamada diretamente via `.invoke(...)` contra os dublês de
 `ScheduleDataSource`/`ContinuidadeDataSource` já usados na Fase 5a.
 """
 
+import re
 from dataclasses import dataclass, field
 from datetime import date, time
 from typing import Any
@@ -15,6 +16,7 @@ from app.ai.tools import EnviarRelatorio, criar_tools
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import (
     Atendimento,
+    Convenio,
     EntradaGrade,
     Especialidade,
     Paciente,
@@ -137,13 +139,87 @@ def test_buscar_paciente_tool_encontra_paciente() -> None:
     assert "paciente-um" in resultado
 
 
-def test_buscar_paciente_tool_devolve_mensagem_clara_quando_nao_encontra() -> None:
+def _assert_nao_pede_cadastro_id_nem_cpf(resultado: str) -> None:
+    texto = resultado.lower()
+    assert "cadastr" not in texto
+    assert "cpf" not in texto
+    assert "grafia" not in texto
+    assert "confirm" not in texto
+
+
+def test_buscar_paciente_tool_encontrado_no_dia_nao_pede_nada() -> None:
+    origem = FakeScheduleDataSource(pacientes={DIA: [PACIENTE_UM]})
+    tool = _tool(origem, _continuidade_vazia(), "buscar_paciente")
+
+    resultado = tool.invoke({"nome_ou_id": "Paciente Um", "data": "2026-09-08"})
+
+    assert resultado == (
+        "Paciente encontrado: Paciente Um (id: paciente-um, convênio: não informado)."
+    )
+    _assert_nao_pede_cadastro_id_nem_cpf(resultado)
+
+
+def test_buscar_paciente_tool_so_em_outros_dias_lista_os_dias_e_o_convenio() -> None:
+    theo = Paciente(id="theo-souza", nome="Theo Souza", convenio=Convenio.UNIMED)
+    origem = FakeScheduleDataSource(pacientes={date(2026, 9, 7): [theo], date(2026, 9, 10): [theo]})
+    tool = _tool(origem, _continuidade_vazia(), "buscar_paciente")
+
+    resultado = tool.invoke({"nome_ou_id": "Theo Souza", "data": "2026-09-11"})
+
+    assert resultado == (
+        "Theo Souza não tem atendimentos na agenda de sexta-feira (11/09). "
+        "Nesta semana aparece em: segunda-feira (07/09), quinta-feira (10/09). "
+        "Convênio no registro encontrado: Unimed."
+    )
+    _assert_nao_pede_cadastro_id_nem_cpf(resultado)
+    assert not re.search(r"\bid\b", resultado)
+
+
+def test_buscar_paciente_tool_ausente_na_semana_com_nomes_parecidos() -> None:
+    origem = FakeScheduleDataSource(
+        pacientes={date(2026, 9, 7): [Paciente(id="theo-souza", nome="Theo Souza")]}
+    )
+    tool = _tool(origem, _continuidade_vazia(), "buscar_paciente")
+
+    resultado = tool.invoke({"nome_ou_id": "Teo Souza", "data": "2026-09-11"})
+
+    assert resultado == (
+        "'Teo Souza' não aparece na agenda de nenhum dia da semana (período verificado: "
+        "07/09/2026 a 12/09/2026). Nomes parecidos na agenda: Theo Souza (podem ser a "
+        "mesma pessoa ou não; é só uma sugestão). Pacientes só aparecem na agenda quando "
+        "têm atendimento marcado; isso não impede buscar encaixe, que aceita qualquer nome."
+    )
+    _assert_nao_pede_cadastro_id_nem_cpf(resultado)
+    assert not re.search(r"\bid\b", resultado)
+
+
+def test_buscar_paciente_tool_ausente_na_semana_sem_nomes_parecidos() -> None:
     origem = FakeScheduleDataSource(pacientes={DIA: [PACIENTE_UM]})
     tool = _tool(origem, _continuidade_vazia(), "buscar_paciente")
 
     resultado = tool.invoke({"nome_ou_id": "paciente-fantasma", "data": "2026-09-08"})
 
-    assert "não encontrado" in resultado.lower()
+    assert "não aparece na agenda de nenhum dia da semana" in resultado
+    assert "Nomes parecidos" not in resultado
+    assert "não impede buscar encaixe" in resultado
+    _assert_nao_pede_cadastro_id_nem_cpf(resultado)
+    assert not re.search(r"\bid\b", resultado)
+
+
+def test_descricao_de_buscar_paciente_proibe_uso_antes_do_encaixe() -> None:
+    tool = _tool(FakeScheduleDataSource(), _continuidade_vazia(), "buscar_paciente")
+
+    assert "NÃO chame antes de `buscar_encaixe`" in tool.description
+
+
+def test_descricao_de_buscar_encaixe_diz_que_paciente_e_opcional() -> None:
+    tool = _tool(FakeScheduleDataSource(), _continuidade_vazia(), "buscar_encaixe")
+    descricao_paciente = tool.args["paciente"]["description"]
+
+    assert "O paciente é opcional e pode ser qualquer nome" in tool.description
+    assert "sem verificar o paciente antes" in tool.description
+    assert descricao_paciente.startswith("Opcional.")
+    assert "qualquer nome" in descricao_paciente
 
 
 # ---- buscar_encaixe ----
@@ -258,7 +334,31 @@ def test_buscar_encaixe_tool_retorna_nenhum_sem_opcao() -> None:
         }
     )
 
-    assert "Nenhum horário disponível" in resultado
+    assert resultado == (
+        "Nenhum horário disponível em 08/09/2026 para essa combinação de especialidades. "
+        "O dia inteiro foi verificado, de 08:00 até o fechamento (18:00), e não existe "
+        "nenhum bloco contínuo livre de 30 minutos que atenda ao pedido."
+    )
+
+
+def test_buscar_encaixe_tool_nenhum_informa_horario_minimo_e_duracao_total() -> None:
+    origem = FakeScheduleDataSource(pacientes={DIA: [PACIENTE_UM]})
+    tool = _tool(origem, _continuidade_vazia(), "buscar_encaixe")
+
+    resultado = tool.invoke(
+        {
+            "data": "2026-09-08",
+            "itens": [
+                {"especialidade": "fonoaudiologia", "duracao_minutos": 30},
+                {"especialidade": "psicologia", "duracao_minutos": 30},
+            ],
+            "horario_minimo": "07:00",
+            "horario_desejado": "09:00",
+        }
+    )
+
+    assert "de 07:00 até o fechamento (18:00)" in resultado
+    assert "bloco contínuo livre de 60 minutos" in resultado
 
 
 def _origem_com_ana_livre() -> FakeScheduleDataSource:

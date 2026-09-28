@@ -55,7 +55,7 @@ ignore = [
 "tests/**/*.py" = ["S101"]  # assert é esperado em testes
 
 [tool.ruff.lint.isort]
-known-first-party = ["app"]
+known-first-party = ["app", "scripts"]
 
 [tool.ruff.format]
 quote-style = "double"

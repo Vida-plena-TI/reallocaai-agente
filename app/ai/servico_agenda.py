@@ -7,7 +7,8 @@ mantém o módulo testável sem rede e sem depender de qual fase futura escolher
 """
 
 import logging
-from datetime import date, time
+from datetime import date, time, timedelta
+from difflib import SequenceMatcher
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -43,6 +44,108 @@ def buscar_paciente(fonte: ScheduleDataSource, data: date, nome_ou_id: str) -> P
     alvo = normalizar_id(nome_ou_id)
     return next(
         (paciente for paciente in fonte.listar_pacientes(data) if paciente.id == alvo), None
+    )
+
+
+#: Similaridade mínima (`difflib.SequenceMatcher.ratio`) entre ids para um nome
+#: da agenda entrar em `LocalizacaoPaciente.sugestoes`.
+LIMIAR_NOME_PARECIDO = 0.85
+
+#: Máximo de nomes parecidos devolvidos em `LocalizacaoPaciente.sugestoes`.
+MAX_SUGESTOES_NOME = 3
+
+
+class LocalizacaoPaciente(BaseModel):
+    """Onde um paciente aparece na agenda da semana de uma data.
+
+    `paciente_no_dia` é o registro da própria data consultada; `outros_dias`,
+    os demais dias da semana em que o mesmo id aparece; `paciente_referencia`,
+    um registro encontrado em qualquer dia (para mostrar nome e convênio).
+    `sugestoes` só vem preenchida quando o paciente não aparece em dia nenhum,
+    e é apenas informativa — nunca é usada para fundir pacientes.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    paciente_no_dia: Paciente | None
+    outros_dias: list[date]
+    paciente_referencia: Paciente | None
+    sugestoes: list[str]
+
+
+def dias_da_semana_de(data: date) -> list[date]:
+    """Segunda a sábado da semana que contém `data`."""
+    segunda = data - timedelta(days=data.weekday())
+    return [segunda + timedelta(days=deslocamento) for deslocamento in range(6)]
+
+
+def localizar_paciente(
+    fonte: ScheduleDataSource, data: date, nome_ou_id: str
+) -> LocalizacaoPaciente:
+    """Procura o paciente na agenda de `data` e nos outros dias da mesma semana.
+
+    A janela semanal existe porque a fonte atual é uma planilha com uma aba
+    por dia da semana e sem cadastro de pacientes: um paciente só é visível
+    nos dias em que tem atendimento. Quando a fonte passar a ser o cadastro do
+    Agendador, esta varredura será substituída pela consulta direta.
+
+    A correspondência continua sendo por igualdade exata do id normalizado —
+    nomes parecidos nunca são tratados como o mesmo paciente; no máximo viram
+    `sugestoes` informativas. Um dia cuja leitura falhe é pulado com warning;
+    se todos falharem, o último erro sobe.
+    """
+    alvo = normalizar_id(nome_ou_id)
+    dias = dias_da_semana_de(data)
+    if data not in dias:
+        dias.append(data)
+
+    pacientes_por_dia: dict[date, list[Paciente]] = {}
+    ultimo_erro: Exception | None = None
+    for dia in dias:
+        try:
+            pacientes_por_dia[dia] = fonte.listar_pacientes(dia)
+        except Exception as erro:
+            ultimo_erro = erro
+            logger.warning(
+                "Falha ao ler os pacientes de %s ao localizar paciente: %s", dia.isoformat(), erro
+            )
+    if not pacientes_por_dia and ultimo_erro is not None:
+        raise ultimo_erro
+
+    encontrados = {
+        dia: paciente
+        for dia, pacientes in pacientes_por_dia.items()
+        for paciente in pacientes
+        if paciente.id == alvo
+    }
+    paciente_no_dia = encontrados.get(data)
+    outros_dias = sorted(dia for dia in encontrados if dia != data)
+    registros = [encontrados[dia] for dia in sorted(encontrados)]
+    paciente_referencia = paciente_no_dia or next(
+        (paciente for paciente in registros if paciente.convenio is not None),
+        registros[0] if registros else None,
+    )
+
+    sugestoes: list[str] = []
+    if not encontrados and alvo:
+        similaridade: dict[str, tuple[float, str]] = {}
+        for pacientes in pacientes_por_dia.values():
+            for paciente in pacientes:
+                razao = SequenceMatcher(None, alvo, paciente.id).ratio()
+                if razao >= LIMIAR_NOME_PARECIDO and paciente.id not in similaridade:
+                    similaridade[paciente.id] = (razao, paciente.nome)
+        sugestoes = [
+            nome
+            for _, nome in sorted(similaridade.values(), key=lambda par: (-par[0], par[1]))[
+                :MAX_SUGESTOES_NOME
+            ]
+        ]
+
+    return LocalizacaoPaciente(
+        paciente_no_dia=paciente_no_dia,
+        outros_dias=outros_dias,
+        paciente_referencia=paciente_referencia,
+        sugestoes=sugestoes,
     )
 
 

@@ -14,7 +14,14 @@ def normalizar_id(texto: str) -> str:
 
     Remove acento e caixa, e junta os trechos alfanuméricos com hífen —
     pontuação, parênteses e espaço viram apenas separador.
+
+    A decomposição (NFKD) é aplicada ao texto inteiro e as marcas combinantes
+    (categoria `Mn`) são descartadas depois: assim o texto já decomposto (NFD,
+    ex.: `"Joa\\u0303o"`) gera o mesmo id do texto composto (NFC, `"João"`), em
+    vez de o acento solto virar separador (`joa-o`).
     """
-    sem_acento = "".join(unicodedata.normalize("NFKD", caractere)[0] for caractere in texto)
-    achatado = " ".join(sem_acento.split()).casefold()
-    return "-".join(re.findall(r"[a-z0-9]+", achatado))
+    decomposto = unicodedata.normalize("NFKD", texto)
+    sem_acento = "".join(
+        caractere for caractere in decomposto if unicodedata.category(caractere) != "Mn"
+    )
+    return "-".join(re.findall(r"[a-z0-9]+", sem_acento.casefold()))

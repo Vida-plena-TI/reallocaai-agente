@@ -31,6 +31,8 @@ from app.ai.servico_agenda import (
     buscar_paciente,
     consultar_disponibilidade_do_dia,
     consultar_ocupacao_do_dia,
+    dias_da_semana_de,
+    localizar_paciente,
     sugerir_realocacao_por_id,
 )
 from app.config import get_settings
@@ -47,7 +49,7 @@ from app.domain import (
     Slot,
     normalizar_id,
 )
-from app.domain.constants import HORARIO_PREFERENCIAL_PADRAO
+from app.domain.constants import HORARIO_FECHAMENTO, HORARIO_PREFERENCIAL_PADRAO
 from app.engine.disponibilidade import SlotDisponivel
 from app.engine.encaixe import CenarioSugestao, ItemEncaixeResolvido, OpcaoEncaixe
 from app.engine.ocupacao import OcupacaoAgregada
@@ -169,9 +171,17 @@ def _formatar_linha_ocupacao(rotulo: str, agregada: OcupacaoAgregada) -> str:
 
 
 def _formatar_resultado_encaixe(
-    fonte: ScheduleDataSource, dia: date, resultado: ResultadoBuscaEncaixe
+    fonte: ScheduleDataSource,
+    dia: date,
+    resultado: ResultadoBuscaEncaixe,
+    horario_minimo: time,
+    duracao_total_minutos: int,
 ) -> str:
-    """Texto de `buscar_encaixe` para cada um dos três resultados possíveis."""
+    """Texto de `buscar_encaixe` para cada um dos três resultados possíveis.
+
+    `horario_minimo` e `duracao_total_minutos` só entram no texto de "nenhum":
+    deixam explícito que o dia inteiro foi varrido, e não só o horário pedido.
+    """
     if isinstance(resultado, ResultadoExato):
         return "Horário encontrado:\n" + _formatar_opcao_encaixe(fonte, dia, resultado.opcao)
 
@@ -185,7 +195,10 @@ def _formatar_resultado_encaixe(
 
     return (
         f"Nenhum horário disponível em {dia.strftime('%d/%m/%Y')} para essa combinação "
-        "de especialidades."
+        f"de especialidades. O dia inteiro foi verificado, de "
+        f"{horario_minimo.strftime('%H:%M')} até o fechamento "
+        f"({HORARIO_FECHAMENTO.strftime('%H:%M')}), e não existe nenhum bloco contínuo "
+        f"livre de {duracao_total_minutos} minutos que atenda ao pedido."
     )
 
 
@@ -220,9 +233,10 @@ class ArgsBuscarEncaixe(BaseModel):
     paciente: str | None = Field(
         default=None,
         description=(
-            "Nome ou id do paciente, quando o pedido citar um. Deixe em branco em "
-            'perguntas de viabilidade sem paciente (ex.: "consigo encaixar psicologia '
-            'às 10h?"). O paciente não precisa ter atendimentos na agenda do dia.'
+            "Opcional. Nome ou id do paciente, quando o pedido citar um — pode ser "
+            "qualquer nome, esteja ou não na agenda; não verifique antes com "
+            "buscar_paciente. Deixe em branco em perguntas de viabilidade sem paciente "
+            '(ex.: "consigo encaixar psicologia às 10h?").'
         ),
     )
     data: date = Field(description="Data do atendimento, no formato AAAA-MM-DD.")
@@ -308,25 +322,56 @@ def criar_tools(
 
     @tool("buscar_paciente", args_schema=ArgsBuscarPaciente)
     def buscar_paciente_tool(nome_ou_id: str, data: date) -> str:
-        """Busca um paciente na agenda de um dia pelo nome ou id.
+        """Localiza um paciente na agenda de um dia e nos outros dias da mesma semana.
 
-        Use antes de qualquer outra pergunta sobre um paciente específico,
-        para confirmar que ele está na agenda daquele dia e obter o id exato
-        a usar nas outras tools.
+        Use somente quando o usuário perguntar sobre um paciente (convênio, se
+        está na agenda, em que dias aparece) ou para localizar um atendimento
+        existente. NÃO chame antes de `buscar_encaixe` nem de consultas de
+        disponibilidade: essas tools não dependem de o paciente estar na agenda.
         """
         try:
-            paciente = buscar_paciente(fonte, data, nome_ou_id)
+            localizacao = localizar_paciente(fonte, data, nome_ou_id)
         except Exception as erro:
             return f"Erro ao buscar paciente: {erro}"
 
-        if paciente is None:
+        paciente = localizacao.paciente_no_dia
+        if paciente is not None:
             return (
-                f"Paciente não encontrado com o nome ou id '{nome_ou_id}' na agenda de "
-                f"{data.strftime('%d/%m/%Y')}. Peça para confirmar a grafia do nome."
+                f"Paciente encontrado: {paciente.nome} (id: {paciente.id}, "
+                f"convênio: {_rotulo_convenio(paciente.convenio)})."
             )
-        return (
-            f"Paciente encontrado: {paciente.nome} (id: {paciente.id}, "
-            f"convênio: {_rotulo_convenio(paciente.convenio)})."
+
+        referencia = localizacao.paciente_referencia
+        if referencia is not None:
+            dias = ", ".join(
+                f"{DIAS_DA_SEMANA[dia.weekday()]} ({dia.strftime('%d/%m')})"
+                for dia in localizacao.outros_dias
+            )
+            convenio = (
+                f" Convênio no registro encontrado: {_rotulo_convenio(referencia.convenio)}."
+                if referencia.convenio is not None
+                else ""
+            )
+            return (
+                f"{referencia.nome} não tem atendimentos na agenda de "
+                f"{DIAS_DA_SEMANA[data.weekday()]} ({data.strftime('%d/%m')}). "
+                f"Nesta semana aparece em: {dias}.{convenio}"
+            )
+
+        semana = dias_da_semana_de(data)
+        texto = (
+            f"'{nome_ou_id}' não aparece na agenda de nenhum dia da semana (período "
+            f"verificado: {semana[0].strftime('%d/%m/%Y')} a "
+            f"{semana[-1].strftime('%d/%m/%Y')})."
+        )
+        if localizacao.sugestoes:
+            texto += (
+                f" Nomes parecidos na agenda: {', '.join(localizacao.sugestoes)} (podem ser "
+                "a mesma pessoa ou não; é só uma sugestão)."
+            )
+        return texto + (
+            " Pacientes só aparecem na agenda quando têm atendimento marcado; isso não "
+            "impede buscar encaixe, que aceita qualquer nome."
         )
 
     @tool("buscar_encaixe", args_schema=ArgsBuscarEncaixe)
@@ -343,8 +388,9 @@ def criar_tools(
         atendimento novo e para perguntas de viabilidade ("consigo encaixar
         X às Y?"), com ou sem paciente. É a única fonte de combinações de
         horário (sessões longas, várias especialidades em sequência,
-        alternativas). O paciente não precisa estar na agenda do dia: a busca
-        é feita do mesmo jeito.
+        alternativas). O paciente é opcional e pode ser qualquer nome, esteja
+        ou não na agenda: chame direto, sem verificar o paciente antes com
+        `buscar_paciente`.
         """
         nota = ""
         try:
@@ -390,7 +436,15 @@ def criar_tools(
         except Exception as erro:
             return f"Erro ao buscar encaixe: {erro}"
 
-        return _formatar_resultado_encaixe(fonte, data, resultado) + nota
+        duracao_total_minutos = sum(
+            item.duracao_em_slots * DURACAO_SLOT_MINUTOS for item in itens_brutos
+        )
+        return (
+            _formatar_resultado_encaixe(
+                fonte, data, resultado, horario_minimo_efetivo, duracao_total_minutos
+            )
+            + nota
+        )
 
     @tool("consultar_disponibilidade", args_schema=ArgsConsultarDisponibilidade)
     def consultar_disponibilidade_tool(
