@@ -33,6 +33,7 @@ from app.domain import (
     MAPA_ALIAS_PROFISSIONAL,
     MAPA_ESPECIALIDADE_FALLBACK,
     MAPA_SALA_FALLBACK,
+    PADROES_ESPECIALIDADE,
     PROFISSIONAIS_IGNORAR,
     Atendimento,
     Convenio,
@@ -77,40 +78,6 @@ _MARCADOR_FECHADO: Final[str] = "fechado"
 #: Pontuação que sobra nas bordas depois de separar nome e especialidade
 #: (uma célula "TO - Rossana" vira "Rossana", "(Calebe)" vira "Calebe").
 _BORDAS_DESCARTAVEIS: Final[str] = " ()[].,;:-_|"
-
-#: Como a especialidade aparece escrita nas células de profissional. A ordem
-#: importa: `psicomotricidade` e `psicopedagogia` precisam ser testadas antes de
-#: `psico`, senão as duas cairiam em psicologia.
-_ESPECIALIDADE_POR_PADRAO: Final[tuple[tuple[re.Pattern[str], Especialidade], ...]] = (
-    (
-        re.compile(r"\b(?:psicomotricidade|psicomotora|psicomotor|psicomo|fisio\w*)\b"),
-        Especialidade.PSICOMOTRICIDADE,
-    ),
-    (
-        re.compile(r"\b(?:psicopedagogia|psicopedagoga|psicopedagogo|neuroppg|ppg)\b"),
-        Especialidade.PSICOPEDAGOGIA,
-    ),
-    (
-        re.compile(r"\b(?:psicologia|psicologa|psicologo|psicol|psico)\b"),
-        Especialidade.PSICOLOGIA,
-    ),
-    (
-        re.compile(r"\b(?:fonoaudiologia|fonoaudiologa|fonoaudiologo|fonoaudio|fono)\b"),
-        Especialidade.FONOAUDIOLOGIA,
-    ),
-    (
-        re.compile(r"\b(?:musicoterapia|musicoterapeuta|musicoterapeuto|musico)\b"),
-        Especialidade.MUSICOTERAPIA,
-    ),
-    (
-        re.compile(r"\b(?:nutricionista|nutricao|nutri)\b"),
-        Especialidade.TERAPIA_ALIMENTAR,
-    ),
-    (
-        re.compile(r"\b(?:terapia\s+ocupacional|to)\b"),
-        Especialidade.TERAPIA_OCUPACIONAL,
-    ),
-)
 
 
 class DadosAgendaDoDia(BaseModel):
@@ -649,7 +616,7 @@ def _separar_especialidade(texto: str) -> tuple[Especialidade | None, str]:
     de verdade sem estragar a acentuação do nome.
     """
     chave = _sem_acento(texto).lower()
-    for padrao, especialidade in _ESPECIALIDADE_POR_PADRAO:
+    for padrao, especialidade in PADROES_ESPECIALIDADE:
         encontrado = padrao.search(chave)
         if encontrado is None:
             continue

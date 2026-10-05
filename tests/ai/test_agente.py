@@ -396,3 +396,56 @@ def test_prompt_de_sistema_manda_usar_a_tool_de_ocupacao_da_profissional() -> No
     assert "chame `consultar_ocupacao_profissional`" in prompt
     assert "nunca calcule essa taxa a partir de outras ferramentas" in prompt
     assert "sem recalcular nem" in prompt
+
+
+def test_agente_conta_pacientes_por_profissional_pela_tool_dedicada() -> None:
+    manha = horas_da_manha(SEGUNDA)
+    origem = FakeScheduleDataSource(
+        profissionais={SEGUNDA: [LUCIANA]},
+        grade={SEGUNDA: grade(SEGUNDA, manha)},
+        atendimentos={SEGUNDA: atendimentos(SEGUNDA, manha[:2], paciente_ids=["ana", "beto"])},
+    )
+    fake_model = FakeToolCallingChatModel(
+        responses=[
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "consultar_pacientes_por_profissional",
+                        "args": {},
+                        "id": "call-1",
+                    }
+                ],
+            ),
+            AIMessage(content="A Luciana atende 2 pacientes na segunda."),
+        ]
+    )
+
+    agente = criar_agente(
+        origem,
+        SemHistoricoContinuidadeDataSource(),
+        fake_model,
+        SEGUNDA,
+        _enviar_relatorio_nao_usado,
+    )
+    resultado = agente.invoke(
+        {"messages": [HumanMessage("Quantos pacientes cada profissional atende por dia?")]}
+    )
+
+    mensagens_de_tool = [
+        mensagem for mensagem in resultado["messages"] if isinstance(mensagem, ToolMessage)
+    ]
+    assert len(mensagens_de_tool) == 1
+    conteudo = mensagens_de_tool[0].content
+    assert "Pacientes atendidos por profissional — semana de 28/09 a 03/10/2026" in conteudo
+    assert "- Luciana: Seg 2 — média 2,0/dia em 1 dia" in conteudo
+    assert resultado["messages"][-1].content == "A Luciana atende 2 pacientes na segunda."
+
+
+def test_prompt_de_sistema_manda_contar_pacientes_pela_tool_dedicada_sem_perguntar_a_data() -> None:
+    prompt = PROMPT_SISTEMA.format(data_referencia="08/09/2026", dia_da_semana="terça-feira")
+
+    assert "vão direto para `consultar_pacientes_por_profissional`" in prompt
+    assert 'Não pergunte "para qual data" nem "todas ou específicas"' in prompt
+    assert "Nunca percorra `consultar_ocupacao_profissional`" in prompt
+    assert "sem recalcular, arredondar nem somar por conta própria" in prompt

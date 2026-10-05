@@ -211,6 +211,33 @@ números refletem a grade vigente, e não uma semana específica do calendário 
 sempre traz essa ressalva (`NOTA_GRADE_SEMANAL` em `app/ai/tools.py`, a remover na migração
 para o Agendador).
 
+### Pacientes por profissional (tool `consultar_pacientes_por_profissional`)
+
+Responde, pelo chat, perguntas como "quantos pacientes cada profissional atende por dia?":
+quantos **pacientes** (pessoas, não slots) cada profissional atende. Sem pedir confirmação, o
+padrão é a semana de hoje, todas as profissionais, com o detalhe por dia.
+
+- **Escopos:** `semana` (padrão; segunda a sábado da semana da data) traz, por profissional, os
+  pacientes de cada dia com agenda, a média por dia e os pacientes distintos na semana, além dos
+  pacientes distintos da clínica por dia; `dia` (quando a pergunta cita "hoje", "na terça" ou uma
+  data) traz o total de cada profissional naquele dia e os pacientes distintos da clínica no dia.
+- **Filtros opcionais:** uma profissional (resolvida como em `consultar_ocupacao_profissional`,
+  com aliases e pergunta em caso de ambiguidade; traz também sessões e slots ocupados por dia) e
+  uma especialidade, reconhecida de forma tolerante ("psicóloga", "fono", "TO") pela mesma tabela
+  que o parser usa (`app/domain/especialidade_texto.py`).
+- **O que conta como paciente:** cada paciente conta **uma vez por profissional e dia**, mesmo que
+  apareça em dois blocos ou em dois postos; numa sessão em grupo (`Ana/Beto` na célula), cada
+  paciente conta. Sessões = número de atendimentos; slots ocupados seguem a mesma conta da
+  ocupação. Na linha da clínica, quem passa por mais de uma profissional no dia conta uma vez só
+  — por isso ela pode ser menor que a soma das linhas por profissional.
+- **Média:** soma dos pacientes dos dias com agenda (grade ou atendimento) dividida pelo número
+  desses dias; um dia com agenda e nenhum paciente entra como 0. Profissional sem agenda no
+  período não aparece; com agenda e nenhum paciente aparece com 0.
+- O cálculo vive em `app/engine/carga_profissionais.py`, que lê cada dia **uma vez** para todas
+  as profissionais (as leituras à fonte não crescem com o número de profissionais). Um dia cuja
+  leitura falhe é sinalizado e os números ficam marcados como parciais. A resposta nunca traz
+  nome de paciente, e no escopo `semana` termina com a mesma ressalva da grade semanal.
+
 A documentação interativa completa (`/docs`) descreve o schema exato de cada endpoint,
 incluindo os campos de `/agenda/disponibilidade` e `/agenda/ocupacao`.
 

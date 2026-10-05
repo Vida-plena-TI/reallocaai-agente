@@ -25,6 +25,7 @@ from app.domain.entities import (
     SolicitacaoAtendimento,
 )
 from app.domain.enums import Convenio, Especialidade
+from app.domain.especialidade_texto import PADROES_ESPECIALIDADE, reconhecer_especialidade
 from app.domain.exceptions import (
     AtendimentoComBuracoError,
     AtendimentoEmDiasDiferentesError,
@@ -54,6 +55,7 @@ __all__ = [
     "MAPA_ESPECIALIDADE_FALLBACK",
     "MAPA_SALA_FALLBACK",
     "META_OCUPACAO_POR_SALA",
+    "PADROES_ESPECIALIDADE",
     "PROFISSIONAIS_IGNORAR",
     "Atendimento",
     "AtendimentoComBuracoError",
@@ -76,4 +78,5 @@ __all__ = [
     "SolicitacaoAtendimento",
     "dias_da_semana_de",
     "normalizar_id",
+    "reconhecer_especialidade",
 ]
