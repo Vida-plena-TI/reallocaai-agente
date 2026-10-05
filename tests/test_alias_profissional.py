@@ -14,6 +14,8 @@ from app.ai.servico_agenda import (
     ProfissionalEncontrado,
     localizar_profissional,
 )
+from app.ai.tools import criar_tools
+from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
 from app.data_sources.google_sheets_parser import parse_worksheet_data
 from app.domain import MAPA_ALIAS_PROFISSIONAL
 from app.engine.ocupacao import construir_relatorio_ocupacao_do_dia
@@ -54,6 +56,29 @@ DIA_COM_AS_DUAS_GRAFIAS = [
     ["", "Odette Lima (Fono)"],
     ["13:00", "Paciente Dois"],
     ["13:30", "Paciente Dois"],
+]
+
+
+#: Segunda: a grafia canônica digitada em minúsculo, sem passar pelo alias.
+SEGUNDA_CANONICA_MINUSCULA = [
+    ["", "Sala 1"],
+    ["", "odette lima (Fono)"],
+    ["09:00", "Paciente Um"],
+    ["09:30", ""],
+]
+
+#: Terça: só a grafia antiga, que passa pelo alias.
+TERCA_GRAFIA_ANTIGA = [
+    ["", "Sala 1"],
+    ["", "Odete Lima (Fono)"],
+    ["09:00", "Paciente Dois"],
+]
+
+#: Profissional que não é destino de alias, com acento e caixa irregulares.
+SEM_ALIAS_DIGITADO_LIVRE = [
+    ["", "Sala 1"],
+    ["", "íris DE Sá (Fono)"],
+    ["09:00", "Paciente Um"],
 ]
 
 
@@ -134,6 +159,52 @@ def test_sem_o_alias_a_busca_ve_duas_profissionais_distintas() -> None:
 
     assert antiga == ProfissionalEncontrado(profissional_id="odete-lima", nome="Odete Lima")
     assert canonica == ProfissionalEncontrado(profissional_id="odette-lima", nome="Odette Lima")
+
+
+def test_destino_de_alias_em_minusculo_tem_o_mesmo_nome_reconstruido_da_variante(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(MAPA_ALIAS_PROFISSIONAL, *ALIAS_FICTICIO)
+    fonte = _fonte({SEGUNDA: SEGUNDA_CANONICA_MINUSCULA, TERCA: TERCA_GRAFIA_ANTIGA})
+
+    nomes = {
+        dia: [(item.id, item.nome) for item in itens] for dia, itens in fonte.profissionais.items()
+    }
+
+    assert nomes == {
+        SEGUNDA: [("odette-lima", "Odette Lima")],
+        TERCA: [("odette-lima", "Odette Lima")],
+    }
+
+
+def test_profissional_que_nao_e_destino_de_alias_mantem_o_nome_digitado(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(MAPA_ALIAS_PROFISSIONAL, *ALIAS_FICTICIO)
+    fonte = _fonte({SEGUNDA: SEM_ALIAS_DIGITADO_LIVRE})
+
+    assert [(item.id, item.nome) for item in fonte.profissionais[SEGUNDA]] == [
+        ("iris-de-sa", "íris DE Sá")
+    ]
+
+
+def test_tool_mostra_o_nome_reconstruido_mesmo_com_minusculo_no_primeiro_dia(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setitem(MAPA_ALIAS_PROFISSIONAL, *ALIAS_FICTICIO)
+    fonte = _fonte({SEGUNDA: SEGUNDA_CANONICA_MINUSCULA, TERCA: TERCA_GRAFIA_ANTIGA})
+    tool = next(
+        item
+        for item in criar_tools(
+            fonte, SemHistoricoContinuidadeDataSource(), SEGUNDA, lambda *_: None
+        )
+        if item.name == "consultar_ocupacao_profissional"
+    )
+
+    resultado = tool.invoke({"profissional": "Odette"})
+
+    assert resultado.startswith("Ocupação de Odette Lima (Fonoaudiologia) — semana de")
+    assert "odette lima" not in resultado
 
 
 def test_mapa_de_alias_real_nao_tem_auto_referencia_nem_cadeia() -> None:

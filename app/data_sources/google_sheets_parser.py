@@ -629,11 +629,18 @@ def _resolver_profissional(nome: str) -> tuple[str, str]:
     grafia é uma das alternativas conhecidas (`MAPA_ALIAS_PROFISSIONAL`), o id
     vira o canônico e o nome de exibição é reconstruído a partir dele — assim as
     duas grafias colapsam na mesma pessoa, não importa qual apareceu primeiro.
+
+    A célula que já traz o id canônico (ex.: "laryssa", em minúsculo) também tem
+    o nome reconstruído: senão o nome de exibição dependeria de qual grafia
+    apareceu primeiro na semana. Quem não é destino de alias mantém o nome como
+    foi digitado.
     """
     identificador = normalizar_id(nome)
-    canonico = MAPA_ALIAS_PROFISSIONAL.get(identificador)
-    if canonico is None:
+    canonico = MAPA_ALIAS_PROFISSIONAL.get(identificador, identificador)
+    if canonico not in MAPA_ALIAS_PROFISSIONAL.values():
         return identificador, nome
+    # `_nome_do_id` parte do id, que não tem acento: o nome reconstruído também
+    # não terá. Isso só afeta destinos de alias, e nenhum deles tem acento hoje.
     return canonico, _nome_do_id(canonico)
 
 
