@@ -27,6 +27,7 @@ from typing import Final
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain import (
+    COLUNAS_IGNORADAS_PROFISSIONAL,
     COR_AGUARDANDO_AUTORIZACAO,
     CORES_CONVENIO,
     MAPA_ALIAS_PROFISSIONAL,
@@ -175,7 +176,9 @@ def parse_worksheet_data(
 
     intervalos = _intervalos_mesclados(merges)
     salas_por_bloco = [_salas_por_coluna(raw_values, bloco, intervalos) for bloco in blocos]
-    analises_por_bloco = [_analisar_profissionais(raw_values, bloco) for bloco in blocos]
+    leituras_por_bloco = [_analisar_profissionais(raw_values, bloco) for bloco in blocos]
+    analises_por_bloco = [analises for analises, _ in leituras_por_bloco]
+    ignoradas_por_bloco = [ignoradas for _, ignoradas in leituras_por_bloco]
 
     # A mesma coluna costuma ser a mesma sala nos dois blocos do dia. Isso é o
     # que salva os cabeçalhos que faltam num deles (a tarde de sexta não repete
@@ -184,9 +187,12 @@ def parse_worksheet_data(
     especialidades_do_dia = _especialidades_por_profissional(analises_por_bloco)
 
     coletor = _Coletor()
-    for salas_do_bloco in salas_por_bloco:
-        for posto_do_cabecalho in salas_do_bloco.values():
-            coletor.registrar_sala(posto_do_cabecalho.sala)
+    # Uma coluna ignorada não sustenta a sala sozinha: a sala só entra se outra
+    # coluna (mesmo vazia) do cabeçalho a cobrir.
+    for salas_do_bloco, ignoradas in zip(salas_por_bloco, ignoradas_por_bloco, strict=True):
+        for coluna, posto_do_cabecalho in salas_do_bloco.items():
+            if coluna not in ignoradas:
+                coletor.registrar_sala(posto_do_cabecalho.sala)
 
     # Horários vistos valem para a aba inteira: é assim que a linha 11:30
     # duplicada da quinta-feira é reduzida à primeira ocorrência.
@@ -242,6 +248,9 @@ def parse_worksheet_data(
                 id=analise.id, nome=analise.nome, especialidade=especialidade
             )
             coletor.registrar_profissional(profissional)
+            # Normalmente já registrada pelo cabeçalho; garante a sala de uma
+            # coluna ativa cujo cabeçalho só existe num bloco em que ela foi ignorada.
+            coletor.registrar_sala(posto.sala)
             _extrair_coluna(
                 dia=dia,
                 raw_values=raw_values,
@@ -331,6 +340,11 @@ class _AnaliseProfissional:
     id: str
     nome: str
     especialidade: Especialidade | None
+
+
+@dataclass(frozen=True, slots=True)
+class _ColunaIgnorada:
+    """Coluna cujo profissional está em `COLUNAS_IGNORADAS_PROFISSIONAL`."""
 
 
 @dataclass(slots=True)
@@ -560,9 +574,15 @@ def _salas_por_coluna_no_dia(
 
 def _analisar_profissionais(
     raw_values: Sequence[Sequence[str]], bloco: _Bloco
-) -> dict[int, _AnaliseProfissional]:
-    """Lê a linha de profissionais do bloco, coluna a coluna."""
+) -> tuple[dict[int, _AnaliseProfissional], set[int]]:
+    """Lê a linha de profissionais do bloco, coluna a coluna.
+
+    Devolve as colunas com profissional identificado e, à parte, as colunas
+    descartadas de propósito (`COLUNAS_IGNORADAS_PROFISSIONAL`) — estas nunca
+    entram nas análises, então também não emprestam especialidade a ninguém.
+    """
     analises: dict[int, _AnaliseProfissional] = {}
+    ignoradas: set[int] = set()
     linha = bloco.linha_dos_profissionais
     largura = len(raw_values[linha]) if linha < len(raw_values) else 0
     for coluna in range(_COLUNA_DOS_HORARIOS + 1, largura):
@@ -570,6 +590,16 @@ def _analisar_profissionais(
         if not texto:
             continue
         analise = _analisar_celula_de_profissional(texto)
+        if isinstance(analise, _ColunaIgnorada):
+            ignoradas.add(coluna)
+            # Info, não warning: o descarte é pedido da clínica e se repete a
+            # cada leitura da planilha.
+            logger.info(
+                "Coluna %s (%r) está em COLUNAS_IGNORADAS_PROFISSIONAL: coluna ignorada no bloco.",
+                rotulo_da_coluna(coluna),
+                texto,
+            )
+            continue
         if analise is None:
             logger.warning(
                 "Célula %s (%r) não resolve para um único profissional: coluna ignorada no bloco.",
@@ -578,17 +608,21 @@ def _analisar_profissionais(
             )
             continue
         analises[coluna] = analise
-    return analises
+    return analises, ignoradas
 
 
-def _analisar_celula_de_profissional(texto: str) -> _AnaliseProfissional | None:
+def _analisar_celula_de_profissional(
+    texto: str,
+) -> _AnaliseProfissional | _ColunaIgnorada | None:
     """Separa nome e especialidade de uma célula de profissional.
 
     A especialidade sai primeiro, do texto inteiro, porque ela costuma estar
     grudada no nome que será descartado (uma coluna "Aline/Raíssa", com o "TO"
     na segunda linha da célula). Só depois o que sobra é dividido por barra e
     filtrado pelos estagiários. Devolve None quando sobra mais de um nome
-    (dois profissionais dividindo a coluna) ou nenhum.
+    (dois profissionais dividindo a coluna) ou nenhum, e `_ColunaIgnorada`
+    quando o nome que sobra está em `COLUNAS_IGNORADAS_PROFISSIONAL` — conferido
+    antes do alias, pela grafia da própria célula.
     """
     especialidade, restante = _separar_especialidade(texto)
 
@@ -601,6 +635,8 @@ def _analisar_celula_de_profissional(texto: str) -> _AnaliseProfissional | None:
 
     if len(nomes) != 1:
         return None
+    if normalizar_id(nomes[0]) in COLUNAS_IGNORADAS_PROFISSIONAL:
+        return _ColunaIgnorada()
     identificador, nome = _resolver_profissional(nomes[0])
     return _AnaliseProfissional(id=identificador, nome=nome, especialidade=especialidade)
 

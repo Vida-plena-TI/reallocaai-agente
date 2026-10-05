@@ -1,6 +1,7 @@
 """Domínio do RealocAI: entidades, regras estáticas e exceções do negócio."""
 
 from app.domain.constants import (
+    COLUNAS_IGNORADAS_PROFISSIONAL,
     COR_AGUARDANDO_AUTORIZACAO,
     CORES_CONVENIO,
     DURACAO_SLOT_MINUTOS,
@@ -40,6 +41,7 @@ from app.domain.semana import dias_da_semana_de
 from app.domain.slot import Slot
 
 __all__ = [
+    "COLUNAS_IGNORADAS_PROFISSIONAL",
     "CORES_CONVENIO",
     "COR_AGUARDANDO_AUTORIZACAO",
     "DURACAO_SLOT_MINUTOS",

@@ -91,9 +91,28 @@ MAPA_ALIAS_PROFISSIONAL: Final[dict[str, str]] = {
     "natieli-est": "natieli",
     "talyta-ayla": "talita-aylla",
     "gabriele": "gabrielle",
-    # A grafia do cadastro é "Laryssa"; no sábado ela aparece como "Larissa (CONSULTAS)".
+    # A grafia do cadastro é "Laryssa".
     "larissa": "laryssa",
-    "larissa-consultas": "laryssa",
     # "Cabele" é erro de digitação.
     "cabele": "calebe",
 }
+
+#: Colunas de profissional que a clínica pediu para não considerar na agenda.
+#:
+#: A chave é o id normalizado do nome que sobra na célula do profissional,
+#: depois de tirar a especialidade e os estagiários e ANTES de aplicar
+#: `MAPA_ALIAS_PROFISSIONAL`. A coluna inteira é descartada: não gera
+#: profissional, grade, atendimento, ocupação nem disponibilidade, e sozinha não
+#: faz a sala dela aparecer na agenda do dia.
+#:
+#: É separado de `PROFISSIONAIS_IGNORAR` de propósito: aquele filtra estagiários
+#: que DIVIDEM a coluna com o titular (por nome ou primeiro nome, parte a parte
+#: de `Aline/Raíssa`) e, quando não sobra ninguém, avisa com warning porque isso
+#: é sinal de célula mal preenchida. Aqui a coluna é conhecida e o descarte é
+#: intencional.
+COLUNAS_IGNORADAS_PROFISSIONAL: Final[frozenset[str]] = frozenset(
+    {
+        # "Larissa (CONSULTAS)", no sábado: a mesma Laryssa das outras colunas.
+        "larissa-consultas",
+    }
+)
