@@ -4,7 +4,11 @@ import io
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
-from scripts.chat_manual import formatar_rastro_de_tools, reconfigurar_para_utf8
+from scripts.chat_manual import (
+    _argumentos,
+    formatar_rastro_de_tools,
+    reconfigurar_para_utf8,
+)
 
 
 def test_reconfigurar_para_utf8_troca_cp1252_por_utf8() -> None:
@@ -41,3 +45,12 @@ def test_rastro_de_tools_mostra_nome_argumentos_e_resultado_truncado() -> None:
 
 def test_rastro_de_tools_sem_tools() -> None:
     assert formatar_rastro_de_tools([AIMessage("Oi")]) == "  (nenhuma tool chamada)"
+
+
+def test_flag_renderiza_e_opcional_e_independente_de_verbose() -> None:
+    padrao = _argumentos([])
+    assert not padrao.renderiza and not padrao.verbose
+    assert _argumentos(["--renderiza"]).renderiza
+    combinado = _argumentos(["2026-10-05", "--renderiza", "--verbose"])
+    assert combinado.renderiza and combinado.verbose
+    assert str(combinado.data) == "2026-10-05"

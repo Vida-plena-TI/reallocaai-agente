@@ -30,6 +30,7 @@ from app.ai.relatorios import (
     bloco_pacientes_profissional,
     ocupacao_agregada_acima_de_cem,
     ocupacao_profissional_acima_de_cem,
+    salas_em_ordem_natural,
 )
 from app.ai.servico_agenda import (
     ItemDemandaBruta,
@@ -924,8 +925,8 @@ def criar_tools(
         linhas.append("")
         linhas.append("Por sala:")
         linhas.extend(
-            _formatar_linha_ocupacao(nomes_salas.get(sala_id, sala_id), agregada)
-            for sala_id, agregada in sorted(por_sala.items())
+            _formatar_linha_ocupacao(nome, agregada)
+            for nome, agregada in salas_em_ordem_natural(por_sala, nomes_salas)
         )
         if ocupacao_agregada_acima_de_cem(relatorio):
             linhas.extend(["", AVISO_ACIMA_DE_CEM])

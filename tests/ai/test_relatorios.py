@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 from datetime import date
 from typing import Any
 
@@ -389,3 +390,61 @@ def test_ocupacao_acima_de_cem_por_cento_mantem_o_valor_da_engine(
     bloco = BlocoRelatorio.model_validate(mensagem.artifact)
     assert AVISO_ACIMA_DE_CEM in bloco.avisos
     assert "300,0%" in str(mensagem.content)
+
+
+def test_texto_voltado_ao_usuario_usa_data_legivel_e_nunca_iso() -> None:
+    fonte = fonte_relatorios()
+    fonte.dias_com_falha = {QUARTA}
+    iso = re.compile(r"\d{4}-\d{2}-\d{2}")
+    for nome, args in [
+        ("consultar_ocupacao_profissional", {"profissional": "Ana"}),
+        ("consultar_pacientes_por_profissional", {}),
+        ("consultar_pacientes_por_profissional", {"escopo": "dia", "profissional": "Ana"}),
+        ("consultar_ocupacao", {"data": SEGUNDA.isoformat()}),
+    ]:
+        bloco = BlocoRelatorio.model_validate(mensagem_tool(nome, args, fonte).artifact)
+        textos = [bloco.titulo, *bloco.avisos]
+        textos += [f"{i.rotulo} {i.exibicao}" for i in bloco.resumo]
+        textos += [t.nome for t in bloco.tabelas]
+        textos += [c.rotulo for t in bloco.tabelas for c in t.colunas]
+        assert not [t for t in textos if iso.search(t)], nome
+
+
+def test_titulo_do_agregado_traz_a_data_em_dd_mm_aaaa() -> None:
+    dia = date(2026, 10, 5)
+    fonte = FakeScheduleDataSource(
+        profissionais={dia: [ANA]},
+        salas={dia: [Sala(id="sala-12", nome="Sala Azul")]},
+        grade={dia: grade(dia, horas_da_manha(dia), ANA)},
+    )
+    bloco = BlocoRelatorio.model_validate(
+        mensagem_tool("consultar_ocupacao", {"data": dia.isoformat()}, fonte).artifact
+    )
+    assert bloco.titulo == "Ocupação de 05/10/2026"
+    assert bloco.periodo.inicio == dia
+    assert isinstance(bloco.dados, DadosOcupacaoAgregada) and bloco.dados.data == dia
+
+
+def test_salas_em_ordem_natural_no_texto_nos_dados_e_na_tabela() -> None:
+    horas = horas_da_manha(SEGUNDA)
+    salas = [("sala-2", "Sala 2"), ("sala-10", "Sala 10"), ("sala-1", "Sala 1")]
+    fonte = FakeScheduleDataSource(
+        profissionais={SEGUNDA: [ANA]},
+        salas={SEGUNDA: [Sala(id=i, nome=n) for i, n in salas]},
+        grade={
+            SEGUNDA: [
+                entrada
+                for posicao, (sala_id, _) in enumerate(salas)
+                for entrada in grade(SEGUNDA, horas[2 * posicao : 2 * posicao + 2], ANA, sala_id)
+            ]
+        },
+    )
+    mensagem = mensagem_tool("consultar_ocupacao", {"data": SEGUNDA.isoformat()}, fonte)
+    bloco = BlocoRelatorio.model_validate(mensagem.artifact)
+    esperado = ["Sala 1", "Sala 2", "Sala 10"]
+    assert isinstance(bloco.dados, DadosOcupacaoAgregada)
+    assert [i.rotulo for i in bloco.dados.por_sala] == esperado
+    tabela = next(t for t in bloco.tabelas if t.nome == "Por sala")
+    assert [linha["rotulo"] for linha in tabela.linhas] == esperado
+    texto = str(mensagem.content).split("Por sala:")[1]
+    assert re.findall(r"- (Sala \d+):", texto) == esperado

@@ -4,6 +4,7 @@ Só projeções explícitas dos resultados da engine: nunca texto analisado,
 entidades de pacientes, arquivos ou desenho. IDs de profissionais são opacos.
 """
 
+import re
 from datetime import date
 from hashlib import sha256
 from typing import Annotated, Literal
@@ -234,6 +235,27 @@ def ocupacao_agregada_acima_de_cem(resultado: RelatorioOcupacaoDoDia) -> bool:
         0 < a.slots_escalados < a.slots_ocupados
         for a in [*resultado.por_especialidade().values(), *resultado.por_sala().values()]
     )
+
+
+def _chave_natural(texto: str) -> tuple[str | int, ...]:
+    """`Sala 10` -> `("sala ", 10, "")`: números comparados como números (Sala 2 < Sala 10)."""
+    return tuple(
+        int(parte) if i % 2 else parte
+        for i, parte in enumerate(re.split(r"(\d+)", texto.casefold()))
+    )
+
+
+def salas_em_ordem_natural(
+    por_sala: dict[str, OcupacaoAgregada], nomes_salas: dict[str, str]
+) -> list[tuple[str, OcupacaoAgregada]]:
+    """(nome de exibição, ocupação) por número da sala; o id desempata."""
+    return [
+        (nomes_salas.get(sala_id, sala_id), agregada)
+        for sala_id, agregada in sorted(
+            por_sala.items(),
+            key=lambda par: (_chave_natural(nomes_salas.get(par[0], par[0])), par[0]),
+        )
+    ]
 
 
 def _com_aviso(avisos: list[str], acima_de_cem: bool) -> list[str]:
@@ -499,7 +521,7 @@ def bloco_ocupacao_agregada(
         item(e.value.replace("_", " ").title(), a)
         for e, a in sorted(resultado.por_especialidade().items(), key=lambda par: par[0].value)
     ]
-    salas = [item(nomes_salas.get(s, s), a) for s, a in sorted(resultado.por_sala().items())]
+    salas = [item(n, a) for n, a in salas_em_ordem_natural(resultado.por_sala(), nomes_salas)]
     colunas: list[tuple[str, str, Formato]] = [
         ("rotulo", "Nome", "texto"),
         ("slots_escalados", "Slots escalados", "inteiro"),
@@ -509,7 +531,7 @@ def bloco_ocupacao_agregada(
     ]
     return BlocoRelatorio(
         tipo="ocupacao_agregada",
-        titulo=f"Ocupação de {resultado.data.isoformat()}",
+        titulo=f"Ocupação de {resultado.data.strftime('%d/%m/%Y')}",
         periodo=PeriodoRelatorio(inicio=resultado.data, fim=resultado.data),
         meta=META_OCUPACAO_POR_SALA,
         parcial=False,

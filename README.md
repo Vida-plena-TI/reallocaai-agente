@@ -216,7 +216,17 @@ exportação por conta própria. O envio de relatório no corpo de e-mail já ex
 continua sendo uma funcionalidade separada.
 
 Em `uv run python scripts/chat_manual.py --verbose`, cada turno também imprime o
-tipo e o título dos blocos, além do rastro de tools.
+tipo e o título dos blocos, além do rastro de tools. Por padrão o script usa a variante
+de texto completo do prompt (`renderiza_relatorios: false`); com `--renderiza`, cria o
+agente com `renderiza_relatorios=True`, a variante curta usada por clientes que mostram
+os blocos na tela. As flags combinam:
+`uv run python scripts/chat_manual.py 2026-10-05 --renderiza --verbose`.
+
+Textos voltados ao usuário nos blocos (`titulo`, `resumo[].exibicao`, `avisos`, nomes de
+tabelas) usam datas em dd/mm/aaaa, por exemplo "Ocupação de 05/10/2026"; datas ISO
+aparecem só nos campos de dados (`periodo`, `data`, `dias_nao_lidos`, colunas de formato
+`data`). As salas seguem ordem natural pelo número (Sala 1, Sala 2, Sala 10) no texto de
+`consultar_ocupacao`, em `dados.por_sala` e na tabela **Por sala**.
 
 ### `POST /relatorio/enviar`
 
