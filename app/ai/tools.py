@@ -695,6 +695,18 @@ class ArgsEnviarRelatorio(BaseModel):
     )
 
 
+def envio_de_email_configurado() -> bool:
+    """`True` quando o Resend está configurado (`RESEND_API_KEY` e `REPORT_EMAIL_FROM`).
+
+    A decisão é por configuração, não por tentativa: sem as duas variáveis
+    preenchidas, a tool `enviar_relatorio` nem é registrada (e o prompt diz que
+    o envio não está disponível), em vez de ser oferecida ao agente e só falhar
+    quando alguém pedir o envio.
+    """
+    settings = get_settings()
+    return bool(settings.resend_api_key) and bool(settings.report_email_from)
+
+
 def criar_tools(
     fonte: ScheduleDataSource,
     continuidade: ContinuidadeDataSource,
@@ -1168,7 +1180,7 @@ def criar_tools(
             f"{len(destinatarios_efetivos)} destinatário(s)."
         )
 
-    return [
+    tools: list[BaseTool] = [
         buscar_paciente_tool,
         buscar_encaixe_tool,
         consultar_disponibilidade_tool,
@@ -1176,5 +1188,8 @@ def criar_tools(
         consultar_ocupacao_profissional_tool,
         consultar_pacientes_por_profissional_tool,
         sugerir_realocacao_tool,
-        enviar_relatorio_tool,
     ]
+    # Por configuração, não por tentativa: sem Resend, a tool não existe para o agente.
+    if envio_de_email_configurado():
+        tools.append(enviar_relatorio_tool)
+    return tools

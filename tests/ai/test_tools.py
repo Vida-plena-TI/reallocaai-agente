@@ -13,6 +13,7 @@ import pytest
 from langchain_core.tools import BaseTool
 
 from app.ai.tools import EnviarRelatorio, criar_tools
+from app.config import Settings
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import (
     Atendimento,
@@ -27,6 +28,7 @@ from app.domain import (
 )
 from app.reports.exceptions import ReportsEnvioError
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
+from tests.support.resend import configurar_resend
 
 DIA = date(2026, 9, 8)
 PACIENTE_UM = Paciente(id="paciente-um", nome="Paciente Um")
@@ -635,6 +637,46 @@ def test_sugerir_realocacao_tool_sem_alternativa_disponivel() -> None:
 # ---- enviar_relatorio ----
 
 
+def _nomes_das_tools() -> list[str]:
+    return [
+        item.name
+        for item in criar_tools(
+            FakeScheduleDataSource(), _continuidade_vazia(), DIA, _enviar_relatorio_nao_usado
+        )
+    ]
+
+
+def test_enviar_relatorio_nao_e_registrada_sem_resend_configurado() -> None:
+    nomes = _nomes_das_tools()
+    assert "enviar_relatorio" not in nomes
+    assert "consultar_ocupacao" in nomes
+
+
+@pytest.mark.parametrize(
+    "api_key,remetente",
+    [("re_test_key", None), (None, "r@exemplo.com.br"), ("", "r@exemplo.com.br")],
+)
+def test_enviar_relatorio_exige_as_duas_variaveis_preenchidas(
+    monkeypatch: pytest.MonkeyPatch, api_key: str | None, remetente: str | None
+) -> None:
+    settings = Settings(resend_api_key=api_key, report_email_from=remetente)
+    monkeypatch.setattr("app.ai.tools.get_settings", lambda: settings)
+    assert "enviar_relatorio" not in _nomes_das_tools()
+
+
+def test_enviar_relatorio_e_registrada_com_resend_configurado(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configurar_resend(monkeypatch, ativo=True)
+    assert _nomes_das_tools()[-1] == "enviar_relatorio"
+
+
+@pytest.fixture
+def _resend_ligado(monkeypatch: pytest.MonkeyPatch) -> None:
+    configurar_resend(monkeypatch, ativo=True)
+
+
+@pytest.mark.usefixtures("_resend_ligado")
 def test_enviar_relatorio_tool_sucesso_confirma_quantidade_de_destinatarios() -> None:
     chamadas: list[tuple[Any, date, list[str] | None]] = []
     origem = FakeScheduleDataSource()
@@ -654,6 +696,7 @@ def test_enviar_relatorio_tool_sucesso_confirma_quantidade_de_destinatarios() ->
     assert chamadas[0][2] == ["a@b.com", "c@d.com"]
 
 
+@pytest.mark.usefixtures("_resend_ligado")
 def test_enviar_relatorio_tool_sem_data_usa_data_de_referencia_da_conversa() -> None:
     chamadas: list[tuple[Any, date, list[str] | None]] = []
     origem = FakeScheduleDataSource()
@@ -672,6 +715,7 @@ def test_enviar_relatorio_tool_sem_data_usa_data_de_referencia_da_conversa() -> 
     assert chamadas[0][1] == DIA
 
 
+@pytest.mark.usefixtures("_resend_ligado")
 def test_enviar_relatorio_tool_erro_devolve_mensagem_clara() -> None:
     def _levanta_erro(fonte: Any, data: date, destinatarios: list[str] | None) -> None:
         raise ReportsEnvioError("falha simulada")

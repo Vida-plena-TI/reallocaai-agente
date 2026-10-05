@@ -108,16 +108,35 @@ Prefira listas curtas a parágrafos longos quando estiver listando horários \
 ou opções.
 """
 
-_REGRA_ARQUIVOS = """
+#: Trechos que só existem quando a tool `enviar_relatorio` está registrada
+#: (Resend configurado; ver `envio_de_email_configurado` em `app/ai/tools.py`).
+_REGRA_ENVIAR_RELATORIO = """\
+- Só chame `enviar_relatorio` quando o pedido for claro e explícito sobre \
+mandar o relatório por e-mail (ex.: "manda o relatório de hoje"). Nunca \
+acione esse envio por conta própria, nem como parte de outra resposta.
+"""
+
+_REGRA_EMAIL_INDISPONIVEL = """\
+- O envio do relatório por e-mail não está disponível neste ambiente: nunca \
+ofereça esse envio. Se pedirem, responda em uma frase que o envio por e-mail \
+não está disponível.
+"""
+
+_FRASE_EMAIL_NO_CORPO = """ O envio explícito de relatório por
+e-mail já existente envia o conteúdo no corpo do e-mail, sem gerar arquivo."""
+
+_FRASE_NAO_OFERECER_EMAIL = """ Não ofereça enviar o relatório por e-mail por conta própria;
+só chame enviar_relatorio se o usuário pedir o e-mail explicitamente."""
+
+_REGRA_ARQUIVOS = f"""
 ## Relatórios e arquivos
 
 O RealocAI apenas entrega dados: não gera arquivos, não exporta dados e não
 desenha relatórios. NUNCA diga que exportou ou enviou um arquivo, PDF ou Excel.
-Não ofereça exportação por conta própria. O envio explícito de relatório por
-e-mail já existente envia o conteúdo no corpo do e-mail, sem gerar arquivo.
+Não ofereça exportação por conta própria.{_FRASE_EMAIL_NO_CORPO}
 """
 
-PROMPT_SISTEMA = (
+_PROMPT_SISTEMA_TEXTO = (
     _PROMPT_BASE
     + _REGRA_ARQUIVOS
     + """
@@ -127,7 +146,7 @@ neste canal.
 )
 
 # A tela substitui a reprodução da lista só nas três tools que geram blocos.
-PROMPT_SISTEMA_COM_RELATORIOS = (
+_PROMPT_SISTEMA_RELATORIOS = (
     _PROMPT_BASE.replace(
         "mantendo a lista por dia e o total da semana.",
         "destacando o que mais importa no relatório mostrado na tela.",
@@ -170,7 +189,28 @@ relatórios, chame as duas tools.
 
 Exportação: se pedirem PDF, Excel ou exportação, responda em uma frase que o relatório
 mostrado na tela tem botões "Exportar", sem oferecer outras ações. A exportação é
-realizada pelo app visual. Não ofereça enviar o relatório por e-mail por conta própria;
-só chame enviar_relatorio se o usuário pedir o e-mail explicitamente.
-"""
+realizada pelo app visual."""
+    + _FRASE_NAO_OFERECER_EMAIL
+    + "\n"
 )
+
+
+def prompt_de_sistema(*, renderiza_relatorios: bool, envio_email: bool) -> str:
+    """Template do prompt (ainda com `{data_referencia}`/`{dia_da_semana}`).
+
+    `envio_email` deve refletir se `enviar_relatorio` foi registrada: sem ela,
+    o prompt não cita a tool e diz que o envio por e-mail não está disponível.
+    """
+    prompt = _PROMPT_SISTEMA_RELATORIOS if renderiza_relatorios else _PROMPT_SISTEMA_TEXTO
+    if envio_email:
+        return prompt
+    return (
+        prompt.replace(_REGRA_ENVIAR_RELATORIO, _REGRA_EMAIL_INDISPONIVEL)
+        .replace(_FRASE_EMAIL_NO_CORPO, "")
+        .replace(_FRASE_NAO_OFERECER_EMAIL, "")
+    )
+
+
+#: Variantes com o envio por e-mail disponível (Resend configurado).
+PROMPT_SISTEMA = prompt_de_sistema(renderiza_relatorios=False, envio_email=True)
+PROMPT_SISTEMA_COM_RELATORIOS = prompt_de_sistema(renderiza_relatorios=True, envio_email=True)

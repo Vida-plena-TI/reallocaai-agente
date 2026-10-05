@@ -30,7 +30,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import ValidationError
 
-from app.ai.prompts import PROMPT_SISTEMA, PROMPT_SISTEMA_COM_RELATORIOS
+from app.ai.prompts import prompt_de_sistema
 from app.ai.relatorios import BlocoRelatorio
 from app.ai.tools import DIAS_DA_SEMANA, EnviarRelatorio, criar_tools
 from app.config import exigir, get_settings
@@ -96,7 +96,11 @@ def criar_agente(
     de não ser importado direto de `app.reports`).
     """
     tools = criar_tools(fonte, continuidade, data_referencia, enviar_relatorio)
-    variante = PROMPT_SISTEMA_COM_RELATORIOS if renderiza_relatorios else PROMPT_SISTEMA
+    # O prompt só cita o envio por e-mail quando a tool foi registrada.
+    variante = prompt_de_sistema(
+        renderiza_relatorios=renderiza_relatorios,
+        envio_email=any(item.name == "enviar_relatorio" for item in tools),
+    )
     prompt = variante.format(
         data_referencia=data_referencia.strftime("%d/%m/%Y"),
         dia_da_semana=DIAS_DA_SEMANA[data_referencia.weekday()],

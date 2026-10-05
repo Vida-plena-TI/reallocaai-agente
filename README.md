@@ -265,6 +265,20 @@ O mesmo envio também pode ser disparado **por conversa com o agente** (`/agenda
 através da tool `enviar_relatorio` — o agente só a aciona quando o pedido for claro e
 explícito (ex.: "manda o relatório de hoje").
 
+**A tool só existe quando o Resend está configurado.** `criar_tools` registra
+`enviar_relatorio` apenas se `RESEND_API_KEY` e `REPORT_EMAIL_FROM` estiverem preenchidos
+(`envio_de_email_configurado()` em `app/ai/tools.py`). A decisão é por configuração, não por
+tentativa: sem as duas variáveis, o agente nem vê a tool, e o prompt de sistema (nas duas
+variantes) diz que o envio por e-mail não está disponível neste ambiente, que o agente não deve
+oferecê-lo e que, se pedirem, responde em uma frase que não está disponível. Com o Resend
+configurado, a tool e o prompt voltam ao comportamento descrito acima, incluindo a regra de não
+oferecer o e-mail por conta própria. Os valores de exemplo do `.env.example` não estão vazios:
+para desligar o envio, deixe as duas variáveis em branco. Esta regra vale só para o agente; o
+endpoint `POST /relatorio/enviar` não foi alterado.
+
+Para revisar o e-mail sem o Resend, use `scripts/preview_email.py` (ver
+[Scripts exploratórios](#scripts-exploratórios)).
+
 ### Ocupação de uma profissional (tool `consultar_ocupacao_profissional`)
 
 Responde, pelo chat, perguntas como "qual a taxa de ocupação da profissional Rossana?": a
@@ -359,6 +373,21 @@ planilha compartilhada com o e-mail da service account (basta permissão de leit
 
 O relatório é impresso no terminal e salvo em `scripts/output/sheet_inspection.txt`. Essa pasta
 é git-ignorada — o output contém dados reais de pacientes e profissionais.
+
+### `scripts/preview_email.py`
+
+Gera localmente o e-mail do relatório de ocupação de uma data (padrão: hoje), com a planilha
+real (`GoogleSheetsDataSource`), **sem usar o Resend e sem enviar nada**. Grava o HTML e o texto
+do corpo em `scripts/output/preview_email.html` e `scripts/output/preview_email.txt` e imprime os
+caminhos.
+
+```bash
+uv run python scripts/preview_email.py [AAAA-MM-DD]
+```
+
+Exige só as credenciais do Google Sheets. O relatório traz salas, especialidades e contagens,
+sem nomes de pacientes, mas vem da agenda real: por isso a saída fica em `scripts/output/`, que
+é git-ignorada.
 
 ### `scripts/avaliar_prompt_renderiza.py`
 
