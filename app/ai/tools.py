@@ -18,12 +18,15 @@ import math
 from collections import Counter
 from collections.abc import Callable
 from datetime import date, time
+from decimal import ROUND_HALF_UP, Decimal
 
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
 from app.ai.servico_agenda import (
     ItemDemandaBruta,
+    ProfissionalAmbiguo,
+    ProfissionalNaoEncontrado,
     ResultadoAlternativas,
     ResultadoBuscaEncaixe,
     ResultadoExato,
@@ -31,8 +34,9 @@ from app.ai.servico_agenda import (
     buscar_paciente,
     consultar_disponibilidade_do_dia,
     consultar_ocupacao_do_dia,
-    dias_da_semana_de,
+    consultar_ocupacao_semanal_profissional,
     localizar_paciente,
+    localizar_profissional,
     sugerir_realocacao_por_id,
 )
 from app.config import get_settings
@@ -47,12 +51,21 @@ from app.domain import (
     Especialidade,
     ScheduleDataSource,
     Slot,
+    dias_da_semana_de,
     normalizar_id,
 )
-from app.domain.constants import HORARIO_FECHAMENTO, HORARIO_PREFERENCIAL_PADRAO
+from app.domain.constants import (
+    HORARIO_FECHAMENTO,
+    HORARIO_PREFERENCIAL_PADRAO,
+    META_OCUPACAO_POR_SALA,
+)
 from app.engine.disponibilidade import SlotDisponivel
 from app.engine.encaixe import CenarioSugestao, ItemEncaixeResolvido, OpcaoEncaixe
 from app.engine.ocupacao import OcupacaoAgregada
+from app.engine.ocupacao_profissional import (
+    OcupacaoDiaProfissional,
+    OcupacaoSemanalProfissional,
+)
 
 #: Assinatura de `enviar_relatorio_por_email` (`app.reports.envio`), recebida
 #: como parâmetro em vez de importada direto: `app.ai` não pode depender de
@@ -170,6 +183,145 @@ def _formatar_linha_ocupacao(rotulo: str, agregada: OcupacaoAgregada) -> str:
     return f"- {rotulo}: {agregada.percentual:.0%}{aviso}"
 
 
+#: Nome curto do dia da semana por `date.weekday()`, usado no texto de
+#: `consultar_ocupacao_profissional`.
+_DIAS_DA_SEMANA_CURTOS = ("Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo")
+
+#: Ressalva fixa de `consultar_ocupacao_profissional` enquanto a fonte for a
+#: planilha. Remover quando a agenda passar a vir do Agendador, com datas reais.
+NOTA_GRADE_SEMANAL = (
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da "
+    "semana, sem datas); os números refletem a grade vigente, não uma semana específica "
+    "do calendário."
+)
+
+
+def _formatar_percentual(slots_escalados: int, slots_ocupados: int) -> str:
+    """`31` de `40` -> `77,5%` (uma casa, arredondamento comercial, vírgula decimal).
+
+    Conta em `Decimal` a partir dos inteiros para não herdar artefato de ponto
+    flutuante na casa decimal exibida.
+    """
+    if slots_escalados == 0:
+        return "0,0%"
+    valor = (Decimal(slots_ocupados) * 100 / Decimal(slots_escalados)).quantize(
+        Decimal("0.1"), rounding=ROUND_HALF_UP
+    )
+    return f"{valor}%".replace(".", ",")
+
+
+def _rotulo_meta() -> str:
+    """`80%` — a meta da clínica, sem casa decimal."""
+    return f"{round(META_OCUPACAO_POR_SALA * 100)}%"
+
+
+def _plural(quantidade: int, singular: str, plural: str) -> str:
+    return singular if quantidade == 1 else plural
+
+
+def _situacao_meta(slots_para_meta: int) -> str:
+    if slots_para_meta == 0:
+        return "meta atingida"
+    return (
+        f"abaixo da meta; {_plural(slots_para_meta, 'falta', 'faltam')} {slots_para_meta} "
+        f"{_plural(slots_para_meta, 'slot', 'slots')} para {_rotulo_meta()}"
+    )
+
+
+def _resumo_ocupacao(slots_escalados: int, slots_ocupados: int, slots_livres: int) -> str:
+    """`77,5% — 31 de 40 slots ocupados, 9 livres`."""
+    return (
+        f"{_formatar_percentual(slots_escalados, slots_ocupados)} — {slots_ocupados} de "
+        f"{slots_escalados} {_plural(slots_escalados, 'slot ocupado', 'slots ocupados')}, "
+        f"{slots_livres} {_plural(slots_livres, 'livre', 'livres')}"
+    )
+
+
+def _rotulo_dia(dia: date) -> str:
+    return f"{_DIAS_DA_SEMANA_CURTOS[dia.weekday()]} ({dia.strftime('%d/%m')})"
+
+
+def _formatar_dia_ocupacao_profissional(dia: OcupacaoDiaProfissional) -> list[str]:
+    """Linha do dia e, quando ela passou por mais de uma sala/posto, uma linha por combinação.
+
+    O posto só aparece quando a mesma sala teve mais de um posto dela no dia;
+    é contado a partir de 1 no texto, como em `_sufixo_posto`.
+    """
+    blocos = [
+        f"{rotulo} {ocupados}/{escalados}"
+        for rotulo, escalados, ocupados in (
+            ("manhã", dia.manha_escalados, dia.manha_ocupados),
+            ("tarde", dia.tarde_escalados, dia.tarde_ocupados),
+        )
+        if escalados or ocupados
+    ]
+    resumo = _resumo_ocupacao(dia.slots_escalados, dia.slots_ocupados, dia.slots_livres)
+    linhas = [
+        f"- {_rotulo_dia(dia.data)}: {resumo} ({', '.join(blocos)}) — "
+        f"{_situacao_meta(dia.slots_para_meta)}"
+    ]
+    if len(dia.por_sala_posto) > 1:
+        postos_por_sala = Counter(item.sala_id for item in dia.por_sala_posto)
+        for item in dia.por_sala_posto:
+            posto = f" (posto {item.indice_posto + 1})" if postos_por_sala[item.sala_id] > 1 else ""
+            linhas.append(
+                f"  · {item.sala_nome}{posto}: {item.slots_ocupados} de {item.slots_escalados}"
+            )
+    return linhas
+
+
+def _formatar_ocupacao_profissional(ocupacao: OcupacaoSemanalProfissional) -> str:
+    """Texto de `consultar_ocupacao_profissional`: dia a dia, total da semana e ressalvas."""
+    especialidade = (
+        f" ({_rotulo_especialidade(ocupacao.especialidade)})"
+        if ocupacao.especialidade is not None
+        else ""
+    )
+    periodo = (
+        f"{ocupacao.semana_inicio.strftime('%d/%m')} a {ocupacao.semana_fim.strftime('%d/%m/%Y')}"
+    )
+    aviso_parcial = None
+    if ocupacao.parcial:
+        falhas = ", ".join(_rotulo_dia(dia) for dia in ocupacao.dias_com_falha)
+        aviso_parcial = f"Não foi possível ler: {falhas}; os totais da semana são parciais."
+
+    if not ocupacao.dias:
+        linhas = [f"{ocupacao.nome}{especialidade} não tem agenda na semana de {periodo}."]
+        if aviso_parcial is not None:
+            linhas.append(aviso_parcial)
+        linhas.append(NOTA_GRADE_SEMANAL)
+        return "\n".join(linhas)
+
+    linhas = [
+        f"Ocupação de {ocupacao.nome}{especialidade} — semana de {periodo}",
+        f"Meta: {_rotulo_meta()}",
+        "",
+        "Por dia:",
+    ]
+    for dia in ocupacao.dias:
+        linhas.extend(_formatar_dia_ocupacao_profissional(dia))
+    if ocupacao.dias_sem_agenda:
+        sem_agenda = ", ".join(
+            _DIAS_DA_SEMANA_CURTOS[dia.weekday()] for dia in ocupacao.dias_sem_agenda
+        )
+        linhas.append(f"Sem agenda: {sem_agenda}.")
+    resumo_semana = _resumo_ocupacao(
+        ocupacao.slots_escalados, ocupacao.slots_ocupados, ocupacao.slots_livres
+    )
+    linhas.append("")
+    linhas.append(f"Semana: {resumo_semana} — {_situacao_meta(ocupacao.slots_para_meta)}")
+    if aviso_parcial is not None:
+        linhas.append(aviso_parcial)
+    if ocupacao.tem_inconsistencia:
+        linhas.append(
+            "Atenção: há atendimentos fora dos horários escalados da profissional "
+            "(possível inconsistência na planilha)."
+        )
+    linhas.append("")
+    linhas.append(NOTA_GRADE_SEMANAL)
+    return "\n".join(linhas)
+
+
 def _formatar_resultado_encaixe(
     fonte: ScheduleDataSource,
     dia: date,
@@ -272,6 +424,19 @@ class ArgsConsultarDisponibilidade(BaseModel):
 
 class ArgsConsultarOcupacao(BaseModel):
     data: date = Field(description="Data a consultar, no formato AAAA-MM-DD.")
+
+
+class ArgsConsultarOcupacaoProfissional(BaseModel):
+    profissional: str = Field(
+        description="Nome (ou parte do nome) da profissional, como citado na pergunta."
+    )
+    data: date | None = Field(
+        default=None,
+        description=(
+            "Qualquer data da semana a consultar, no formato AAAA-MM-DD. Deixe em branco "
+            "para usar a semana de hoje."
+        ),
+    )
 
 
 class ArgsSugerirRealocacao(BaseModel):
@@ -500,7 +665,8 @@ def criar_tools(
         """Ocupação do dia, por especialidade e por sala, sinalizando quem está abaixo da meta.
 
         Use para perguntas do tipo "como está a ocupação hoje?" ou "tem sala
-        ociosa?".
+        ociosa?". Para a taxa de ocupação de UMA profissional específica, use
+        `consultar_ocupacao_profissional`.
         """
         try:
             relatorio = consultar_ocupacao_do_dia(fonte, data)
@@ -526,6 +692,44 @@ def criar_tools(
             for sala_id, agregada in sorted(por_sala.items())
         )
         return "\n".join(linhas)
+
+    @tool("consultar_ocupacao_profissional", args_schema=ArgsConsultarOcupacaoProfissional)
+    def consultar_ocupacao_profissional_tool(profissional: str, data: date | None = None) -> str:
+        """Taxa de ocupação de UMA profissional, dia a dia e no total da semana, frente à meta.
+
+        Use quando pedirem a taxa de ocupação de uma profissional específica
+        ("qual a ocupação da Rossana?"), por dia e por semana. NÃO use para
+        ocupação por especialidade ou por sala — para isso, use
+        `consultar_ocupacao`.
+        """
+        data_efetiva = data if data is not None else data_referencia
+        try:
+            localizacao = localizar_profissional(fonte, data_efetiva, profissional)
+            if isinstance(localizacao, ProfissionalAmbiguo):
+                candidatos = ", ".join(
+                    f"{candidato.nome} ({_rotulo_especialidade(candidato.especialidade)})"
+                    for candidato in localizacao.candidatos
+                )
+                return (
+                    f"Mais de uma profissional corresponde a '{profissional}': {candidatos}. "
+                    "Pergunte qual delas a pessoa quis dizer antes de consultar a ocupação."
+                )
+            if isinstance(localizacao, ProfissionalNaoEncontrado):
+                semana = dias_da_semana_de(data_efetiva)
+                disponiveis = ", ".join(localizacao.nomes_disponiveis) or "nenhum"
+                return (
+                    f"Não há profissional com o nome '{profissional}' na agenda da semana de "
+                    f"{semana[0].strftime('%d/%m')} a {semana[-1].strftime('%d/%m/%Y')}. "
+                    f"Profissionais disponíveis: {disponiveis}."
+                )
+
+            ocupacao = consultar_ocupacao_semanal_profissional(
+                fonte, localizacao.profissional_id, data_efetiva
+            )
+        except Exception as erro:
+            return f"Erro ao consultar ocupação da profissional: {erro}"
+
+        return _formatar_ocupacao_profissional(ocupacao)
 
     @tool("sugerir_realocacao", args_schema=ArgsSugerirRealocacao)
     def sugerir_realocacao_tool(
@@ -592,6 +796,7 @@ def criar_tools(
         buscar_encaixe_tool,
         consultar_disponibilidade_tool,
         consultar_ocupacao_tool,
+        consultar_ocupacao_profissional_tool,
         sugerir_realocacao_tool,
         enviar_relatorio_tool,
     ]

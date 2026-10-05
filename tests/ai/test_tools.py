@@ -732,6 +732,11 @@ class FonteQuebrada:
         ),
         ("consultar_ocupacao", {"data": "2026-09-08"}, "Erro ao consultar ocupação:"),
         (
+            "consultar_ocupacao_profissional",
+            {"profissional": "Ana"},
+            "Erro ao consultar ocupação da profissional:",
+        ),
+        (
             "sugerir_realocacao",
             {"atendimento_id": "at-1", "data": "2026-09-08"},
             "Erro ao sugerir realocação:",

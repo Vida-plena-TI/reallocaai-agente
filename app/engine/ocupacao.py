@@ -18,7 +18,7 @@ from app.domain.slot import Slot
 logger = logging.getLogger(__name__)
 
 
-def _percentual(slots_escalados: int, slots_ocupados: int) -> float:
+def percentual_de_ocupacao(slots_escalados: int, slots_ocupados: int) -> float:
     """Fração de slots escalados já ocupados, sem dividir por zero."""
     if slots_escalados == 0:
         return 0.0
@@ -39,7 +39,7 @@ class OcupacaoProfissional(BaseModel):
     @property
     def percentual(self) -> float:
         """Fração de `slots_escalados` já ocupada (0.0 quando não há escala)."""
-        return _percentual(self.slots_escalados, self.slots_ocupados)
+        return percentual_de_ocupacao(self.slots_escalados, self.slots_ocupados)
 
 
 class OcupacaoAgregada(BaseModel):
@@ -53,7 +53,7 @@ class OcupacaoAgregada(BaseModel):
     @property
     def percentual(self) -> float:
         """Fração de `slots_escalados` já ocupada (0.0 quando não há escala)."""
-        return _percentual(self.slots_escalados, self.slots_ocupados)
+        return percentual_de_ocupacao(self.slots_escalados, self.slots_ocupados)
 
     @property
     def abaixo_da_meta(self) -> bool:

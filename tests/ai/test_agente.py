@@ -23,6 +23,7 @@ from app.ai.prompts import PROMPT_SISTEMA
 from app.config import Settings
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
 from app.domain import Atendimento, EntradaGrade, Especialidade, Profissional, Slot
+from tests.support.agenda_semanal import LUCIANA, SEGUNDA, atendimentos, grade, horas_da_manha
 from tests.support.fake_chat_model import FakeToolCallingChatModel
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 
@@ -346,3 +347,52 @@ def test_prompt_de_sistema_proibe_buscar_paciente_antes_do_encaixe() -> None:
     assert "nunca use esse resultado para interromper um encaixe" in prompt
     assert "pergunte uma única vez se é a mesma pessoa" in prompt
     assert "confirmar o nome ou o id" not in prompt
+
+
+def test_agente_consulta_a_ocupacao_de_uma_profissional_pela_tool_dedicada() -> None:
+    manha = horas_da_manha(SEGUNDA)
+    origem = FakeScheduleDataSource(
+        profissionais={SEGUNDA: [LUCIANA]},
+        grade={SEGUNDA: grade(SEGUNDA, manha)},
+        atendimentos={SEGUNDA: atendimentos(SEGUNDA, manha[:7])},
+    )
+    fake_model = FakeToolCallingChatModel(
+        responses=[
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "consultar_ocupacao_profissional",
+                        "args": {"profissional": "Luciana"},
+                        "id": "call-1",
+                    }
+                ],
+            ),
+            AIMessage(content="A Luciana está com 70,0% de ocupação na semana."),
+        ]
+    )
+
+    agente = criar_agente(
+        origem,
+        SemHistoricoContinuidadeDataSource(),
+        fake_model,
+        SEGUNDA,
+        _enviar_relatorio_nao_usado,
+    )
+    resultado = agente.invoke({"messages": [HumanMessage("Qual a ocupação da Luciana?")]})
+
+    mensagens_de_tool = [
+        mensagem for mensagem in resultado["messages"] if isinstance(mensagem, ToolMessage)
+    ]
+    assert len(mensagens_de_tool) == 1
+    assert "Ocupação de Luciana (Psicologia)" in mensagens_de_tool[0].content
+    assert "Semana: 70,0% — 7 de 10 slots ocupados" in mensagens_de_tool[0].content
+    assert resultado["messages"][-1].content == "A Luciana está com 70,0% de ocupação na semana."
+
+
+def test_prompt_de_sistema_manda_usar_a_tool_de_ocupacao_da_profissional() -> None:
+    prompt = PROMPT_SISTEMA.format(data_referencia="08/09/2026", dia_da_semana="terça-feira")
+
+    assert "chame `consultar_ocupacao_profissional`" in prompt
+    assert "nunca calcule essa taxa a partir de outras ferramentas" in prompt
+    assert "sem recalcular nem" in prompt

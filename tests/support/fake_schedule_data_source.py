@@ -20,23 +20,35 @@ class FakeScheduleDataSource:
     pacientes: dict[date, list[Paciente]] = field(default_factory=dict)
     grade: dict[date, list[EntradaGrade]] = field(default_factory=dict)
     atendimentos: dict[date, list[Atendimento]] = field(default_factory=dict)
+    #: Dias cuja leitura falha (qualquer método levanta `RuntimeError`), para
+    #: simular uma aba da planilha ilegível.
+    dias_com_falha: set[date] = field(default_factory=set)
+
+    def _falhar_se_preciso(self, dia: date) -> None:
+        if dia in self.dias_com_falha:
+            raise RuntimeError(f"falha simulada ao ler {dia.isoformat()}")
 
     def listar_salas(self, dia: date) -> list[Sala]:
         """Salas em uso no dia, com a capacidade simultânea de cada uma."""
+        self._falhar_se_preciso(dia)
         return self.salas.get(dia, [])
 
     def listar_profissionais(self, dia: date) -> list[Profissional]:
         """Profissionais escalados no dia."""
+        self._falhar_se_preciso(dia)
         return self.profissionais.get(dia, [])
 
     def listar_grade(self, dia: date) -> list[EntradaGrade]:
         """Todas as janelas (sala, profissional, slot) abertas no dia."""
+        self._falhar_se_preciso(dia)
         return self.grade.get(dia, [])
 
     def listar_atendimentos(self, dia: date) -> list[Atendimento]:
         """Atendimentos já alocados no dia."""
+        self._falhar_se_preciso(dia)
         return self.atendimentos.get(dia, [])
 
     def listar_pacientes(self, dia: date) -> list[Paciente]:
         """Todos os pacientes que aparecem em algum `Atendimento` do dia."""
+        self._falhar_se_preciso(dia)
         return self.pacientes.get(dia, [])

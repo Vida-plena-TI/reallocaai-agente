@@ -186,6 +186,31 @@ O mesmo envio também pode ser disparado **por conversa com o agente** (`/agenda
 através da tool `enviar_relatorio` — o agente só a aciona quando o pedido for claro e
 explícito (ex.: "manda o relatório de hoje").
 
+### Ocupação de uma profissional (tool `consultar_ocupacao_profissional`)
+
+Responde, pelo chat, perguntas como "qual a taxa de ocupação da profissional Rossana?": a
+ocupação dela **dia a dia** (segunda a sábado da semana da data consultada, ou da semana de
+hoje) e o **total da semana**, sempre frente à meta de 80%.
+
+- O nome é resolvido entre os profissionais da semana sem diferenciar acento e caixa, e aceita
+  nome completo ou parcial por palavras ("Rossana Belfort" encontra `Rossana`). Se mais de uma
+  profissional corresponder, o agente lista as candidatas e pergunta qual é — nunca escolhe
+  sozinho; se nenhuma corresponder, lista os nomes disponíveis.
+- Cada dia traz percentual (uma casa decimal, ex.: `77,5%`), slots ocupados/escalados e livres,
+  os blocos manhã/tarde, quantos slots faltam para a meta e, quando ela passou por mais de uma
+  sala ou posto no dia, uma linha por sala/posto. O total da semana é **ponderado** pelos slots
+  de cada dia (não é a média dos percentuais diários).
+- As regras de contagem são as mesmas de `/agenda/ocupacao` (`app/engine/ocupacao.py`); o
+  cálculo vive em `app/engine/ocupacao_profissional.py`.
+- Dias sem escala dela aparecem como "Sem agenda"; um dia cuja leitura falhe é sinalizado e os
+  totais da semana ficam marcados como parciais; atendimento fora dos horários escalados gera
+  um aviso de possível inconsistência na planilha.
+
+**Limitação:** a planilha é uma grade semanal (uma aba por dia da semana, sem datas), então os
+números refletem a grade vigente, e não uma semana específica do calendário — a resposta da tool
+sempre traz essa ressalva (`NOTA_GRADE_SEMANAL` em `app/ai/tools.py`, a remover na migração
+para o Agendador).
+
 A documentação interativa completa (`/docs`) descreve o schema exato de cada endpoint,
 incluindo os campos de `/agenda/disponibilidade` e `/agenda/ocupacao`.
 
