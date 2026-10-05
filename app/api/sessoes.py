@@ -23,10 +23,13 @@ from dataclasses import dataclass, field
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
+from app.ai.relatorios import BlocoRelatorio
+
 
 @dataclass
 class _Conversa:
     historico: list[BaseMessage] = field(default_factory=list)
+    blocos_por_mensagem: list[list[BlocoRelatorio]] = field(default_factory=list)
     # `lambda: time.monotonic()`, não `time.monotonic` direto: o segundo capturaria a
     # função original já no momento em que este módulo é importado, o que impediria os
     # testes de simular o avanço do tempo via `monkeypatch.setattr(..., "time.monotonic", ...)`.
@@ -75,7 +78,11 @@ class ArmazenamentoConversas:
             return list(conversa.historico)
 
     def registrar_troca(
-        self, conversa_id: str, mensagem_usuario: str, resposta_agente: str
+        self,
+        conversa_id: str,
+        mensagem_usuario: str,
+        resposta_agente: str,
+        blocos: list[BlocoRelatorio] | None = None,
     ) -> None:
         """Adiciona a pergunta e a resposta ao histórico e atualiza o instante de último uso.
 
@@ -90,4 +97,29 @@ class ArmazenamentoConversas:
                 return
             conversa.historico.append(HumanMessage(mensagem_usuario))
             conversa.historico.append(AIMessage(resposta_agente))
+            conversa.blocos_por_mensagem.extend(
+                [
+                    [],
+                    [bloco.model_copy(deep=True) for bloco in blocos or []],
+                ]
+            )
             conversa.ultimo_uso = time.monotonic()
+
+    def obter_historico_com_blocos(
+        self,
+        conversa_id: str,
+    ) -> list[tuple[BaseMessage, list[BlocoRelatorio]]] | None:
+        """Snapshot para a API; obter_historico continua trazendo só texto ao modelo."""
+        with self._lock:
+            self._remover_expiradas()
+            conversa = self._conversas.get(conversa_id)
+            if conversa is None:
+                return None
+            return [
+                (mensagem, [b.model_copy(deep=True) for b in blocos])
+                for mensagem, blocos in zip(
+                    conversa.historico,
+                    conversa.blocos_por_mensagem,
+                    strict=True,
+                )
+            ]

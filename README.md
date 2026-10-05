@@ -129,7 +129,8 @@ Corpo da requisição:
 ```json
 {
   "conversa_id": null,
-  "mensagem": "Tem vaga de psicologia hoje à tarde?"
+  "mensagem": "Tem vaga de psicologia hoje à tarde?",
+  "renderiza_relatorios": false
 }
 ```
 
@@ -137,19 +138,72 @@ Corpo da requisição:
   conversa existente, envie o `conversa_id` devolvido numa resposta anterior — o histórico
   completo do diálogo é reaproveitado automaticamente.
 - `mensagem`: texto da pergunta ao agente (não pode ser vazia nem conter só espaços).
+- `renderiza_relatorios`: opcional, `false` por padrão. Use `true` quando o cliente
+  mostra as tabelas e os destaques dos relatórios na tela. Nesse modo, o agente
+  responde em 1 a 3 frases com os destaques, sem repetir a lista ou a tabela.
+  Omitido ou `false` mantém as respostas detalhadas atuais.
 
 Resposta:
 
 ```json
 {
   "conversa_id": "3f1b1e4a-...",
-  "resposta": "Sim, há um horário às 14h com a Dra. Ana na Sala 2."
+  "resposta": "Sim, há um horário às 14h com a Dra. Ana na Sala 2.",
+  "blocos": []
 }
 ```
 
 Conversas ficam **em memória** (perdidas num restart do processo) e expiram após um período
 de inatividade. Um `conversa_id` inexistente ou expirado devolve `404`; um erro inesperado ao
 rodar o agente (rede, modelo) devolve `502`, sem vazar detalhes internos na resposta.
+
+O campo `blocos` está sempre presente, mesmo quando vazio e independentemente de
+`renderiza_relatorios`. As consultas de ocupação profissional, pacientes por profissional
+e ocupação agregada devolvem dados tipados em `app/ai/relatorios.py`, versão 1:
+
+- `tipo`, `titulo`, `periodo` (início e fim ISO), `meta`, `parcial` e `avisos`;
+- `resumo`: valores e strings de exibição já formatadas;
+- `dados`: união discriminada por `tipo`, com os detalhes específicos da consulta;
+- `tabelas`: nomes, colunas (`chave`, `rotulo`, `formato`) e linhas prontas para exportação.
+
+O tipo `ocupacao_profissional` traz a semana, os dias, manhã/tarde, salas/postos e
+inconsistências, com as tabelas **Por dia** e **Resumo da semana**.
+`pacientes_por_profissional` traz pacientes, sessões, slots, dias sem agenda, média
+por dia com agenda e distintos por profissional no período; as tabelas são
+**Por profissional e dia**, **Resumo por profissional** e **Clínica por dia**.
+Os totais da clínica por dia representam a clínica inteira, mesmo com filtro de
+profissional ou especialidade. A engine não fornece pacientes distintos da clínica
+na semana: os totais diários não são somados como se fossem pessoas únicas na semana.
+O resumo traz distintos e média quando disponíveis para a consulta individual semanal,
+ou os distintos da clínica na consulta diária geral.
+`ocupacao_agregada` traz o mesmo conteúdo de `/agenda/ocupacao`, com as tabelas
+**Por especialidade** e **Por sala**.
+
+Texto e blocos usam o mesmo resultado da engine. Os dados preservam valores sem
+arredondamento, contagens inteiras, percentuais como frações e dias da semana por extenso.
+As strings de exibição usam `ROUND_HALF_UP`, uma casa decimal e vírgula, também no
+texto das tools (a ocupação agregada antes usava percentual sem casa decimal).
+Em caso de inconsistência na grade, a engine pode produzir ocupação acima de 100%.
+Como o contrato limita percentuais a 0–1, esse caso segue o caminho de erro sem bloco,
+sem limitar nem alterar os números da engine.
+Os blocos não contêm nomes nem IDs de pacientes; IDs de profissionais são opacos.
+Ambiguidade, profissional não encontrada, ausência de agenda, especialidade desconhecida
+ou erro devolvem apenas texto, com `blocos: []`. Há no máximo dez blocos por turno.
+
+`GET /agenda/chat/{conversa_id}` devolve `blocos` associados a cada resposta do agente
+(lista vazia nas mensagens do usuário). São armazenados separados do histórico textual,
+e não enviados ao modelo nas rodadas seguintes. Clientes antigos podem ignorar o campo.
+
+**O RealocAI não desenha relatórios nem gera PDF ou Excel.** O app visual de outro projeto
+renderiza os dados e implementa a exportação. Se o usuário pedir exportação, com
+`renderiza_relatorios: true` o agente informa que o relatório na tela tem botões
+"Exportar"; com `false`, informa que a exportação não está disponível neste canal.
+As duas variantes proíbem afirmar que um arquivo foi exportado ou enviado e oferecer
+exportação por conta própria. O envio de relatório no corpo de e-mail já existente
+continua sendo uma funcionalidade separada.
+
+Em `uv run python scripts/chat_manual.py --verbose`, cada turno também imprime o
+tipo e o título dos blocos, além do rastro de tools.
 
 ### `POST /relatorio/enviar`
 

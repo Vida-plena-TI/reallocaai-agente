@@ -122,12 +122,14 @@ def main() -> None:
             break
 
         historico.append(HumanMessage(pergunta))
-        resposta, mensagens = perguntar_com_mensagens(agente, historico)
+        resposta, mensagens, blocos = perguntar_com_mensagens(agente, historico)
         mensagens_do_turno = mensagens[len(historico) :]
         historico.append(AIMessage(resposta))
         print(f"RealocAI: {resposta}\n")
         if argumentos.verbose:
             print(f"[tools do turno]\n{formatar_rastro_de_tools(mensagens_do_turno)}\n")
+            for bloco in blocos:
+                print(f"[relatório] {bloco.tipo}: {bloco.titulo}")
 
 
 if __name__ == "__main__":

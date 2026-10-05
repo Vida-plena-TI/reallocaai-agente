@@ -118,8 +118,8 @@ def test_get_historico_de_conversa_devolve_mensagens_esperadas(client: TestClien
 
     assert resposta.status_code == 200
     assert resposta.json() == [
-        {"papel": "usuario", "conteudo": "Pergunta única."},
-        {"papel": "agente", "conteudo": "Resposta padrão do agente de teste."},
+        {"papel": "usuario", "conteudo": "Pergunta única.", "blocos": []},
+        {"papel": "agente", "conteudo": "Resposta padrão do agente de teste.", "blocos": []},
     ]
 
 

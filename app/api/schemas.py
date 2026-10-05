@@ -9,6 +9,8 @@ from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.ai.relatorios import BlocoRelatorio
+
 
 class SlotDisponivelResponse(BaseModel):
     """Um horário livre, já com nomes resolvidos (não ids) para exibição."""
@@ -52,6 +54,13 @@ class ChatRequest(BaseModel):
         default=None, description="Id de uma conversa já existente. Omitido para iniciar uma nova."
     )
     mensagem: str = Field(min_length=1, description="Mensagem do usuário para o agente.")
+    renderiza_relatorios: bool = Field(
+        default=False,
+        description=(
+            "Informe true se o cliente mostra os blocos de relatório na tela. "
+            "O agente então responde brevemente; false mantém a resposta detalhada."
+        ),
+    )
 
     @field_validator("mensagem")
     @classmethod
@@ -68,6 +77,13 @@ class ChatResponse(BaseModel):
 
     conversa_id: str
     resposta: str
+    blocos: list[BlocoRelatorio] = Field(
+        default_factory=list,
+        description=(
+            "Relatórios estruturados do turno, para o app visual desenhar e exportar. "
+            "Sempre presente; vazio quando não houver relatório. O RealocAI não gera arquivos."
+        ),
+    )
 
 
 class MensagemHistoricoResponse(BaseModel):
@@ -77,6 +93,10 @@ class MensagemHistoricoResponse(BaseModel):
 
     papel: str
     conteudo: str
+    blocos: list[BlocoRelatorio] = Field(
+        default_factory=list,
+        description="Relatórios associados à resposta do agente; vazio nas mensagens do usuário.",
+    )
 
 
 class EnviarRelatorioRequest(BaseModel):

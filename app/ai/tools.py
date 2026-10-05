@@ -18,12 +18,17 @@ import math
 from collections import Counter
 from collections.abc import Callable
 from datetime import date, time
-from decimal import ROUND_HALF_UP, Decimal
-from typing import Literal
+from typing import Any, Literal
 
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
+from app.ai.formatacao import formatar_razao
+from app.ai.relatorios import (
+    bloco_ocupacao_agregada,
+    bloco_ocupacao_profissional,
+    bloco_pacientes_profissional,
+)
 from app.ai.servico_agenda import (
     ItemDemandaBruta,
     ProfissionalAmbiguo,
@@ -184,7 +189,8 @@ def _formatar_opcao_encaixe(fonte: ScheduleDataSource, dia: date, opcao: OpcaoEn
 
 def _formatar_linha_ocupacao(rotulo: str, agregada: OcupacaoAgregada) -> str:
     aviso = " (abaixo da meta de 80%)" if agregada.abaixo_da_meta else ""
-    return f"- {rotulo}: {agregada.percentual:.0%}{aviso}"
+    percentual = _formatar_percentual(agregada.slots_escalados, agregada.slots_ocupados)
+    return f"- {rotulo}: {percentual}{aviso}"
 
 
 #: Nome curto do dia da semana por `date.weekday()`, usado no texto de
@@ -206,12 +212,7 @@ def _formatar_percentual(slots_escalados: int, slots_ocupados: int) -> str:
     Conta em `Decimal` a partir dos inteiros para não herdar artefato de ponto
     flutuante na casa decimal exibida.
     """
-    if slots_escalados == 0:
-        return "0,0%"
-    valor = (Decimal(slots_ocupados) * 100 / Decimal(slots_escalados)).quantize(
-        Decimal("0.1"), rounding=ROUND_HALF_UP
-    )
-    return f"{valor}%".replace(".", ",")
+    return formatar_razao(slots_ocupados, slots_escalados, percentual=True)
 
 
 def _rotulo_meta() -> str:
@@ -342,10 +343,7 @@ def _formatar_media(soma: int, quantidade: int) -> str:
 
     Conta em `Decimal` a partir dos inteiros, como `_formatar_percentual`.
     """
-    if quantidade == 0:
-        return "0,0"
-    valor = (Decimal(soma) / Decimal(quantidade)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
-    return str(valor).replace(".", ",")
+    return formatar_razao(soma, quantidade)
 
 
 def _contagem(quantidade: int, singular: str, plural: str) -> str:
@@ -882,8 +880,15 @@ def criar_tools(
         ]
         return f"Horários livres em {data.strftime('%d/%m/%Y')}:\n" + "\n".join(linhas)
 
-    @tool("consultar_ocupacao", args_schema=ArgsConsultarOcupacao)
-    def consultar_ocupacao_tool(data: date) -> str:
+    # langchain_core instalado: convert.tool aceita content_and_artifact;
+    # base.BaseTool desempacota (content, artifact). ToolMessage.artifact não
+    # vai ao modelo (messages/tool.py; conversor OpenAI só envia content/role/tool_call_id).
+    @tool(
+        "consultar_ocupacao",
+        args_schema=ArgsConsultarOcupacao,
+        response_format="content_and_artifact",
+    )
+    def consultar_ocupacao_tool(data: date) -> tuple[str, dict[str, Any] | None]:
         """Ocupação do dia, por especialidade e por sala, sinalizando quem está abaixo da meta.
 
         Use para perguntas do tipo "como está a ocupação hoje?" ou "tem sala
@@ -894,13 +899,15 @@ def criar_tools(
         """
         try:
             relatorio = consultar_ocupacao_do_dia(fonte, data)
+            nomes_salas = {s.id: s.nome for s in fonte.listar_salas(data)}
+            bloco = bloco_ocupacao_agregada(relatorio, nomes_salas)
         except Exception as erro:
-            return f"Erro ao consultar ocupação: {erro}"
+            return f"Erro ao consultar ocupação: {erro}", None
 
         por_especialidade = relatorio.por_especialidade()
         por_sala = relatorio.por_sala()
         if not por_especialidade and not por_sala:
-            return f"Nenhuma escala encontrada para {data.strftime('%d/%m/%Y')}."
+            return f"Nenhuma escala encontrada para {data.strftime('%d/%m/%Y')}.", None
 
         linhas = [f"Ocupação de {data.strftime('%d/%m/%Y')}:", "", "Por especialidade:"]
         linhas.extend(
@@ -912,13 +919,20 @@ def criar_tools(
         linhas.append("")
         linhas.append("Por sala:")
         linhas.extend(
-            _formatar_linha_ocupacao(_nome_sala(fonte, data, sala_id), agregada)
+            _formatar_linha_ocupacao(nomes_salas.get(sala_id, sala_id), agregada)
             for sala_id, agregada in sorted(por_sala.items())
         )
-        return "\n".join(linhas)
+        return "\n".join(linhas), bloco.model_dump(mode="json")
 
-    @tool("consultar_ocupacao_profissional", args_schema=ArgsConsultarOcupacaoProfissional)
-    def consultar_ocupacao_profissional_tool(profissional: str, data: date | None = None) -> str:
+    @tool(
+        "consultar_ocupacao_profissional",
+        args_schema=ArgsConsultarOcupacaoProfissional,
+        response_format="content_and_artifact",
+    )
+    def consultar_ocupacao_profissional_tool(
+        profissional: str,
+        data: date | None = None,
+    ) -> tuple[str, dict[str, Any] | None]:
         """Taxa de ocupação de UMA profissional, dia a dia e no total da semana, frente à meta.
 
         Use quando pedirem a taxa de ocupação de uma profissional específica
@@ -939,7 +953,7 @@ def criar_tools(
                 return (
                     f"Mais de uma profissional corresponde a '{profissional}': {candidatos}. "
                     "Pergunte qual delas a pessoa quis dizer antes de consultar a ocupação."
-                )
+                ), None
             if isinstance(localizacao, ProfissionalNaoEncontrado):
                 semana = dias_da_semana_de(data_efetiva)
                 disponiveis = ", ".join(localizacao.nomes_disponiveis) or "nenhum"
@@ -947,23 +961,40 @@ def criar_tools(
                     f"Não há profissional com o nome '{profissional}' na agenda da semana de "
                     f"{semana[0].strftime('%d/%m')} a {semana[-1].strftime('%d/%m/%Y')}. "
                     f"Profissionais disponíveis: {disponiveis}."
-                )
+                ), None
 
             ocupacao = consultar_ocupacao_semanal_profissional(
                 fonte, localizacao.profissional_id, data_efetiva
             )
+            texto = _formatar_ocupacao_profissional(ocupacao)
+            if not ocupacao.dias:
+                return texto, None
+            avisos = [NOTA_GRADE_SEMANAL]
+            if ocupacao.parcial:
+                falhas = ", ".join(_rotulo_dia(dia) for dia in ocupacao.dias_com_falha)
+                avisos.append(f"Não foi possível ler: {falhas}; os totais da semana são parciais.")
+            if ocupacao.tem_inconsistencia:
+                avisos.append(
+                    "Atenção: há atendimentos fora dos horários escalados da profissional "
+                    "(possível inconsistência na planilha)."
+                )
+            bloco = bloco_ocupacao_profissional(ocupacao, avisos)
         except Exception as erro:
-            return f"Erro ao consultar ocupação da profissional: {erro}"
+            return f"Erro ao consultar ocupação da profissional: {erro}", None
 
-        return _formatar_ocupacao_profissional(ocupacao)
+        return texto, bloco.model_dump(mode="json")
 
-    @tool("consultar_pacientes_por_profissional", args_schema=ArgsConsultarPacientesPorProfissional)
+    @tool(
+        "consultar_pacientes_por_profissional",
+        args_schema=ArgsConsultarPacientesPorProfissional,
+        response_format="content_and_artifact",
+    )
     def consultar_pacientes_por_profissional_tool(
         data: date | None = None,
         escopo: Literal["semana", "dia"] = "semana",
         profissional: str | None = None,
         especialidade: str | None = None,
-    ) -> str:
+    ) -> tuple[str, dict[str, Any] | None]:
         """QUANTOS PACIENTES cada profissional (ou uma) atende, por dia ou na semana.
 
         Use quando perguntarem quantos pacientes as profissionais atendem
@@ -975,7 +1006,10 @@ def criar_tools(
         """
         data_efetiva = data if data is not None else data_referencia
         if escopo == "dia" and data_efetiva not in dias_da_semana_de(data_efetiva):
-            return f"A clínica não tem agenda aos domingos ({data_efetiva.strftime('%d/%m/%Y')})."
+            return (
+                f"A clínica não tem agenda aos domingos ({data_efetiva.strftime('%d/%m/%Y')}).",
+                None,
+            )
         dias = [data_efetiva] if escopo == "dia" else dias_da_semana_de(data_efetiva)
         periodo = (
             f"em {_rotulo_dia_longo(data_efetiva)}"
@@ -991,7 +1025,7 @@ def criar_tools(
                 return (
                     f"Especialidade '{especialidade}' não reconhecida. Especialidades "
                     f"válidas: {validas}."
-                )
+                ), None
 
         try:
             profissional_id: str | None = None
@@ -1007,33 +1041,35 @@ def criar_tools(
                         f"Mais de uma profissional corresponde a '{profissional}': "
                         f"{candidatos}. Pergunte qual delas a pessoa quis dizer antes de "
                         "contar os pacientes."
-                    )
+                    ), None
                 if isinstance(localizacao, ProfissionalNaoEncontrado):
                     semana = dias_da_semana_de(data_efetiva)
                     disponiveis = ", ".join(localizacao.nomes_disponiveis) or "nenhum"
                     return (
                         f"Não há profissional com o nome '{profissional}' na agenda da semana "
                         f"de {_periodo(semana)}. Profissionais disponíveis: {disponiveis}."
-                    )
+                    ), None
                 profissional_id = localizacao.profissional_id
                 nome_encontrado = localizacao.nome
 
             resultado = consultar_carga_profissionais(fonte, dias)
         except Exception as erro:
-            return f"Erro ao contar pacientes por profissional: {erro}"
+            return f"Erro ao contar pacientes por profissional: {erro}", None
 
         aviso_parcial = _aviso_parcial_pacientes(resultado.dias_com_falha)
         cargas = resultado.profissionais
         if profissional_id is not None:
             carga = next((item for item in cargas if item.profissional_id == profissional_id), None)
             if carga is None:
-                return "\n".join([f"{nome_encontrado} não tem agenda {periodo}.", *aviso_parcial])
+                return "\n".join(
+                    [f"{nome_encontrado} não tem agenda {periodo}.", *aviso_parcial]
+                ), None
             if especialidade_filtro is not None and carga.especialidade != especialidade_filtro:
                 return (
                     f"{_cabecalho_profissional(carga)} não é de "
                     f"{_rotulo_especialidade(especialidade_filtro)}."
-                )
-            return _formatar_pacientes_da_profissional(resultado, carga)
+                ), None
+            cargas = [carga]
 
         filtro = ""
         if especialidade_filtro is not None:
@@ -1042,10 +1078,27 @@ def criar_tools(
         if not cargas:
             return "\n".join(
                 [f"Nenhuma profissional{filtro} tem agenda {periodo}.", *aviso_parcial]
+            ), None
+        try:
+            avisos = [DEFINICAO_PACIENTE, *aviso_parcial]
+            if escopo == "semana":
+                avisos.append(NOTA_GRADE_SEMANAL)
+            if profissional_id is not None:
+                texto = _formatar_pacientes_da_profissional(resultado, cargas[0])
+            elif escopo == "dia":
+                texto = _formatar_pacientes_dia(resultado, cargas, filtro)
+            else:
+                texto = _formatar_pacientes_semana(resultado, cargas, filtro)
+            bloco = bloco_pacientes_profissional(
+                resultado,
+                cargas,
+                escopo,
+                avisos,
+                individual=profissional_id is not None,
             )
-        if escopo == "dia":
-            return _formatar_pacientes_dia(resultado, cargas, filtro)
-        return _formatar_pacientes_semana(resultado, cargas, filtro)
+            return texto, bloco.model_dump(mode="json")
+        except Exception as erro:
+            return f"Erro ao contar pacientes por profissional: {erro}", None
 
     @tool("sugerir_realocacao", args_schema=ArgsSugerirRealocacao)
     def sugerir_realocacao_tool(
