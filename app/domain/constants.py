@@ -90,4 +90,10 @@ MAPA_ESPECIALIDADE_FALLBACK: Final[dict[str, Especialidade]] = {
 MAPA_ALIAS_PROFISSIONAL: Final[dict[str, str]] = {
     "natieli-est": "natieli",
     "talyta-ayla": "talita-aylla",
+    "gabriele": "gabrielle",
+    # A grafia do cadastro é "Laryssa"; no sábado ela aparece como "Larissa (CONSULTAS)".
+    "larissa": "laryssa",
+    "larissa-consultas": "laryssa",
+    # "Cabele" é erro de digitação.
+    "cabele": "calebe",
 }

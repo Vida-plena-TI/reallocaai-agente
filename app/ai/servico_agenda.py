@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import (
+    MAPA_ALIAS_PROFISSIONAL,
     Especialidade,
     ItemSolicitacao,
     Paciente,
@@ -195,7 +196,8 @@ def localizar_profissional(
 ) -> LocalizacaoProfissional:
     """Resolve o profissional citado em `texto` entre os escalados na semana de `data`.
 
-    Correspondência pelo id normalizado (acento e caixa não importam): o id
+    Correspondência pelo id normalizado (acento e caixa não importam), já
+    trocado pelo canônico quando é uma grafia em `MAPA_ALIAS_PROFISSIONAL`: o id
     exato vence; sem ele, vale quando a sequência de palavras de um lado é
     prefixo da do outro ("Rossana Belfort" encontra `rossana`, e "Ana" encontra
     `ana-paula`). Se mais de um profissional casar, devolve todos como
@@ -222,7 +224,10 @@ def localizar_profissional(
     if not algum_dia_lido and ultimo_erro is not None:
         raise ultimo_erro
 
+    # A grafia antiga de quem tem alias ("Larissa") nunca existe na agenda: o
+    # parser já a trocou pela canônica, então a busca precisa fazer o mesmo.
     alvo = normalizar_id(texto)
+    alvo = MAPA_ALIAS_PROFISSIONAL.get(alvo, alvo)
     exato = profissionais.get(alvo) if alvo else None
     if exato is not None:
         return ProfissionalEncontrado(profissional_id=exato.id, nome=exato.nome)
