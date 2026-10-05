@@ -25,6 +25,7 @@ from app.domain import (
     dias_da_semana_de,
     normalizar_id,
 )
+from app.engine.carga_profissionais import CargaProfissionais, construir_carga_profissionais
 from app.engine.disponibilidade import SlotDisponivel, listar_disponibilidade
 from app.engine.encaixe import (
     OpcaoComCenario,
@@ -394,6 +395,13 @@ def consultar_ocupacao_semanal_profissional(
 ) -> OcupacaoSemanalProfissional:
     """Delega para `construir_ocupacao_semanal_profissional`."""
     return construir_ocupacao_semanal_profissional(fonte, profissional_id, data)
+
+
+def consultar_carga_profissionais(
+    fonte: ScheduleDataSource, dias: list[date]
+) -> CargaProfissionais:
+    """Delega para `construir_carga_profissionais`."""
+    return construir_carga_profissionais(fonte, dias)
 
 
 def sugerir_realocacao_por_id(

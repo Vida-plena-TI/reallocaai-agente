@@ -19,6 +19,7 @@ from collections import Counter
 from collections.abc import Callable
 from datetime import date, time
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Literal
 
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
@@ -32,6 +33,7 @@ from app.ai.servico_agenda import (
     ResultadoExato,
     buscar_encaixe,
     buscar_paciente,
+    consultar_carga_profissionais,
     consultar_disponibilidade_do_dia,
     consultar_ocupacao_do_dia,
     consultar_ocupacao_semanal_profissional,
@@ -53,12 +55,14 @@ from app.domain import (
     Slot,
     dias_da_semana_de,
     normalizar_id,
+    reconhecer_especialidade,
 )
 from app.domain.constants import (
     HORARIO_FECHAMENTO,
     HORARIO_PREFERENCIAL_PADRAO,
     META_OCUPACAO_POR_SALA,
 )
+from app.engine.carga_profissionais import CargaProfissionais, CargaProfissional
 from app.engine.disponibilidade import SlotDisponivel
 from app.engine.encaixe import CenarioSugestao, ItemEncaixeResolvido, OpcaoEncaixe
 from app.engine.ocupacao import OcupacaoAgregada
@@ -322,6 +326,192 @@ def _formatar_ocupacao_profissional(ocupacao: OcupacaoSemanalProfissional) -> st
     return "\n".join(linhas)
 
 
+#: Abreviação do dia da semana por `date.weekday()`, usada nas linhas compactas
+#: de `consultar_pacientes_por_profissional`.
+_DIAS_DA_SEMANA_ABREVIADOS = ("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom")
+
+#: Definição de "paciente" que acompanha toda resposta de
+#: `consultar_pacientes_por_profissional`.
+DEFINICAO_PACIENTE = (
+    "Cada paciente conta uma vez por profissional e dia; em sessão em grupo, cada paciente conta."
+)
+
+
+def _formatar_media(soma: int, quantidade: int) -> str:
+    """`31` em `3` dias -> `10,3` (uma casa, arredondamento comercial, vírgula decimal).
+
+    Conta em `Decimal` a partir dos inteiros, como `_formatar_percentual`.
+    """
+    if quantidade == 0:
+        return "0,0"
+    valor = (Decimal(soma) / Decimal(quantidade)).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    return str(valor).replace(".", ",")
+
+
+def _contagem(quantidade: int, singular: str, plural: str) -> str:
+    """`1 paciente`, `2 pacientes`."""
+    return f"{quantidade} {_plural(quantidade, singular, plural)}"
+
+
+def _periodo(dias: list[date]) -> str:
+    """`28/09 a 03/10/2026`."""
+    return f"{dias[0].strftime('%d/%m')} a {dias[-1].strftime('%d/%m/%Y')}"
+
+
+def _rotulo_dia_longo(dia: date) -> str:
+    """`segunda-feira, 28/09/2026`."""
+    return f"{DIAS_DA_SEMANA[dia.weekday()]}, {dia.strftime('%d/%m/%Y')}"
+
+
+def _aviso_parcial_pacientes(dias_com_falha: list[date]) -> list[str]:
+    if not dias_com_falha:
+        return []
+    falhas = ", ".join(_rotulo_dia(dia) for dia in dias_com_falha)
+    return [f"Não foi possível ler: {falhas}; os números são parciais."]
+
+
+def _media_da_profissional(carga: CargaProfissional) -> str:
+    """Média de pacientes por dia com agenda, recalculada dos inteiros para formatar sem float."""
+    return _formatar_media(sum(dia.pacientes for dia in carga.dias), len(carga.dias))
+
+
+def _distintos_na_semana(carga: CargaProfissional) -> str:
+    """`25 pacientes distintos na semana`."""
+    quantidade = carga.pacientes_distintos_semana
+    return f"{_contagem(quantidade, 'paciente distinto', 'pacientes distintos')} na semana"
+
+
+def _cabecalho_profissional(carga: CargaProfissional) -> str:
+    """`Luciana Xavier (Psicologia)`, ou só o nome quando a especialidade é desconhecida."""
+    if carga.especialidade is None:
+        return carga.nome
+    return f"{carga.nome} ({_rotulo_especialidade(carga.especialidade)})"
+
+
+def _agrupar_por_especialidade(
+    cargas: list[CargaProfissional],
+) -> list[tuple[str, list[CargaProfissional]]]:
+    """Grupos por especialidade, na ordem em que a engine já entrega as profissionais."""
+    grupos: list[tuple[str, list[CargaProfissional]]] = []
+    for carga in cargas:
+        rotulo = (
+            _rotulo_especialidade(carga.especialidade)
+            if carga.especialidade is not None
+            else "Sem especialidade"
+        )
+        if not grupos or grupos[-1][0] != rotulo:
+            grupos.append((rotulo, []))
+        grupos[-1][1].append(carga)
+    return grupos
+
+
+def _detalhe_do_dia(pacientes: int, sessoes: int, slots_ocupados: int) -> str:
+    """`12 pacientes, 13 sessões, 24 slots ocupados`."""
+    return (
+        f"{_contagem(pacientes, 'paciente', 'pacientes')}, "
+        f"{_contagem(sessoes, 'sessão', 'sessões')}, "
+        f"{_contagem(slots_ocupados, 'slot ocupado', 'slots ocupados')}"
+    )
+
+
+def _formatar_pacientes_semana(
+    resultado: CargaProfissionais, cargas: list[CargaProfissional], filtro: str
+) -> str:
+    """Semana, várias profissionais: uma linha compacta por profissional, por especialidade."""
+    linhas = [
+        f"Pacientes atendidos por profissional{filtro} — semana de {_periodo(resultado.dias)}",
+        "(pacientes distintos por dia; a média considera só os dias com agenda)",
+        DEFINICAO_PACIENTE,
+    ]
+    for rotulo, grupo in _agrupar_por_especialidade(cargas):
+        linhas.append("")
+        linhas.append(rotulo)
+        for carga in grupo:
+            por_dia = " · ".join(
+                f"{_DIAS_DA_SEMANA_ABREVIADOS[dia.data.weekday()]} {dia.pacientes}"
+                for dia in carga.dias
+            )
+            linhas.append(
+                f"- {carga.nome}: {por_dia} — média {_media_da_profissional(carga)}/dia em "
+                f"{_contagem(len(carga.dias), 'dia', 'dias')} · {_distintos_na_semana(carga)}"
+            )
+    clinica = " · ".join(
+        f"{_DIAS_DA_SEMANA_ABREVIADOS[dia.data.weekday()]} {dia.pacientes_distintos_clinica}"
+        for dia in resultado.por_dia
+        if dia.pacientes_distintos_clinica > 0
+    )
+    if clinica:
+        linhas.append("")
+        linhas.append(f"Pacientes distintos na clínica por dia: {clinica}")
+    linhas.extend(_aviso_parcial_pacientes(resultado.dias_com_falha))
+    linhas.append("")
+    linhas.append(NOTA_GRADE_SEMANAL)
+    return "\n".join(linhas)
+
+
+def _formatar_pacientes_dia(
+    resultado: CargaProfissionais, cargas: list[CargaProfissional], filtro: str
+) -> str:
+    """Um dia, várias profissionais: o total de pacientes de cada uma, por especialidade."""
+    linhas = [
+        f"Pacientes por profissional{filtro} — {_rotulo_dia_longo(resultado.dias[0])}",
+        DEFINICAO_PACIENTE,
+    ]
+    for rotulo, grupo in _agrupar_por_especialidade(cargas):
+        linhas.append("")
+        linhas.append(rotulo)
+        linhas.extend(
+            f"- {carga.nome}: {_contagem(carga.dias[0].pacientes, 'paciente', 'pacientes')}"
+            for carga in grupo
+        )
+    distintos = sum(dia.pacientes_distintos_clinica for dia in resultado.por_dia)
+    linhas.append("")
+    linhas.append(f"Pacientes distintos na clínica no dia: {distintos}")
+    return "\n".join(linhas)
+
+
+def _formatar_pacientes_da_profissional(
+    resultado: CargaProfissionais, carga: CargaProfissional
+) -> str:
+    """Uma profissional: pacientes, sessões e slots de cada dia com agenda e a média.
+
+    No escopo de um dia, só a linha desse dia (sem média nem nota da grade
+    semanal, como no formato de um dia com todas as profissionais).
+    """
+    if len(resultado.dias) == 1:
+        dia = carga.dias[0]
+        return "\n".join(
+            [
+                f"{_cabecalho_profissional(carga)} — {_rotulo_dia_longo(dia.data)}",
+                DEFINICAO_PACIENTE,
+                f"- {_detalhe_do_dia(dia.pacientes, dia.sessoes, dia.slots_ocupados)}",
+            ]
+        )
+
+    linhas = [
+        f"{_cabecalho_profissional(carga)} — semana de {_periodo(resultado.dias)}",
+        DEFINICAO_PACIENTE,
+    ]
+    linhas.extend(
+        f"- {_rotulo_dia(dia.data)}: "
+        f"{_detalhe_do_dia(dia.pacientes, dia.sessoes, dia.slots_ocupados)}"
+        for dia in carga.dias
+    )
+    linhas.append(
+        f"Média: {_media_da_profissional(carga)} pacientes por dia em "
+        f"{_contagem(len(carga.dias), 'dia', 'dias')} · {_distintos_na_semana(carga)}"
+    )
+    if carga.dias_sem_agenda:
+        sem_agenda = ", ".join(
+            _DIAS_DA_SEMANA_CURTOS[dia.weekday()] for dia in carga.dias_sem_agenda
+        )
+        linhas.append(f"Sem agenda: {sem_agenda}.")
+    linhas.extend(_aviso_parcial_pacientes(carga.dias_com_falha))
+    linhas.append("")
+    linhas.append(NOTA_GRADE_SEMANAL)
+    return "\n".join(linhas)
+
+
 def _formatar_resultado_encaixe(
     fonte: ScheduleDataSource,
     dia: date,
@@ -435,6 +625,38 @@ class ArgsConsultarOcupacaoProfissional(BaseModel):
         description=(
             "Qualquer data da semana a consultar, no formato AAAA-MM-DD. Deixe em branco "
             "para usar a semana de hoje."
+        ),
+    )
+
+
+class ArgsConsultarPacientesPorProfissional(BaseModel):
+    data: date | None = Field(
+        default=None,
+        description=(
+            "Data no formato AAAA-MM-DD: no escopo 'semana', qualquer dia da semana a "
+            "consultar; no escopo 'dia', o próprio dia. Deixe em branco para usar hoje."
+        ),
+    )
+    escopo: Literal["semana", "dia"] = Field(
+        default="semana",
+        description=(
+            "'semana' (padrão): segunda a sábado da semana da data, com o detalhe por dia. "
+            "'dia': só a data informada — use quando a pergunta citar um dia ('hoje', "
+            "'na terça', uma data)."
+        ),
+    )
+    profissional: str | None = Field(
+        default=None,
+        description=(
+            "Nome (ou parte do nome) de uma profissional, só quando a pergunta citar uma. "
+            "Deixe em branco para todas."
+        ),
+    )
+    especialidade: str | None = Field(
+        default=None,
+        description=(
+            "Especialidade como citada na pergunta (ex.: 'psicologia', 'fono', 'TO'), só "
+            "quando a pergunta filtrar por uma. Deixe em branco para todas."
         ),
     )
 
@@ -666,7 +888,9 @@ def criar_tools(
 
         Use para perguntas do tipo "como está a ocupação hoje?" ou "tem sala
         ociosa?". Para a taxa de ocupação de UMA profissional específica, use
-        `consultar_ocupacao_profissional`.
+        `consultar_ocupacao_profissional`. NÃO serve para contar pacientes
+        (ocupação mede slots): para quantos pacientes cada profissional
+        atende, use `consultar_pacientes_por_profissional`.
         """
         try:
             relatorio = consultar_ocupacao_do_dia(fonte, data)
@@ -700,7 +924,9 @@ def criar_tools(
         Use quando pedirem a taxa de ocupação de uma profissional específica
         ("qual a ocupação da Rossana?"), por dia e por semana. NÃO use para
         ocupação por especialidade ou por sala — para isso, use
-        `consultar_ocupacao`.
+        `consultar_ocupacao`. NÃO serve para contar pacientes (mede slots):
+        para quantos pacientes uma ou todas as profissionais atendem, use
+        `consultar_pacientes_por_profissional`.
         """
         data_efetiva = data if data is not None else data_referencia
         try:
@@ -730,6 +956,96 @@ def criar_tools(
             return f"Erro ao consultar ocupação da profissional: {erro}"
 
         return _formatar_ocupacao_profissional(ocupacao)
+
+    @tool("consultar_pacientes_por_profissional", args_schema=ArgsConsultarPacientesPorProfissional)
+    def consultar_pacientes_por_profissional_tool(
+        data: date | None = None,
+        escopo: Literal["semana", "dia"] = "semana",
+        profissional: str | None = None,
+        especialidade: str | None = None,
+    ) -> str:
+        """QUANTOS PACIENTES cada profissional (ou uma) atende, por dia ou na semana.
+
+        Use quando perguntarem quantos pacientes as profissionais atendem
+        ("quantos pacientes cada profissional atende por dia?", "quantos
+        pacientes a Rossana atende?", "quantos pacientes de fono na
+        terça?"). Padrão: semana de hoje, todas as profissionais, com o
+        detalhe por dia. NÃO use para taxa de ocupação (slots) — para isso,
+        `consultar_ocupacao_profissional` ou `consultar_ocupacao`.
+        """
+        data_efetiva = data if data is not None else data_referencia
+        if escopo == "dia" and data_efetiva not in dias_da_semana_de(data_efetiva):
+            return f"A clínica não tem agenda aos domingos ({data_efetiva.strftime('%d/%m/%Y')})."
+        dias = [data_efetiva] if escopo == "dia" else dias_da_semana_de(data_efetiva)
+        periodo = (
+            f"em {_rotulo_dia_longo(data_efetiva)}"
+            if escopo == "dia"
+            else f"na semana de {_periodo(dias)}"
+        )
+
+        especialidade_filtro: Especialidade | None = None
+        if especialidade is not None:
+            especialidade_filtro = reconhecer_especialidade(especialidade)
+            if especialidade_filtro is None:
+                validas = ", ".join(_rotulo_especialidade(item) for item in Especialidade)
+                return (
+                    f"Especialidade '{especialidade}' não reconhecida. Especialidades "
+                    f"válidas: {validas}."
+                )
+
+        try:
+            profissional_id: str | None = None
+            nome_encontrado = ""
+            if profissional is not None:
+                localizacao = localizar_profissional(fonte, data_efetiva, profissional)
+                if isinstance(localizacao, ProfissionalAmbiguo):
+                    candidatos = ", ".join(
+                        f"{candidato.nome} ({_rotulo_especialidade(candidato.especialidade)})"
+                        for candidato in localizacao.candidatos
+                    )
+                    return (
+                        f"Mais de uma profissional corresponde a '{profissional}': "
+                        f"{candidatos}. Pergunte qual delas a pessoa quis dizer antes de "
+                        "contar os pacientes."
+                    )
+                if isinstance(localizacao, ProfissionalNaoEncontrado):
+                    semana = dias_da_semana_de(data_efetiva)
+                    disponiveis = ", ".join(localizacao.nomes_disponiveis) or "nenhum"
+                    return (
+                        f"Não há profissional com o nome '{profissional}' na agenda da semana "
+                        f"de {_periodo(semana)}. Profissionais disponíveis: {disponiveis}."
+                    )
+                profissional_id = localizacao.profissional_id
+                nome_encontrado = localizacao.nome
+
+            resultado = consultar_carga_profissionais(fonte, dias)
+        except Exception as erro:
+            return f"Erro ao contar pacientes por profissional: {erro}"
+
+        aviso_parcial = _aviso_parcial_pacientes(resultado.dias_com_falha)
+        cargas = resultado.profissionais
+        if profissional_id is not None:
+            carga = next((item for item in cargas if item.profissional_id == profissional_id), None)
+            if carga is None:
+                return "\n".join([f"{nome_encontrado} não tem agenda {periodo}.", *aviso_parcial])
+            if especialidade_filtro is not None and carga.especialidade != especialidade_filtro:
+                return (
+                    f"{_cabecalho_profissional(carga)} não é de "
+                    f"{_rotulo_especialidade(especialidade_filtro)}."
+                )
+            return _formatar_pacientes_da_profissional(resultado, carga)
+
+        filtro = ""
+        if especialidade_filtro is not None:
+            filtro = f" de {_rotulo_especialidade(especialidade_filtro)}"
+            cargas = [item for item in cargas if item.especialidade == especialidade_filtro]
+        if not cargas:
+            return "\n".join(
+                [f"Nenhuma profissional{filtro} tem agenda {periodo}.", *aviso_parcial]
+            )
+        if escopo == "dia":
+            return _formatar_pacientes_dia(resultado, cargas, filtro)
+        return _formatar_pacientes_semana(resultado, cargas, filtro)
 
     @tool("sugerir_realocacao", args_schema=ArgsSugerirRealocacao)
     def sugerir_realocacao_tool(
@@ -797,6 +1113,7 @@ def criar_tools(
         consultar_disponibilidade_tool,
         consultar_ocupacao_tool,
         consultar_ocupacao_profissional_tool,
+        consultar_pacientes_por_profissional_tool,
         sugerir_realocacao_tool,
         enviar_relatorio_tool,
     ]
