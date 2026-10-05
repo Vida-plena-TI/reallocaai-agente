@@ -1,0 +1,131 @@
+{
+  "versao": 1,
+  "tipo": "ocupacao_agregada",
+  "titulo": "Ocupação de 2026-09-28",
+  "periodo": {
+    "inicio": "2026-09-28",
+    "fim": "2026-09-28"
+  },
+  "meta": 0.8,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [],
+  "resumo": [],
+  "dados": {
+    "data": "2026-09-28",
+    "dia_semana": "segunda-feira",
+    "tipo": "ocupacao_agregada",
+    "por_especialidade": [
+      {
+        "rotulo": "Fonoaudiologia",
+        "slots_escalados": 10,
+        "slots_ocupados": 2,
+        "percentual": 0.2,
+        "abaixo_da_meta": true
+      },
+      {
+        "rotulo": "Psicologia",
+        "slots_escalados": 10,
+        "slots_ocupados": 3,
+        "percentual": 0.3,
+        "abaixo_da_meta": true
+      }
+    ],
+    "por_sala": [
+      {
+        "rotulo": "Sala Azul",
+        "slots_escalados": 20,
+        "slots_ocupados": 5,
+        "percentual": 0.25,
+        "abaixo_da_meta": true
+      }
+    ]
+  },
+  "tabelas": [
+    {
+      "nome": "Por especialidade",
+      "colunas": [
+        {
+          "chave": "rotulo",
+          "rotulo": "Nome",
+          "formato": "texto"
+        },
+        {
+          "chave": "slots_escalados",
+          "rotulo": "Slots escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "percentual",
+          "rotulo": "Ocupação",
+          "formato": "percentual"
+        },
+        {
+          "chave": "abaixo_da_meta",
+          "rotulo": "Abaixo da meta",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "rotulo": "Fonoaudiologia",
+          "slots_escalados": 10,
+          "slots_ocupados": 2,
+          "percentual": 0.2,
+          "abaixo_da_meta": true
+        },
+        {
+          "rotulo": "Psicologia",
+          "slots_escalados": 10,
+          "slots_ocupados": 3,
+          "percentual": 0.3,
+          "abaixo_da_meta": true
+        }
+      ]
+    },
+    {
+      "nome": "Por sala",
+      "colunas": [
+        {
+          "chave": "rotulo",
+          "rotulo": "Nome",
+          "formato": "texto"
+        },
+        {
+          "chave": "slots_escalados",
+          "rotulo": "Slots escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "percentual",
+          "rotulo": "Ocupação",
+          "formato": "percentual"
+        },
+        {
+          "chave": "abaixo_da_meta",
+          "rotulo": "Abaixo da meta",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "rotulo": "Sala Azul",
+          "slots_escalados": 20,
+          "slots_ocupados": 5,
+          "percentual": 0.25,
+          "abaixo_da_meta": true
+        }
+      ]
+    }
+  ]
+}

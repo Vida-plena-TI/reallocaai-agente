@@ -19,6 +19,11 @@ from app.engine.ocupacao_profissional import OcupacaoSemanalProfissional
 Formato = Literal["texto", "inteiro", "decimal", "percentual", "data"]
 TipoRelatorio = Literal["ocupacao_profissional", "pacientes_por_profissional", "ocupacao_agregada"]
 ValorSimples = str | int | float | bool | None
+#: Aviso de ocupação acima de 100%, repetido no texto das tools.
+AVISO_ACIMA_DE_CEM = (
+    "Atenção: há ocupação acima de 100% (mais slots ocupados que escalados); "
+    "possível inconsistência na planilha."
+)
 DIAS_DA_SEMANA = (
     "segunda-feira",
     "terça-feira",
@@ -82,8 +87,8 @@ class MetricasOcupacao(_ModeloRelatorio):
     escalados: int
     ocupados: int
     livres: int
-    # Acima de 100% a tool segue o caminho de erro, sem alterar o valor da engine.
-    percentual: float = Field(ge=0, le=1)
+    # Pode passar de 1 (inconsistência na grade): o valor da engine não é limitado.
+    percentual: float = Field(ge=0)
     abaixo_da_meta: bool
     slots_para_meta: int
 
@@ -96,7 +101,8 @@ class TurnoOcupacao(_ModeloRelatorio):
 class SalaPostoRelatorio(TurnoOcupacao):
     sala_id: str
     sala_nome: str
-    indice_posto: int
+    # Número de exibição, contado a partir de 1, como no texto das tools.
+    posto: int = Field(ge=1)
 
 
 class DiaOcupacao(DataRelatorio, MetricasOcupacao):
@@ -145,7 +151,7 @@ class ItemOcupacaoAgregada(_ModeloRelatorio):
     rotulo: str
     slots_escalados: int
     slots_ocupados: int
-    percentual: float = Field(ge=0, le=1)
+    percentual: float = Field(ge=0)
     abaixo_da_meta: bool
 
 
@@ -168,6 +174,8 @@ class BlocoRelatorio(_ModeloRelatorio):
     periodo: PeriodoRelatorio
     meta: float | None
     parcial: bool
+    # Datas ISO ordenadas dos dias cuja leitura falhou; vazia quando não é parcial.
+    dias_nao_lidos: list[date]
     avisos: list[str]
     resumo: list[ItemResumo]
     dados: DadosRelatorio
@@ -177,6 +185,12 @@ class BlocoRelatorio(_ModeloRelatorio):
     def _validar_tipo(self) -> BlocoRelatorio:
         if self.tipo != self.dados.tipo:
             raise ValueError("O tipo do bloco deve corresponder ao tipo dos dados.")
+        if self.parcial != bool(self.dias_nao_lidos):
+            raise ValueError("dias_nao_lidos deve ser vazio exatamente quando parcial é False.")
+        if self.dias_nao_lidos != sorted(set(self.dias_nao_lidos)):
+            raise ValueError("dias_nao_lidos deve estar ordenado e sem repetição.")
+        if (self.meta is None) != (self.tipo == "pacientes_por_profissional"):
+            raise ValueError("Só pacientes_por_profissional não tem meta.")
         return self
 
 
@@ -203,6 +217,29 @@ def _metricas(resultado: OcupacaoSemanalProfissional) -> MetricasOcupacao:
         abaixo_da_meta=resultado.abaixo_da_meta,
         slots_para_meta=resultado.slots_para_meta,
     )
+
+
+def ocupacao_profissional_acima_de_cem(resultado: OcupacaoSemanalProfissional) -> bool:
+    """Se a semana, algum dia ou alguma sala/posto passa de 100% (com slots escalados)."""
+    contagens = [(m.slots_escalados, m.slots_ocupados) for m in [resultado, *resultado.dias]]
+    contagens += [
+        (s.slots_escalados, s.slots_ocupados) for d in resultado.dias for s in d.por_sala_posto
+    ]
+    return any(0 < escalados < ocupados for escalados, ocupados in contagens)
+
+
+def ocupacao_agregada_acima_de_cem(resultado: RelatorioOcupacaoDoDia) -> bool:
+    """Se alguma especialidade ou sala passa de 100% (com slots escalados)."""
+    return any(
+        0 < a.slots_escalados < a.slots_ocupados
+        for a in [*resultado.por_especialidade().values(), *resultado.por_sala().values()]
+    )
+
+
+def _com_aviso(avisos: list[str], acima_de_cem: bool) -> list[str]:
+    if acima_de_cem and AVISO_ACIMA_DE_CEM not in avisos:
+        return [*avisos, AVISO_ACIMA_DE_CEM]
+    return list(avisos)
 
 
 def _tabela(
@@ -255,7 +292,7 @@ def bloco_ocupacao_profissional(
                 SalaPostoRelatorio(
                     sala_id=s.sala_id,
                     sala_nome=s.sala_nome,
-                    indice_posto=s.indice_posto,
+                    posto=s.indice_posto + 1,
                     escalados=s.slots_escalados,
                     ocupados=s.slots_ocupados,
                 )
@@ -265,6 +302,7 @@ def bloco_ocupacao_profissional(
         for dia in resultado.dias
     ]
     semana = _metricas(resultado)
+    acima_de_cem = ocupacao_profissional_acima_de_cem(resultado)
     linhas: list[dict[str, ValorSimples]] = [
         {
             **dia.model_dump(mode="json", exclude={"manha", "tarde", "por_sala_posto"}),
@@ -281,7 +319,8 @@ def bloco_ocupacao_profissional(
         periodo=PeriodoRelatorio(inicio=resultado.semana_inicio, fim=resultado.semana_fim),
         meta=META_OCUPACAO_POR_SALA,
         parcial=resultado.parcial,
-        avisos=avisos,
+        dias_nao_lidos=sorted(resultado.dias_com_falha),
+        avisos=_com_aviso(avisos, acima_de_cem),
         resumo=[
             ItemResumo(
                 rotulo="Ocupação da semana",
@@ -307,7 +346,7 @@ def bloco_ocupacao_profissional(
             semana=semana,
             dias=dias,
             dias_sem_agenda=[_data(d) for d in resultado.dias_sem_agenda],
-            inconsistencia=resultado.tem_inconsistencia,
+            inconsistencia=resultado.tem_inconsistencia or acima_de_cem,
         ),
         tabelas=[
             _tabela(
@@ -394,6 +433,7 @@ def bloco_pacientes_profissional(
         periodo=PeriodoRelatorio(inicio=resultado.dias[0], fim=resultado.dias[-1]),
         meta=None,
         parcial=resultado.parcial,
+        dias_nao_lidos=sorted(resultado.dias_com_falha),
         avisos=avisos,
         resumo=resumo,
         dados=DadosPacientesProfissional(
@@ -473,7 +513,8 @@ def bloco_ocupacao_agregada(
         periodo=PeriodoRelatorio(inicio=resultado.data, fim=resultado.data),
         meta=META_OCUPACAO_POR_SALA,
         parcial=False,
-        avisos=[],
+        dias_nao_lidos=[],
+        avisos=_com_aviso([], ocupacao_agregada_acima_de_cem(resultado)),
         resumo=[],
         dados=DadosOcupacaoAgregada(
             **_data(resultado.data).model_dump(), por_especialidade=especialidades, por_sala=salas

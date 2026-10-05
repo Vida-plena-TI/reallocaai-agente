@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from app.ai.agente import extrair_blocos_do_turno
 from app.ai.formatacao import formatar_razao
 from app.ai.relatorios import (
+    AVISO_ACIMA_DE_CEM,
     BlocoRelatorio,
     DadosOcupacaoAgregada,
     DadosOcupacaoProfissional,
@@ -21,11 +22,20 @@ from app.ai.relatorios import (
 )
 from app.ai.tools import criar_tools
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
-from app.domain import Profissional
+from app.domain import Profissional, Sala
 from app.engine.carga_profissionais import construir_carga_profissionais
 from app.engine.ocupacao import construir_relatorio_ocupacao_do_dia
 from app.engine.ocupacao_profissional import construir_ocupacao_semanal_profissional
-from tests.support.agenda_semanal import QUARTA, SEGUNDA, SEMANA, TERCA
+from tests.support.agenda_semanal import (
+    QUARTA,
+    SEGUNDA,
+    SEMANA,
+    TERCA,
+    atendimentos,
+    grade,
+    horas_da_manha,
+    horas_da_tarde,
+)
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 from tests.support.relatorios import ANA, NOMES_PACIENTES, fonte_relatorios
 
@@ -64,6 +74,13 @@ def test_contrato_tabelas_privacidade_e_transporte(
     assert all(nome not in serializado for nome in NOMES_PACIENTES)
     assert "paciente_ids" not in serializado
     assert "artifact" not in _convert_message_to_dict(mensagem)
+    assert not bloco.parcial and bloco.dias_nao_lidos == []
+    chaves_de_meta = {"abaixo_da_meta", "slots_para_meta", "meta"}
+    if tipo == "pacientes_por_profissional":
+        assert bloco.meta is None
+        assert all(not chaves_de_meta & {c.chave for c in t.colunas} for t in bloco.tabelas)
+    else:
+        assert bloco.meta == 0.8
     for tabela in bloco.tabelas:
         chaves = {c.chave for c in tabela.colunas}
         assert tabela.linhas
@@ -76,7 +93,7 @@ def test_contrato_tabelas_privacidade_e_transporte(
                     assert valor == date.fromisoformat(valor).isoformat()
                     assert "dia_semana" in linha
                 elif coluna.formato == "percentual":
-                    assert isinstance(valor, float) and 0 <= valor <= 1
+                    assert isinstance(valor, float) and valor >= 0
                 elif coluna.formato == "inteiro":
                     assert type(valor) is int
     with pytest.raises(ValidationError):
@@ -121,10 +138,10 @@ def test_ocupacao_profissional_copia_todas_as_metricas_da_engine() -> None:
             assert (
                 posto.sala_id,
                 posto.sala_nome,
-                posto.indice_posto,
+                posto.posto,
                 posto.escalados,
                 posto.ocupados,
-            ) == (p.sala_id, p.sala_nome, p.indice_posto, p.slots_escalados, p.slots_ocupados)
+            ) == (p.sala_id, p.sala_nome, p.indice_posto + 1, p.slots_escalados, p.slots_ocupados)
     assert all(item.exibicao in str(mensagem.content) for item in bloco.resumo)
     assert all(aviso in str(mensagem.content) for aviso in bloco.avisos)
 
@@ -228,13 +245,14 @@ def test_parcial_e_inconsistencia_aparecem_tambem_nos_avisos() -> None:
     fonte.grade[TERCA] = []
     mensagem = mensagem_tool("consultar_ocupacao_profissional", {"profissional": "Ana"}, fonte)
     bloco = BlocoRelatorio.model_validate(mensagem.artifact)
-    assert bloco.parcial
+    assert bloco.parcial and bloco.dias_nao_lidos == [QUARTA]
     assert isinstance(bloco.dados, DadosOcupacaoProfissional) and bloco.dados.inconsistencia
     assert len(bloco.avisos) == 3
     assert all(aviso in str(mensagem.content) for aviso in bloco.avisos)
     mensagem = mensagem_tool("consultar_pacientes_por_profissional", {}, fonte)
     bloco = BlocoRelatorio.model_validate(mensagem.artifact)
-    assert bloco.parcial
+    assert bloco.parcial and bloco.dias_nao_lidos == [QUARTA]
+    assert mensagem.artifact["dias_nao_lidos"] == [QUARTA.isoformat()]
     assert all(aviso in str(mensagem.content) for aviso in bloco.avisos)
 
 
@@ -262,7 +280,13 @@ def test_extracao_so_turno_atual_ordem_validacao_e_limite(caplog: pytest.LogCapt
 
 def test_artefatos_rejeitam_tipo_versao_e_linhas_incoerentes() -> None:
     artifact = mensagem_tool("consultar_ocupacao", {"data": SEGUNDA.isoformat()}).artifact
-    alteracoes: list[dict[str, Any]] = [{"versao": 2}, {"tipo": "pacientes_por_profissional"}]
+    alteracoes: list[dict[str, Any]] = [
+        {"versao": 2},
+        {"tipo": "pacientes_por_profissional"},
+        {"meta": None},
+        {"parcial": True},
+        {"dias_nao_lidos": [SEGUNDA.isoformat()]},
+    ]
     for alteracao in alteracoes:
         with pytest.raises(ValidationError):
             BlocoRelatorio.model_validate({**artifact, **alteracao})
@@ -277,6 +301,75 @@ def test_arredondamento_comercial_empates_e_zero() -> None:
     assert formatar_razao(0, 0, percentual=True) == "0,0%"
 
 
+def test_posto_e_o_numero_de_exibicao_contado_a_partir_de_um() -> None:
+    fonte = fonte_relatorios()
+    fonte.salas[SEGUNDA].append(Sala(id="sala-20", nome="Sala Verde", capacidade_simultanea=3))
+    horas = horas_da_manha(SEGUNDA)
+    distribuicao = [("sala-12", 0), ("sala-12", 1), ("sala-20", 0), ("sala-20", 1), ("sala-20", 2)]
+    fonte.grade[SEGUNDA] = [
+        entrada
+        for i, (sala, posto) in enumerate(distribuicao)
+        for entrada in grade(SEGUNDA, horas[2 * i : 2 * i + 2], ANA, sala, posto)
+    ]
+    fonte.atendimentos[SEGUNDA] = []
+    mensagem = mensagem_tool("consultar_ocupacao_profissional", {"profissional": "Ana"}, fonte)
+    bloco = BlocoRelatorio.model_validate(mensagem.artifact)
+    assert isinstance(bloco.dados, DadosOcupacaoProfissional)
+    segunda = bloco.dados.dias[0]
+    assert sorted((p.sala_id, p.posto) for p in segunda.por_sala_posto) == [
+        ("sala-12", 1),
+        ("sala-12", 2),
+        ("sala-20", 1),
+        ("sala-20", 2),
+        ("sala-20", 3),
+    ]
+    for p in segunda.por_sala_posto:
+        assert f"{p.sala_nome} (posto {p.posto}):" in str(mensagem.content)
+    assert "posto 0" not in str(mensagem.content)
+
+
+def fonte_cento_e_cinco_por_cento() -> FakeScheduleDataSource:
+    """Ana com 20 slots escalados e 21 ocupados na segunda (um atendimento fora da grade)."""
+    fonte = fonte_relatorios()
+    horas = horas_da_manha(SEGUNDA) + horas_da_tarde(SEGUNDA)
+    fonte.grade = {SEGUNDA: grade(SEGUNDA, horas, ANA)}
+    fonte.atendimentos = {
+        SEGUNDA: atendimentos(SEGUNDA, horas, ANA)
+        + atendimentos(SEGUNDA, horas[:1], ANA, indice_posto=1)
+    }
+    return fonte
+
+
+def test_ocupacao_profissional_acima_de_cem_por_cento_devolve_bloco_com_valor_real() -> None:
+    fonte = fonte_cento_e_cinco_por_cento()
+    engine = construir_ocupacao_semanal_profissional(fonte, ANA.id, SEGUNDA)
+    assert engine.percentual == 1.05 and not engine.tem_inconsistencia
+    mensagem = mensagem_tool("consultar_ocupacao_profissional", {"profissional": "Ana"}, fonte)
+    bloco = BlocoRelatorio.model_validate(mensagem.artifact)
+    dados = bloco.dados
+    assert isinstance(dados, DadosOcupacaoProfissional)
+    assert dados.semana.percentual == dados.dias[0].percentual == 1.05
+    assert (dados.semana.ocupados, dados.semana.escalados) == (21, 20)
+    assert not dados.semana.abaixo_da_meta and not dados.dias[0].abaixo_da_meta
+    assert dados.inconsistencia
+    assert AVISO_ACIMA_DE_CEM in bloco.avisos
+    assert all(aviso in str(mensagem.content) for aviso in bloco.avisos)
+    assert bloco.resumo[0].exibicao == "105,0%"
+    assert BlocoRelatorio.model_validate(json.loads(bloco.model_dump_json())) == bloco
+
+
+def test_ocupacao_agregada_acima_de_cem_por_cento_devolve_bloco_com_aviso() -> None:
+    fonte = fonte_cento_e_cinco_por_cento()
+    mensagem = mensagem_tool("consultar_ocupacao", {"data": SEGUNDA.isoformat()}, fonte)
+    bloco = BlocoRelatorio.model_validate(mensagem.artifact)
+    dados = bloco.dados
+    assert isinstance(dados, DadosOcupacaoAgregada)
+    assert [(i.percentual, i.abaixo_da_meta) for i in dados.por_sala] == [(1.05, False)]
+    assert bloco.avisos == [AVISO_ACIMA_DE_CEM]
+    assert AVISO_ACIMA_DE_CEM in str(mensagem.content)
+    assert "105,0%" in str(mensagem.content)
+
+
 @pytest.mark.parametrize(
     "nome,args",
     [
@@ -284,7 +377,7 @@ def test_arredondamento_comercial_empates_e_zero() -> None:
         ("consultar_ocupacao", {"data": SEGUNDA.isoformat()}),
     ],
 )
-def test_ocupacao_acima_de_cem_por_cento_nao_altera_engine_nem_viola_contrato(
+def test_ocupacao_acima_de_cem_por_cento_mantem_o_valor_da_engine(
     nome: str,
     args: dict[str, Any],
 ) -> None:
@@ -293,5 +386,6 @@ def test_ocupacao_acima_de_cem_por_cento_nao_altera_engine_nem_viola_contrato(
     engine = construir_ocupacao_semanal_profissional(fonte, ANA.id, SEGUNDA)
     assert engine.dias[0].percentual == 3.0
     mensagem = mensagem_tool(nome, args, fonte)
-    assert str(mensagem.content).startswith("Erro ao consultar ocupação")
-    assert mensagem.artifact is None
+    bloco = BlocoRelatorio.model_validate(mensagem.artifact)
+    assert AVISO_ACIMA_DE_CEM in bloco.avisos
+    assert "300,0%" in str(mensagem.content)

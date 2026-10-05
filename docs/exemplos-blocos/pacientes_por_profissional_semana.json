@@ -1,0 +1,311 @@
+{
+  "versao": 1,
+  "tipo": "pacientes_por_profissional",
+  "titulo": "Pacientes por profissional",
+  "periodo": {
+    "inicio": "2026-09-28",
+    "fim": "2026-10-03"
+  },
+  "meta": null,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Cada paciente conta uma vez por profissional e dia; em sessão em grupo, cada paciente conta.",
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da semana, sem datas); os números refletem a grade vigente, não uma semana específica do calendário."
+  ],
+  "resumo": [],
+  "dados": {
+    "tipo": "pacientes_por_profissional",
+    "escopo": "semana",
+    "profissionais": [
+      {
+        "id": "d04554ad08e0847e85a7d9c1c1e354f2cbff51200c1a1ca656b2b7f9541e89db",
+        "nome": "Bia Exemplo",
+        "especialidade": "fonoaudiologia",
+        "dias": [
+          {
+            "data": "2026-09-28",
+            "dia_semana": "segunda-feira",
+            "pacientes": 1,
+            "sessoes": 2,
+            "slots_ocupados": 2
+          }
+        ],
+        "dias_sem_agenda": [
+          {
+            "data": "2026-09-29",
+            "dia_semana": "terça-feira"
+          },
+          {
+            "data": "2026-09-30",
+            "dia_semana": "quarta-feira"
+          },
+          {
+            "data": "2026-10-01",
+            "dia_semana": "quinta-feira"
+          },
+          {
+            "data": "2026-10-02",
+            "dia_semana": "sexta-feira"
+          },
+          {
+            "data": "2026-10-03",
+            "dia_semana": "sábado"
+          }
+        ],
+        "media_pacientes_por_dia": 1.0,
+        "pacientes_distintos_semana": 1
+      },
+      {
+        "id": "86f7aaab0e657f185f463b8bd69d5c0570ccf2810619db5172a4db677d31eb60",
+        "nome": "Ana Exemplo",
+        "especialidade": "psicologia",
+        "dias": [
+          {
+            "data": "2026-09-28",
+            "dia_semana": "segunda-feira",
+            "pacientes": 2,
+            "sessoes": 3,
+            "slots_ocupados": 3
+          },
+          {
+            "data": "2026-09-29",
+            "dia_semana": "terça-feira",
+            "pacientes": 1,
+            "sessoes": 2,
+            "slots_ocupados": 2
+          }
+        ],
+        "dias_sem_agenda": [
+          {
+            "data": "2026-09-30",
+            "dia_semana": "quarta-feira"
+          },
+          {
+            "data": "2026-10-01",
+            "dia_semana": "quinta-feira"
+          },
+          {
+            "data": "2026-10-02",
+            "dia_semana": "sexta-feira"
+          },
+          {
+            "data": "2026-10-03",
+            "dia_semana": "sábado"
+          }
+        ],
+        "media_pacientes_por_dia": 1.5,
+        "pacientes_distintos_semana": 2
+      }
+    ],
+    "clinica_por_dia": [
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "pacientes_distintos": 2
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "pacientes_distintos": 1
+      },
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "pacientes_distintos": 0
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira",
+        "pacientes_distintos": 0
+      },
+      {
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira",
+        "pacientes_distintos": 0
+      },
+      {
+        "data": "2026-10-03",
+        "dia_semana": "sábado",
+        "pacientes_distintos": 0
+      }
+    ]
+  },
+  "tabelas": [
+    {
+      "nome": "Por profissional e dia",
+      "colunas": [
+        {
+          "chave": "id",
+          "rotulo": "Id do profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "nome",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "data",
+          "rotulo": "Data",
+          "formato": "data"
+        },
+        {
+          "chave": "dia_semana",
+          "rotulo": "Dia da semana",
+          "formato": "texto"
+        },
+        {
+          "chave": "pacientes",
+          "rotulo": "Pacientes",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "sessoes",
+          "rotulo": "Sessões",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "id": "d04554ad08e0847e85a7d9c1c1e354f2cbff51200c1a1ca656b2b7f9541e89db",
+          "nome": "Bia Exemplo",
+          "especialidade": "fonoaudiologia",
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "pacientes": 1,
+          "sessoes": 2,
+          "slots_ocupados": 2
+        },
+        {
+          "id": "86f7aaab0e657f185f463b8bd69d5c0570ccf2810619db5172a4db677d31eb60",
+          "nome": "Ana Exemplo",
+          "especialidade": "psicologia",
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "pacientes": 2,
+          "sessoes": 3,
+          "slots_ocupados": 3
+        },
+        {
+          "id": "86f7aaab0e657f185f463b8bd69d5c0570ccf2810619db5172a4db677d31eb60",
+          "nome": "Ana Exemplo",
+          "especialidade": "psicologia",
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "pacientes": 1,
+          "sessoes": 2,
+          "slots_ocupados": 2
+        }
+      ]
+    },
+    {
+      "nome": "Resumo por profissional",
+      "colunas": [
+        {
+          "chave": "id",
+          "rotulo": "Id do profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "nome",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "media_pacientes_por_dia",
+          "rotulo": "Média de pacientes por dia com agenda",
+          "formato": "decimal"
+        },
+        {
+          "chave": "pacientes_distintos_semana",
+          "rotulo": "Pacientes distintos no período",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "id": "d04554ad08e0847e85a7d9c1c1e354f2cbff51200c1a1ca656b2b7f9541e89db",
+          "nome": "Bia Exemplo",
+          "especialidade": "fonoaudiologia",
+          "media_pacientes_por_dia": 1.0,
+          "pacientes_distintos_semana": 1
+        },
+        {
+          "id": "86f7aaab0e657f185f463b8bd69d5c0570ccf2810619db5172a4db677d31eb60",
+          "nome": "Ana Exemplo",
+          "especialidade": "psicologia",
+          "media_pacientes_por_dia": 1.5,
+          "pacientes_distintos_semana": 2
+        }
+      ]
+    },
+    {
+      "nome": "Clínica por dia",
+      "colunas": [
+        {
+          "chave": "data",
+          "rotulo": "Data",
+          "formato": "data"
+        },
+        {
+          "chave": "dia_semana",
+          "rotulo": "Dia da semana",
+          "formato": "texto"
+        },
+        {
+          "chave": "pacientes_distintos",
+          "rotulo": "Pacientes distintos",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "pacientes_distintos": 2
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "pacientes_distintos": 1
+        },
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "pacientes_distintos": 0
+        },
+        {
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "pacientes_distintos": 0
+        },
+        {
+          "data": "2026-10-02",
+          "dia_semana": "sexta-feira",
+          "pacientes_distintos": 0
+        },
+        {
+          "data": "2026-10-03",
+          "dia_semana": "sábado",
+          "pacientes_distintos": 0
+        }
+      ]
+    }
+  ]
+}

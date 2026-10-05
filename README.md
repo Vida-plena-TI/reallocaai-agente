@@ -162,12 +162,18 @@ O campo `blocos` está sempre presente, mesmo quando vazio e independentemente d
 e ocupação agregada devolvem dados tipados em `app/ai/relatorios.py`, versão 1:
 
 - `tipo`, `titulo`, `periodo` (início e fim ISO), `meta`, `parcial` e `avisos`;
+- `meta`: `0.8` em `ocupacao_profissional` e `ocupacao_agregada`; `null` em
+  `pacientes_por_profissional`, que não tem meta (suas tabelas não têm coluna de meta);
+- `dias_nao_lidos`: datas ISO, ordenadas, dos dias cuja leitura falhou; lista vazia
+  exatamente quando `parcial` é `false`;
 - `resumo`: valores e strings de exibição já formatadas;
 - `dados`: união discriminada por `tipo`, com os detalhes específicos da consulta;
 - `tabelas`: nomes, colunas (`chave`, `rotulo`, `formato`) e linhas prontas para exportação.
 
 O tipo `ocupacao_profissional` traz a semana, os dias, manhã/tarde, salas/postos e
-inconsistências, com as tabelas **Por dia** e **Resumo da semana**.
+inconsistências, com as tabelas **Por dia** e **Resumo da semana**. Em `por_sala_posto`,
+`posto` é o número de exibição, contado a partir de 1 (o primeiro posto da sala é 1),
+igual ao "posto N" do texto das tools.
 `pacientes_por_profissional` traz pacientes, sessões, slots, dias sem agenda, média
 por dia com agenda e distintos por profissional no período; as tabelas são
 **Por profissional e dia**, **Resumo por profissional** e **Clínica por dia**.
@@ -184,11 +190,17 @@ arredondamento, contagens inteiras, percentuais como frações e dias da semana 
 As strings de exibição usam `ROUND_HALF_UP`, uma casa decimal e vírgula, também no
 texto das tools (a ocupação agregada antes usava percentual sem casa decimal).
 Em caso de inconsistência na grade, a engine pode produzir ocupação acima de 100%.
-Como o contrato limita percentuais a 0–1, esse caso segue o caminho de erro sem bloco,
-sem limitar nem alterar os números da engine.
+O bloco é devolvido com o valor real (percentuais só têm limite inferior, `>= 0`):
+`abaixo_da_meta` fica `false`, um aviso de ocupação acima de 100% entra em `avisos` (e no
+texto) e, em `ocupacao_profissional`, `inconsistencia` fica `true`.
 Os blocos não contêm nomes nem IDs de pacientes; IDs de profissionais são opacos.
 Ambiguidade, profissional não encontrada, ausência de agenda, especialidade desconhecida
 ou erro devolvem apenas texto, com `blocos: []`. Há no máximo dez blocos por turno.
+
+Exemplos de cada variante (`ocupacao_profissional`, `pacientes_por_profissional` com
+escopo semana e dia, `ocupacao_agregada`) e o JSON Schema de `BlocoRelatorio` ficam em
+`docs/exemplos-blocos/`, gerados com dados fictícios por
+`uv run python scripts/gerar_exemplos_blocos.py`; um teste falha se ficarem desatualizados.
 
 `GET /agenda/chat/{conversa_id}` devolve `blocos` associados a cada resposta do agente
 (lista vazia nas mensagens do usuário). São armazenados separados do histórico textual,

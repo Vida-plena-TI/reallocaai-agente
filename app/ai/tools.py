@@ -25,9 +25,12 @@ from pydantic import BaseModel, Field
 
 from app.ai.formatacao import formatar_razao
 from app.ai.relatorios import (
+    AVISO_ACIMA_DE_CEM,
     bloco_ocupacao_agregada,
     bloco_ocupacao_profissional,
     bloco_pacientes_profissional,
+    ocupacao_agregada_acima_de_cem,
+    ocupacao_profissional_acima_de_cem,
 )
 from app.ai.servico_agenda import (
     ItemDemandaBruta,
@@ -322,6 +325,8 @@ def _formatar_ocupacao_profissional(ocupacao: OcupacaoSemanalProfissional) -> st
             "Atenção: há atendimentos fora dos horários escalados da profissional "
             "(possível inconsistência na planilha)."
         )
+    if ocupacao_profissional_acima_de_cem(ocupacao):
+        linhas.append(AVISO_ACIMA_DE_CEM)
     linhas.append("")
     linhas.append(NOTA_GRADE_SEMANAL)
     return "\n".join(linhas)
@@ -922,6 +927,8 @@ def criar_tools(
             _formatar_linha_ocupacao(nomes_salas.get(sala_id, sala_id), agregada)
             for sala_id, agregada in sorted(por_sala.items())
         )
+        if ocupacao_agregada_acima_de_cem(relatorio):
+            linhas.extend(["", AVISO_ACIMA_DE_CEM])
         return "\n".join(linhas), bloco.model_dump(mode="json")
 
     @tool(

@@ -1,0 +1,762 @@
+{
+  "$defs": {
+    "ClinicaDia": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "format": "date",
+          "title": "Data",
+          "type": "string"
+        },
+        "dia_semana": {
+          "title": "Dia Semana",
+          "type": "string"
+        },
+        "pacientes_distintos": {
+          "title": "Pacientes Distintos",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "data",
+        "dia_semana",
+        "pacientes_distintos"
+      ],
+      "title": "ClinicaDia",
+      "type": "object"
+    },
+    "ColunaTabela": {
+      "additionalProperties": false,
+      "properties": {
+        "chave": {
+          "title": "Chave",
+          "type": "string"
+        },
+        "rotulo": {
+          "title": "Rotulo",
+          "type": "string"
+        },
+        "formato": {
+          "enum": [
+            "texto",
+            "inteiro",
+            "decimal",
+            "percentual",
+            "data"
+          ],
+          "title": "Formato",
+          "type": "string"
+        }
+      },
+      "required": [
+        "chave",
+        "rotulo",
+        "formato"
+      ],
+      "title": "ColunaTabela",
+      "type": "object"
+    },
+    "DadosOcupacaoAgregada": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "format": "date",
+          "title": "Data",
+          "type": "string"
+        },
+        "dia_semana": {
+          "title": "Dia Semana",
+          "type": "string"
+        },
+        "tipo": {
+          "const": "ocupacao_agregada",
+          "default": "ocupacao_agregada",
+          "title": "Tipo",
+          "type": "string"
+        },
+        "por_especialidade": {
+          "items": {
+            "$ref": "#/$defs/ItemOcupacaoAgregada"
+          },
+          "title": "Por Especialidade",
+          "type": "array"
+        },
+        "por_sala": {
+          "items": {
+            "$ref": "#/$defs/ItemOcupacaoAgregada"
+          },
+          "title": "Por Sala",
+          "type": "array"
+        }
+      },
+      "required": [
+        "data",
+        "dia_semana",
+        "por_especialidade",
+        "por_sala"
+      ],
+      "title": "DadosOcupacaoAgregada",
+      "type": "object"
+    },
+    "DadosOcupacaoProfissional": {
+      "additionalProperties": false,
+      "properties": {
+        "tipo": {
+          "const": "ocupacao_profissional",
+          "default": "ocupacao_profissional",
+          "title": "Tipo",
+          "type": "string"
+        },
+        "profissional": {
+          "$ref": "#/$defs/ProfissionalRelatorio"
+        },
+        "semana": {
+          "$ref": "#/$defs/MetricasOcupacao"
+        },
+        "dias": {
+          "items": {
+            "$ref": "#/$defs/DiaOcupacao"
+          },
+          "title": "Dias",
+          "type": "array"
+        },
+        "dias_sem_agenda": {
+          "items": {
+            "$ref": "#/$defs/DataRelatorio"
+          },
+          "title": "Dias Sem Agenda",
+          "type": "array"
+        },
+        "inconsistencia": {
+          "title": "Inconsistencia",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "profissional",
+        "semana",
+        "dias",
+        "dias_sem_agenda",
+        "inconsistencia"
+      ],
+      "title": "DadosOcupacaoProfissional",
+      "type": "object"
+    },
+    "DadosPacientesProfissional": {
+      "additionalProperties": false,
+      "properties": {
+        "tipo": {
+          "const": "pacientes_por_profissional",
+          "default": "pacientes_por_profissional",
+          "title": "Tipo",
+          "type": "string"
+        },
+        "escopo": {
+          "enum": [
+            "semana",
+            "dia"
+          ],
+          "title": "Escopo",
+          "type": "string"
+        },
+        "profissionais": {
+          "items": {
+            "$ref": "#/$defs/PacientesProfissional"
+          },
+          "title": "Profissionais",
+          "type": "array"
+        },
+        "clinica_por_dia": {
+          "items": {
+            "$ref": "#/$defs/ClinicaDia"
+          },
+          "title": "Clinica Por Dia",
+          "type": "array"
+        }
+      },
+      "required": [
+        "escopo",
+        "profissionais",
+        "clinica_por_dia"
+      ],
+      "title": "DadosPacientesProfissional",
+      "type": "object"
+    },
+    "DataRelatorio": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "format": "date",
+          "title": "Data",
+          "type": "string"
+        },
+        "dia_semana": {
+          "title": "Dia Semana",
+          "type": "string"
+        }
+      },
+      "required": [
+        "data",
+        "dia_semana"
+      ],
+      "title": "DataRelatorio",
+      "type": "object"
+    },
+    "DiaOcupacao": {
+      "additionalProperties": false,
+      "properties": {
+        "escalados": {
+          "title": "Escalados",
+          "type": "integer"
+        },
+        "ocupados": {
+          "title": "Ocupados",
+          "type": "integer"
+        },
+        "livres": {
+          "title": "Livres",
+          "type": "integer"
+        },
+        "percentual": {
+          "minimum": 0,
+          "title": "Percentual",
+          "type": "number"
+        },
+        "abaixo_da_meta": {
+          "title": "Abaixo Da Meta",
+          "type": "boolean"
+        },
+        "slots_para_meta": {
+          "title": "Slots Para Meta",
+          "type": "integer"
+        },
+        "data": {
+          "format": "date",
+          "title": "Data",
+          "type": "string"
+        },
+        "dia_semana": {
+          "title": "Dia Semana",
+          "type": "string"
+        },
+        "manha": {
+          "$ref": "#/$defs/TurnoOcupacao"
+        },
+        "tarde": {
+          "$ref": "#/$defs/TurnoOcupacao"
+        },
+        "por_sala_posto": {
+          "items": {
+            "$ref": "#/$defs/SalaPostoRelatorio"
+          },
+          "title": "Por Sala Posto",
+          "type": "array"
+        }
+      },
+      "required": [
+        "escalados",
+        "ocupados",
+        "livres",
+        "percentual",
+        "abaixo_da_meta",
+        "slots_para_meta",
+        "data",
+        "dia_semana",
+        "manha",
+        "tarde",
+        "por_sala_posto"
+      ],
+      "title": "DiaOcupacao",
+      "type": "object"
+    },
+    "DiaPacientes": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "format": "date",
+          "title": "Data",
+          "type": "string"
+        },
+        "dia_semana": {
+          "title": "Dia Semana",
+          "type": "string"
+        },
+        "pacientes": {
+          "title": "Pacientes",
+          "type": "integer"
+        },
+        "sessoes": {
+          "title": "Sessoes",
+          "type": "integer"
+        },
+        "slots_ocupados": {
+          "title": "Slots Ocupados",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "data",
+        "dia_semana",
+        "pacientes",
+        "sessoes",
+        "slots_ocupados"
+      ],
+      "title": "DiaPacientes",
+      "type": "object"
+    },
+    "ItemOcupacaoAgregada": {
+      "additionalProperties": false,
+      "description": "Mesmo conteúdo de OcupacaoItemResponse, sem depender de app.api.",
+      "properties": {
+        "rotulo": {
+          "title": "Rotulo",
+          "type": "string"
+        },
+        "slots_escalados": {
+          "title": "Slots Escalados",
+          "type": "integer"
+        },
+        "slots_ocupados": {
+          "title": "Slots Ocupados",
+          "type": "integer"
+        },
+        "percentual": {
+          "minimum": 0,
+          "title": "Percentual",
+          "type": "number"
+        },
+        "abaixo_da_meta": {
+          "title": "Abaixo Da Meta",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rotulo",
+        "slots_escalados",
+        "slots_ocupados",
+        "percentual",
+        "abaixo_da_meta"
+      ],
+      "title": "ItemOcupacaoAgregada",
+      "type": "object"
+    },
+    "ItemResumo": {
+      "additionalProperties": false,
+      "properties": {
+        "rotulo": {
+          "title": "Rotulo",
+          "type": "string"
+        },
+        "valor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Valor"
+        },
+        "formato": {
+          "enum": [
+            "texto",
+            "inteiro",
+            "decimal",
+            "percentual",
+            "data"
+          ],
+          "title": "Formato",
+          "type": "string"
+        },
+        "exibicao": {
+          "title": "Exibicao",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rotulo",
+        "valor",
+        "formato",
+        "exibicao"
+      ],
+      "title": "ItemResumo",
+      "type": "object"
+    },
+    "MetricasOcupacao": {
+      "additionalProperties": false,
+      "properties": {
+        "escalados": {
+          "title": "Escalados",
+          "type": "integer"
+        },
+        "ocupados": {
+          "title": "Ocupados",
+          "type": "integer"
+        },
+        "livres": {
+          "title": "Livres",
+          "type": "integer"
+        },
+        "percentual": {
+          "minimum": 0,
+          "title": "Percentual",
+          "type": "number"
+        },
+        "abaixo_da_meta": {
+          "title": "Abaixo Da Meta",
+          "type": "boolean"
+        },
+        "slots_para_meta": {
+          "title": "Slots Para Meta",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "escalados",
+        "ocupados",
+        "livres",
+        "percentual",
+        "abaixo_da_meta",
+        "slots_para_meta"
+      ],
+      "title": "MetricasOcupacao",
+      "type": "object"
+    },
+    "PacientesProfissional": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "nome": {
+          "title": "Nome",
+          "type": "string"
+        },
+        "especialidade": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Especialidade"
+        },
+        "dias": {
+          "items": {
+            "$ref": "#/$defs/DiaPacientes"
+          },
+          "title": "Dias",
+          "type": "array"
+        },
+        "dias_sem_agenda": {
+          "items": {
+            "$ref": "#/$defs/DataRelatorio"
+          },
+          "title": "Dias Sem Agenda",
+          "type": "array"
+        },
+        "media_pacientes_por_dia": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Media Pacientes Por Dia"
+        },
+        "pacientes_distintos_semana": {
+          "title": "Pacientes Distintos Semana",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "nome",
+        "especialidade",
+        "dias",
+        "dias_sem_agenda",
+        "media_pacientes_por_dia",
+        "pacientes_distintos_semana"
+      ],
+      "title": "PacientesProfissional",
+      "type": "object"
+    },
+    "PeriodoRelatorio": {
+      "additionalProperties": false,
+      "properties": {
+        "inicio": {
+          "format": "date",
+          "title": "Inicio",
+          "type": "string"
+        },
+        "fim": {
+          "format": "date",
+          "title": "Fim",
+          "type": "string"
+        }
+      },
+      "required": [
+        "inicio",
+        "fim"
+      ],
+      "title": "PeriodoRelatorio",
+      "type": "object"
+    },
+    "ProfissionalRelatorio": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "nome": {
+          "title": "Nome",
+          "type": "string"
+        },
+        "especialidade": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Especialidade"
+        }
+      },
+      "required": [
+        "id",
+        "nome",
+        "especialidade"
+      ],
+      "title": "ProfissionalRelatorio",
+      "type": "object"
+    },
+    "SalaPostoRelatorio": {
+      "additionalProperties": false,
+      "properties": {
+        "escalados": {
+          "title": "Escalados",
+          "type": "integer"
+        },
+        "ocupados": {
+          "title": "Ocupados",
+          "type": "integer"
+        },
+        "sala_id": {
+          "title": "Sala Id",
+          "type": "string"
+        },
+        "sala_nome": {
+          "title": "Sala Nome",
+          "type": "string"
+        },
+        "posto": {
+          "minimum": 1,
+          "title": "Posto",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "escalados",
+        "ocupados",
+        "sala_id",
+        "sala_nome",
+        "posto"
+      ],
+      "title": "SalaPostoRelatorio",
+      "type": "object"
+    },
+    "TabelaExportacao": {
+      "additionalProperties": false,
+      "properties": {
+        "nome": {
+          "title": "Nome",
+          "type": "string"
+        },
+        "colunas": {
+          "items": {
+            "$ref": "#/$defs/ColunaTabela"
+          },
+          "title": "Colunas",
+          "type": "array"
+        },
+        "linhas": {
+          "items": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object"
+          },
+          "title": "Linhas",
+          "type": "array"
+        }
+      },
+      "required": [
+        "nome",
+        "colunas",
+        "linhas"
+      ],
+      "title": "TabelaExportacao",
+      "type": "object"
+    },
+    "TurnoOcupacao": {
+      "additionalProperties": false,
+      "properties": {
+        "escalados": {
+          "title": "Escalados",
+          "type": "integer"
+        },
+        "ocupados": {
+          "title": "Ocupados",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "escalados",
+        "ocupados"
+      ],
+      "title": "TurnoOcupacao",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "versao": {
+      "default": 1,
+      "description": "Versão do contrato do bloco: 1.",
+      "maximum": 1,
+      "minimum": 1,
+      "title": "Versao",
+      "type": "integer"
+    },
+    "tipo": {
+      "enum": [
+        "ocupacao_profissional",
+        "pacientes_por_profissional",
+        "ocupacao_agregada"
+      ],
+      "title": "Tipo",
+      "type": "string"
+    },
+    "titulo": {
+      "title": "Titulo",
+      "type": "string"
+    },
+    "periodo": {
+      "$ref": "#/$defs/PeriodoRelatorio"
+    },
+    "meta": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Meta"
+    },
+    "parcial": {
+      "title": "Parcial",
+      "type": "boolean"
+    },
+    "dias_nao_lidos": {
+      "items": {
+        "format": "date",
+        "type": "string"
+      },
+      "title": "Dias Nao Lidos",
+      "type": "array"
+    },
+    "avisos": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Avisos",
+      "type": "array"
+    },
+    "resumo": {
+      "items": {
+        "$ref": "#/$defs/ItemResumo"
+      },
+      "title": "Resumo",
+      "type": "array"
+    },
+    "dados": {
+      "discriminator": {
+        "mapping": {
+          "ocupacao_agregada": "#/$defs/DadosOcupacaoAgregada",
+          "ocupacao_profissional": "#/$defs/DadosOcupacaoProfissional",
+          "pacientes_por_profissional": "#/$defs/DadosPacientesProfissional"
+        },
+        "propertyName": "tipo"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/DadosOcupacaoProfissional"
+        },
+        {
+          "$ref": "#/$defs/DadosPacientesProfissional"
+        },
+        {
+          "$ref": "#/$defs/DadosOcupacaoAgregada"
+        }
+      ],
+      "title": "Dados"
+    },
+    "tabelas": {
+      "items": {
+        "$ref": "#/$defs/TabelaExportacao"
+      },
+      "title": "Tabelas",
+      "type": "array"
+    }
+  },
+  "required": [
+    "tipo",
+    "titulo",
+    "periodo",
+    "meta",
+    "parcial",
+    "dias_nao_lidos",
+    "avisos",
+    "resumo",
+    "dados",
+    "tabelas"
+  ],
+  "title": "BlocoRelatorio",
+  "type": "object"
+}

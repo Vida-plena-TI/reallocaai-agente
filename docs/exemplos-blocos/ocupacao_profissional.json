@@ -1,0 +1,268 @@
+{
+  "versao": 1,
+  "tipo": "ocupacao_profissional",
+  "titulo": "Ocupação de Ana Exemplo",
+  "periodo": {
+    "inicio": "2026-09-28",
+    "fim": "2026-10-03"
+  },
+  "meta": 0.8,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da semana, sem datas); os números refletem a grade vigente, não uma semana específica do calendário."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Ocupação da semana",
+      "valor": 0.25,
+      "formato": "percentual",
+      "exibicao": "25,0%"
+    },
+    {
+      "rotulo": "Slots ocupados / escalados",
+      "valor": 5,
+      "formato": "inteiro",
+      "exibicao": "5 de 20"
+    },
+    {
+      "rotulo": "Slots para a meta",
+      "valor": 11,
+      "formato": "inteiro",
+      "exibicao": "11"
+    }
+  ],
+  "dados": {
+    "tipo": "ocupacao_profissional",
+    "profissional": {
+      "id": "86f7aaab0e657f185f463b8bd69d5c0570ccf2810619db5172a4db677d31eb60",
+      "nome": "Ana Exemplo",
+      "especialidade": "psicologia"
+    },
+    "semana": {
+      "escalados": 20,
+      "ocupados": 5,
+      "livres": 15,
+      "percentual": 0.25,
+      "abaixo_da_meta": true,
+      "slots_para_meta": 11
+    },
+    "dias": [
+      {
+        "escalados": 10,
+        "ocupados": 3,
+        "livres": 7,
+        "percentual": 0.3,
+        "abaixo_da_meta": true,
+        "slots_para_meta": 5,
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "manha": {
+          "escalados": 10,
+          "ocupados": 3
+        },
+        "tarde": {
+          "escalados": 0,
+          "ocupados": 0
+        },
+        "por_sala_posto": [
+          {
+            "escalados": 10,
+            "ocupados": 3,
+            "sala_id": "sala-12",
+            "sala_nome": "Sala Azul",
+            "posto": 1
+          }
+        ]
+      },
+      {
+        "escalados": 10,
+        "ocupados": 2,
+        "livres": 8,
+        "percentual": 0.2,
+        "abaixo_da_meta": true,
+        "slots_para_meta": 6,
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "manha": {
+          "escalados": 10,
+          "ocupados": 2
+        },
+        "tarde": {
+          "escalados": 0,
+          "ocupados": 0
+        },
+        "por_sala_posto": [
+          {
+            "escalados": 10,
+            "ocupados": 2,
+            "sala_id": "sala-12",
+            "sala_nome": "sala-12",
+            "posto": 1
+          }
+        ]
+      }
+    ],
+    "dias_sem_agenda": [
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira"
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira"
+      },
+      {
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira"
+      },
+      {
+        "data": "2026-10-03",
+        "dia_semana": "sábado"
+      }
+    ],
+    "inconsistencia": false
+  },
+  "tabelas": [
+    {
+      "nome": "Por dia",
+      "colunas": [
+        {
+          "chave": "data",
+          "rotulo": "Data",
+          "formato": "data"
+        },
+        {
+          "chave": "dia_semana",
+          "rotulo": "Dia da semana",
+          "formato": "texto"
+        },
+        {
+          "chave": "escalados",
+          "rotulo": "Slots escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "livres",
+          "rotulo": "Slots livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "percentual",
+          "rotulo": "Ocupação",
+          "formato": "percentual"
+        },
+        {
+          "chave": "abaixo_da_meta",
+          "rotulo": "Abaixo da meta",
+          "formato": "texto"
+        },
+        {
+          "chave": "slots_para_meta",
+          "rotulo": "Slots para a meta",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "manha_escalados",
+          "rotulo": "Manhã: escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "manha_ocupados",
+          "rotulo": "Manhã: ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "tarde_escalados",
+          "rotulo": "Tarde: escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "tarde_ocupados",
+          "rotulo": "Tarde: ocupados",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "escalados": 10,
+          "ocupados": 3,
+          "livres": 7,
+          "percentual": 0.3,
+          "abaixo_da_meta": true,
+          "slots_para_meta": 5,
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "manha_escalados": 10,
+          "manha_ocupados": 3,
+          "tarde_escalados": 0,
+          "tarde_ocupados": 0
+        },
+        {
+          "escalados": 10,
+          "ocupados": 2,
+          "livres": 8,
+          "percentual": 0.2,
+          "abaixo_da_meta": true,
+          "slots_para_meta": 6,
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "manha_escalados": 10,
+          "manha_ocupados": 2,
+          "tarde_escalados": 0,
+          "tarde_ocupados": 0
+        }
+      ]
+    },
+    {
+      "nome": "Resumo da semana",
+      "colunas": [
+        {
+          "chave": "escalados",
+          "rotulo": "Slots escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "livres",
+          "rotulo": "Slots livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "percentual",
+          "rotulo": "Ocupação",
+          "formato": "percentual"
+        },
+        {
+          "chave": "abaixo_da_meta",
+          "rotulo": "Abaixo da meta",
+          "formato": "texto"
+        },
+        {
+          "chave": "slots_para_meta",
+          "rotulo": "Slots para a meta",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "escalados": 20,
+          "ocupados": 5,
+          "livres": 15,
+          "percentual": 0.25,
+          "abaixo_da_meta": true,
+          "slots_para_meta": 11
+        }
+      ]
+    }
+  ]
+}
