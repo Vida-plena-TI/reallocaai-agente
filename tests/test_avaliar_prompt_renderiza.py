@@ -6,6 +6,7 @@ from scripts.avaliar_prompt_renderiza import (
     _argumentos,
     avaliar_turno,
     contar_frases,
+    menciona_email,
     numeros_ausentes_das_tools,
 )
 
@@ -20,6 +21,13 @@ def test_numeros_com_virgula_precisam_estar_no_texto_da_tool() -> None:
     tool = ["Total da semana: 72,5% (29 de 40 slots)"]
     assert numeros_ausentes_das_tools("Está em 72,5%.", tool) == []
     assert numeros_ausentes_das_tools("Está em 72,5%, ou 73,0%.", tool) == ["73,0"]
+
+
+def test_menciona_email_com_qualquer_hifen_ou_nenhum() -> None:
+    nao_separavel = "e" + chr(0x2011) + "mail"  # hífen não separável (U+2011)
+    for texto in ["Posso mandar por e-mail.", f"Por {nao_separavel}.", "email", "E-Mail"]:
+        assert menciona_email(texto), texto
+    assert not menciona_email("O relatório na tela tem botões Exportar.")
 
 
 def test_avaliar_turno_marca_tools_extras_e_blocos() -> None:
@@ -43,6 +51,7 @@ def test_avaliar_turno_marca_tools_extras_e_blocos() -> None:
     )
     assert execucao.extras == ["consultar_pacientes_por_profissional"]
     assert not execucao.tools_ok and execucao.frases_ok and execucao.numeros_ok
+    assert execucao.email_ok
 
 
 def test_repeticoes_padrao_tres() -> None:

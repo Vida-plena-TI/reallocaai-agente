@@ -368,8 +368,9 @@ e a **planilha real**. Repete cada pergunta N vezes (padrão 3), sempre em conve
 "Ocupação por especialidade hoje" e "Exporta isso em Excel". Para cada execução imprime, só no
 terminal, o número de frases da resposta, as tools chamadas, as tools além da esperada (a de
 exportação não espera nenhuma), os blocos gerados e se todo número com vírgula decimal citado
-aparece no texto da tool; no fim, um resumo por pergunta (até 3 frases, só as tools esperadas,
-números fiéis). Não imprime o texto da resposta nem o das tools, e não grava arquivo. O envio
+aparece no texto da tool, e se a resposta oferece e-mail (qualquer menção a "e-mail", com
+qualquer hífen ou nenhum, conta como falha, já que nenhuma pergunta pede e-mail); no fim, um
+resumo por pergunta (até 3 frases, só as tools esperadas, números fiéis, sem oferta de e-mail). Não imprime o texto da resposta nem o das tools, e não grava arquivo. O envio
 de e-mail é substituído por um registro local: se o agente chamar `enviar_relatorio`, aparece
 como tool extra e nenhum e-mail é enviado.
 

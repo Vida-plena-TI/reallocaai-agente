@@ -11,7 +11,7 @@ Uso:
 
 Repete cada pergunta de `PERGUNTAS` N vezes (padrão 3), sempre numa conversa
 nova, com `renderiza_relatorios=True`. Para cada execução imprime só métricas
-(frases, tools, blocos, fidelidade dos números) — nunca o texto da resposta
+(frases, tools, blocos, fidelidade dos números, oferta de e-mail) — nunca o texto da resposta
 nem o resultado das tools, que contêm nomes de pacientes. Nada é gravado em
 arquivo. O envio de e-mail é substituído por um registro local: se o agente
 chamar `enviar_relatorio`, isso aparece como tool extra e nenhum e-mail sai.
@@ -57,6 +57,8 @@ MAXIMO_DE_FRASES = 3
 
 _FIM_DE_FRASE = re.compile(r"(?<=[.!?…])\s+|\n+")
 _DECIMAL_COM_VIRGULA = re.compile(r"\d+,\d+")
+#: Qualquer hífen ou nenhum entre "e" e "mail" (o modelo já usou U+2011).
+_EMAIL = re.compile(r"e\W?mail", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,7 @@ class Execucao:
     extras: list[str]
     blocos: list[str]
     numeros_infieis: list[str]
+    oferece_email: bool
 
     @property
     def frases_ok(self) -> bool:
@@ -79,6 +82,10 @@ class Execucao:
     def numeros_ok(self) -> bool:
         return not self.numeros_infieis
 
+    @property
+    def email_ok(self) -> bool:
+        return not self.oferece_email
+
 
 def contar_frases(texto: str) -> int:
     """Frases por pontuação final ou quebra de linha (cada item de lista conta como uma)."""
@@ -89,6 +96,11 @@ def numeros_ausentes_das_tools(resposta: str, textos_das_tools: list[str]) -> li
     """Números com vírgula decimal citados na resposta que não aparecem no texto das tools."""
     fonte = "\n".join(textos_das_tools)
     return [n for n in _DECIMAL_COM_VIRGULA.findall(resposta) if n not in fonte]
+
+
+def menciona_email(resposta: str) -> bool:
+    """Nenhuma pergunta da avaliação pede e-mail: qualquer menção conta como oferta."""
+    return _EMAIL.search(resposta) is not None
 
 
 def avaliar_turno(
@@ -114,6 +126,7 @@ def avaliar_turno(
         extras=[nome for nome in tools if nome not in esperadas],
         blocos=blocos,
         numeros_infieis=numeros_ausentes_das_tools(resposta, textos),
+        oferece_email=menciona_email(resposta),
     )
 
 
@@ -188,7 +201,8 @@ def main() -> None:
                 f"tools={execucao.tools or '-'} "
                 f"extras={execucao.extras or '-'} "
                 f"blocos={execucao.blocos or '-'} "
-                f"números fiéis={_sim_nao(execucao.numeros_ok)}"
+                f"números fiéis={_sim_nao(execucao.numeros_ok)} "
+                f"oferece e-mail={'SIM' if execucao.oferece_email else 'não'}"
                 + (
                     f" (fora da tool: {execucao.numeros_infieis})"
                     if execucao.numeros_infieis
@@ -205,6 +219,7 @@ def main() -> None:
             f"    até {MAXIMO_DE_FRASES} frases: {sum(e.frases_ok for e in execucoes)}/{total}"
             f" | só as tools esperadas: {sum(e.tools_ok for e in execucoes)}/{total}"
             f" | números fiéis: {sum(e.numeros_ok for e in execucoes)}/{total}"
+            f" | sem oferta de e-mail: {sum(e.email_ok for e in execucoes)}/{total}"
         )
     if emails_bloqueados:
         print(
