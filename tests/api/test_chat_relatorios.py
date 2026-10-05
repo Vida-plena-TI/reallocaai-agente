@@ -124,6 +124,21 @@ def test_prompt_renderizado_na_chamada_da_api(client: TestClient, flag: bool | N
         assert "exportação não está disponível" in prompt
 
 
+def test_variante_com_renderizacao_tem_regras_de_brevidade_tools_e_email() -> None:
+    com = PROMPT_SISTEMA_COM_RELATORIOS.format(
+        data_referencia="05/10/2026", dia_da_semana="segunda-feira"
+    )
+    sem = PROMPT_SISTEMA.format(data_referencia="05/10/2026", dia_da_semana="segunda-feira")
+    assert "no máximo 3 frases" in com
+    assert "sem listas e sem tabelas" in com
+    assert "Não chame tools extras" in com
+    assert "Não ofereça enviar o relatório por e-mail por conta própria" in com
+    assert "Exemplo de resposta boa" in com and "Exemplo de resposta ruim" in com
+    assert "no máximo 3 frases" not in sem
+    assert "Exemplo de resposta" not in sem
+    assert "tools extras" not in sem
+
+
 def test_variantes_renderizadas_e_openapi(client: TestClient) -> None:
     for variante in [PROMPT_SISTEMA, PROMPT_SISTEMA_COM_RELATORIOS]:
         prompt = variante.format(data_referencia="28/09/2026", dia_da_semana="segunda-feira")

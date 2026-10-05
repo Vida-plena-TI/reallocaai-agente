@@ -140,7 +140,9 @@ Corpo da requisição:
 - `mensagem`: texto da pergunta ao agente (não pode ser vazia nem conter só espaços).
 - `renderiza_relatorios`: opcional, `false` por padrão. Use `true` quando o cliente
   mostra as tabelas e os destaques dos relatórios na tela. Nesse modo, o agente
-  responde em 1 a 3 frases com os destaques, sem repetir a lista ou a tabela.
+  responde em no máximo 3 frases curtas, em prosa, com os destaques, sem repetir a lista,
+  a tabela nem os avisos; chama só as tools que a pergunta pede (cada tool de relatório
+  vira um cartão na tela) e não oferece envio por e-mail por conta própria.
   Omitido ou `false` mantém as respostas detalhadas atuais.
 
 Resposta:
@@ -357,6 +359,33 @@ planilha compartilhada com o e-mail da service account (basta permissão de leit
 
 O relatório é impresso no terminal e salvo em `scripts/output/sheet_inspection.txt`. Essa pasta
 é git-ignorada — o output contém dados reais de pacientes e profissionais.
+
+### `scripts/avaliar_prompt_renderiza.py`
+
+Avalia a variante do prompt com renderização (`renderiza_relatorios=True`) com o **modelo real**
+e a **planilha real**. Repete cada pergunta N vezes (padrão 3), sempre em conversa nova:
+"Qual a ocupação da Rossana?", "Quantos pacientes cada profissional atende por dia?",
+"Ocupação por especialidade hoje" e "Exporta isso em Excel". Para cada execução imprime, só no
+terminal, o número de frases da resposta, as tools chamadas, as tools além da esperada (a de
+exportação não espera nenhuma), os blocos gerados e se todo número com vírgula decimal citado
+aparece no texto da tool; no fim, um resumo por pergunta (até 3 frases, só as tools esperadas,
+números fiéis). Não imprime o texto da resposta nem o das tools, e não grava arquivo. O envio
+de e-mail é substituído por um registro local: se o agente chamar `enviar_relatorio`, aparece
+como tool extra e nenhum e-mail é enviado.
+
+```bash
+uv run python scripts/avaliar_prompt_renderiza.py [AAAA-MM-DD] [--repeticoes N]
+```
+
+**Não roda em CI** nem no `uv run pytest` (só as funções puras de contagem têm teste): exige
+`AI_PROVIDER` com a chave e o modelo do provedor, além das credenciais do Google Sheets.
+**Custo aproximado de uma rodada padrão** (4 perguntas × 3 = 12 conversas, em geral 2 chamadas
+ao modelo cada): o prompt de sistema e os schemas das tools somam cerca de 5 mil tokens por
+chamada, mais o resultado das tools, o que dá por volta de 150 mil tokens de entrada e poucos
+milhares de saída. Num modelo de US$ 2,50 por milhão de tokens de entrada e US$ 10 por milhão
+de saída, isso fica em torno de US$ 0,40 por rodada; o custo escala linearmente com
+`--repeticoes`. Com `AI_PROVIDER=google` no tier gratuito, não há custo, mas as ~24 chamadas
+podem esbarrar no limite de requisições por minuto.
 
 ## Qualidade
 
