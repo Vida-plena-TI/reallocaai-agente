@@ -188,7 +188,8 @@ ou os distintos da clínica na consulta diária geral.
 Texto e blocos usam o mesmo resultado da engine. Os dados preservam valores sem
 arredondamento, contagens inteiras, percentuais como frações e dias da semana por extenso.
 As strings de exibição usam `ROUND_HALF_UP`, uma casa decimal e vírgula, também no
-texto das tools (a ocupação agregada antes usava percentual sem casa decimal).
+texto das tools e no e-mail de relatório (a ocupação agregada e o e-mail antes usavam
+percentual sem casa decimal). `GET /agenda/ocupacao` também aceita percentual acima de 1.
 Em caso de inconsistência na grade, a engine pode produzir ocupação acima de 100%.
 O bloco é devolvido com o valor real (percentuais só têm limite inferior, `>= 0`):
 `abaixo_da_meta` fica `false`, um aviso de ocupação acima de 100% entra em `avisos` (e no

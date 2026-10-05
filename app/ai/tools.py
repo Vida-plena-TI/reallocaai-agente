@@ -23,7 +23,6 @@ from typing import Any, Literal
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
-from app.ai.formatacao import formatar_razao
 from app.ai.relatorios import (
     AVISO_ACIMA_DE_CEM,
     bloco_ocupacao_agregada,
@@ -70,6 +69,7 @@ from app.domain.constants import (
     HORARIO_PREFERENCIAL_PADRAO,
     META_OCUPACAO_POR_SALA,
 )
+from app.domain.formatacao import formatar_razao
 from app.engine.carga_profissionais import CargaProfissionais, CargaProfissional
 from app.engine.disponibilidade import SlotDisponivel
 from app.engine.encaixe import CenarioSugestao, ItemEncaixeResolvido, OpcaoEncaixe

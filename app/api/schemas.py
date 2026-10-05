@@ -31,7 +31,7 @@ class OcupacaoItemResponse(BaseModel):
     rotulo: str
     slots_escalados: int
     slots_ocupados: int
-    percentual: float = Field(ge=0.0, le=1.0)
+    percentual: float = Field(ge=0.0)
     abaixo_da_meta: bool
 
 

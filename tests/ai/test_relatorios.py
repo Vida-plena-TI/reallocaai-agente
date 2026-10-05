@@ -11,7 +11,6 @@ from langchain_openai.chat_models.base import _convert_message_to_dict
 from pydantic import ValidationError
 
 from app.ai.agente import extrair_blocos_do_turno
-from app.ai.formatacao import formatar_razao
 from app.ai.relatorios import (
     AVISO_ACIMA_DE_CEM,
     BlocoRelatorio,
@@ -23,6 +22,7 @@ from app.ai.relatorios import (
 from app.ai.tools import criar_tools
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
 from app.domain import Profissional, Sala
+from app.domain.formatacao import formatar_razao
 from app.engine.carga_profissionais import construir_carga_profissionais
 from app.engine.ocupacao import construir_relatorio_ocupacao_do_dia
 from app.engine.ocupacao_profissional import construir_ocupacao_semanal_profissional

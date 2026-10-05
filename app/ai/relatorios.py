@@ -10,8 +10,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.ai.formatacao import formatar_razao
 from app.domain.constants import META_OCUPACAO_POR_SALA
+from app.domain.formatacao import formatar_razao
 from app.engine.carga_profissionais import CargaProfissionais, CargaProfissional
 from app.engine.ocupacao import OcupacaoAgregada, RelatorioOcupacaoDoDia
 from app.engine.ocupacao_profissional import OcupacaoSemanalProfissional
