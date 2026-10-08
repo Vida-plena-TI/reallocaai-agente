@@ -10,6 +10,13 @@ from datetime import date, time
 from app.domain import Atendimento, EntradaGrade, Especialidade, Profissional, Slot
 from app.engine.ocupacao import RelatorioOcupacaoDoDia, construir_relatorio_ocupacao_do_dia
 from app.reports.template import renderizar_relatorio
+from tests.support.agenda_semanal import (
+    LUCIANA,
+    atendimentos,
+    grade,
+    horas_da_manha,
+    horas_da_tarde,
+)
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 
 DIA = date(2026, 9, 8)
@@ -58,8 +65,8 @@ def test_renderizar_relatorio_inclui_percentuais_e_rotulos_no_html_e_no_texto() 
     assert "Psicologia" in corpo_texto
     assert "Sala 1" in corpo_html
     assert "Sala 1" in corpo_texto
-    assert "50%" in corpo_html
-    assert "50%" in corpo_texto
+    assert "50,0%" in corpo_html
+    assert "50,0%" in corpo_texto
     assert "abaixo da meta" in corpo_html.lower()
     assert "abaixo da meta" in corpo_texto.lower()
 
@@ -74,3 +81,24 @@ def test_renderizar_relatorio_sem_escala_no_dia_nao_quebra() -> None:
     assert corpo_texto
     assert "nenhum dado" in corpo_html.lower()
     assert "nenhum dado" in corpo_texto.lower()
+
+
+def test_renderizar_relatorio_acima_de_cem_por_cento_mostra_o_valor_real() -> None:
+    # 20 slots escalados e 21 ocupados: um atendimento fora da grade (outro posto).
+    horas = horas_da_manha(DIA) + horas_da_tarde(DIA)
+    fonte = FakeScheduleDataSource(
+        profissionais={DIA: [LUCIANA]},
+        grade={DIA: grade(DIA, horas, sala_id="sala-1")},
+        atendimentos={
+            DIA: atendimentos(DIA, horas, sala_id="sala-1")
+            + atendimentos(DIA, horas[:1], sala_id="sala-1", indice_posto=1)
+        },
+    )
+    relatorio = construir_relatorio_ocupacao_do_dia(fonte, DIA)
+
+    _, corpo_html, corpo_texto = renderizar_relatorio(relatorio)
+
+    assert "105,0%" in corpo_html
+    assert "105,0%" in corpo_texto
+    assert "abaixo da meta" not in corpo_html.lower()
+    assert "abaixo da meta" not in corpo_texto.lower()

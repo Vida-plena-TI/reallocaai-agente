@@ -14,6 +14,7 @@ corretamente, ou o destinatário prefere abrir em modo texto.
 from datetime import date
 
 from app.domain import Especialidade
+from app.domain.formatacao import formatar_razao
 from app.engine.ocupacao import OcupacaoAgregada, RelatorioOcupacaoDoDia
 
 _MESES = (
@@ -64,6 +65,11 @@ def _itens_por_sala(relatorio: RelatorioOcupacaoDoDia) -> list[_ItemOcupacaoRotu
     ]
 
 
+def _percentual(agregada: OcupacaoAgregada) -> str:
+    """`105,0%`: uma casa, `ROUND_HALF_UP` e vírgula, como no chat; sem limitar a 100%."""
+    return formatar_razao(agregada.slots_ocupados, agregada.slots_escalados, percentual=True)
+
+
 def _linha_html(rotulo: str, agregada: OcupacaoAgregada) -> str:
     estilo = ' style="color: #c00000; font-weight: bold;"' if agregada.abaixo_da_meta else ""
     aviso = " (abaixo da meta de 80%)" if agregada.abaixo_da_meta else ""
@@ -71,7 +77,7 @@ def _linha_html(rotulo: str, agregada: OcupacaoAgregada) -> str:
         f"<tr{estilo}>"
         f'<td style="padding: 6px 12px; border-bottom: 1px solid #eee;">{rotulo}{aviso}</td>'
         f'<td style="padding: 6px 12px; border-bottom: 1px solid #eee; text-align: right;">'
-        f"{agregada.percentual:.0%}</td>"
+        f"{_percentual(agregada)}</td>"
         "</tr>"
     )
 
@@ -99,7 +105,7 @@ def _bloco_texto(titulo: str, itens: list[_ItemOcupacaoRotulado]) -> list[str]:
     linhas = [titulo]
     for rotulo, agregada in itens:
         aviso = " — ABAIXO DA META DE 80%" if agregada.abaixo_da_meta else ""
-        linhas.append(f"  - {rotulo}: {agregada.percentual:.0%}{aviso}")
+        linhas.append(f"  - {rotulo}: {_percentual(agregada)}{aviso}")
     return linhas
 
 

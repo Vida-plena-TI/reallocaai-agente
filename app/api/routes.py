@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
 
-from app.ai.agente import criar_agente, perguntar
+from app.ai.agente import criar_agente, perguntar_com_mensagens
 from app.ai.servico_agenda import consultar_disponibilidade_do_dia, consultar_ocupacao_do_dia
 from app.api.dependencies import (
     obter_armazenamento_conversas,
@@ -137,7 +137,9 @@ def _papel_da_mensagem(mensagem: BaseMessage) -> str:
     response_model=ChatResponse,
     summary="Conversa com o agente de IA sobre a agenda",
     description=(
-        "Envia uma mensagem ao agente RealocAI e devolve a resposta em texto. "
+        "Envia uma mensagem ao agente RealocAI e devolve texto e blocos de relatório. "
+        "Informe renderiza_relatorios=true se o cliente renderiza os blocos: "
+        "nesse caso o texto destaca o essencial. O RealocAI não gera PDF nem Excel. "
         "Omita `conversa_id` para iniciar uma conversa nova; informe o "
         "`conversa_id` devolvido numa resposta anterior para continuá-la, "
         "mantendo o histórico completo do diálogo. Conversas ficam em memória "
@@ -171,17 +173,21 @@ def conversar_com_agente(
         chat_model,
         data_referencia=date.today(),
         enviar_relatorio=enviar_relatorio_por_email,
+        renderiza_relatorios=corpo.renderiza_relatorios,
     )
     try:
-        resposta = perguntar(agente, [*historico, HumanMessage(corpo.mensagem)])
+        resposta, _, blocos = perguntar_com_mensagens(
+            agente,
+            [*historico, HumanMessage(corpo.mensagem)],
+        )
     except Exception as erro:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="erro ao processar a conversa com o agente, tente novamente",
         ) from erro
 
-    conversas.registrar_troca(conversa_id, corpo.mensagem, resposta)
-    return ChatResponse(conversa_id=conversa_id, resposta=resposta)
+    conversas.registrar_troca(conversa_id, corpo.mensagem, resposta, blocos)
+    return ChatResponse(conversa_id=conversa_id, resposta=resposta, blocos=blocos)
 
 
 @router.get(
@@ -192,23 +198,25 @@ def conversar_com_agente(
         "Devolve as mensagens trocadas com o agente numa conversa, na ordem "
         "em que aconteceram — útil para depuração e para uma futura interface "
         "recuperar uma conversa em andamento. 404 se o `conversa_id` não "
-        "existir ou tiver expirado."
+        "existir ou tiver expirado. Cada resposta do agente inclui seus blocos de relatório."
     ),
 )
 def obter_historico_da_conversa(
     conversa_id: str,
     conversas: Annotated[ArmazenamentoConversas, Depends(obter_armazenamento_conversas)],
 ) -> list[MensagemHistoricoResponse]:
-    historico = conversas.obter_historico(conversa_id)
+    historico = conversas.obter_historico_com_blocos(conversa_id)
     if historico is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=_MENSAGEM_CONVERSA_INEXISTENTE
         )
     return [
         MensagemHistoricoResponse(
-            papel=_papel_da_mensagem(mensagem), conteudo=str(mensagem.content)
+            papel=_papel_da_mensagem(mensagem),
+            conteudo=str(mensagem.content),
+            blocos=blocos,
         )
-        for mensagem in historico
+        for mensagem, blocos in historico
     ]
 
 

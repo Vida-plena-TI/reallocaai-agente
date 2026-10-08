@@ -129,7 +129,8 @@ Corpo da requisição:
 ```json
 {
   "conversa_id": null,
-  "mensagem": "Tem vaga de psicologia hoje à tarde?"
+  "mensagem": "Tem vaga de psicologia hoje à tarde?",
+  "renderiza_relatorios": false
 }
 ```
 
@@ -137,19 +138,97 @@ Corpo da requisição:
   conversa existente, envie o `conversa_id` devolvido numa resposta anterior — o histórico
   completo do diálogo é reaproveitado automaticamente.
 - `mensagem`: texto da pergunta ao agente (não pode ser vazia nem conter só espaços).
+- `renderiza_relatorios`: opcional, `false` por padrão. Use `true` quando o cliente
+  mostra as tabelas e os destaques dos relatórios na tela. Nesse modo, o agente
+  responde em no máximo 3 frases curtas, em prosa, com os destaques, sem repetir a lista,
+  a tabela nem os avisos; chama só as tools que a pergunta pede (cada tool de relatório
+  vira um cartão na tela) e não oferece envio por e-mail por conta própria.
+  Omitido ou `false` mantém as respostas detalhadas atuais.
 
 Resposta:
 
 ```json
 {
   "conversa_id": "3f1b1e4a-...",
-  "resposta": "Sim, há um horário às 14h com a Dra. Ana na Sala 2."
+  "resposta": "Sim, há um horário às 14h com a Dra. Ana na Sala 2.",
+  "blocos": []
 }
 ```
 
 Conversas ficam **em memória** (perdidas num restart do processo) e expiram após um período
 de inatividade. Um `conversa_id` inexistente ou expirado devolve `404`; um erro inesperado ao
 rodar o agente (rede, modelo) devolve `502`, sem vazar detalhes internos na resposta.
+
+O campo `blocos` está sempre presente, mesmo quando vazio e independentemente de
+`renderiza_relatorios`. As consultas de ocupação profissional, pacientes por profissional
+e ocupação agregada devolvem dados tipados em `app/ai/relatorios.py`, versão 1:
+
+- `tipo`, `titulo`, `periodo` (início e fim ISO), `meta`, `parcial` e `avisos`;
+- `meta`: `0.8` em `ocupacao_profissional` e `ocupacao_agregada`; `null` em
+  `pacientes_por_profissional`, que não tem meta (suas tabelas não têm coluna de meta);
+- `dias_nao_lidos`: datas ISO, ordenadas, dos dias cuja leitura falhou; lista vazia
+  exatamente quando `parcial` é `false`;
+- `resumo`: valores e strings de exibição já formatadas;
+- `dados`: união discriminada por `tipo`, com os detalhes específicos da consulta;
+- `tabelas`: nomes, colunas (`chave`, `rotulo`, `formato`) e linhas prontas para exportação.
+
+O tipo `ocupacao_profissional` traz a semana, os dias, manhã/tarde, salas/postos e
+inconsistências, com as tabelas **Por dia** e **Resumo da semana**. Em `por_sala_posto`,
+`posto` é o número de exibição, contado a partir de 1 (o primeiro posto da sala é 1),
+igual ao "posto N" do texto das tools.
+`pacientes_por_profissional` traz pacientes, sessões, slots, dias sem agenda, média
+por dia com agenda e distintos por profissional no período; as tabelas são
+**Por profissional e dia**, **Resumo por profissional** e **Clínica por dia**.
+Os totais da clínica por dia representam a clínica inteira, mesmo com filtro de
+profissional ou especialidade. A engine não fornece pacientes distintos da clínica
+na semana: os totais diários não são somados como se fossem pessoas únicas na semana.
+O resumo traz distintos e média quando disponíveis para a consulta individual semanal,
+ou os distintos da clínica na consulta diária geral.
+`ocupacao_agregada` traz o mesmo conteúdo de `/agenda/ocupacao`, com as tabelas
+**Por especialidade** e **Por sala**.
+
+Texto e blocos usam o mesmo resultado da engine. Os dados preservam valores sem
+arredondamento, contagens inteiras, percentuais como frações e dias da semana por extenso.
+As strings de exibição usam `ROUND_HALF_UP`, uma casa decimal e vírgula, também no
+texto das tools e no e-mail de relatório (a ocupação agregada e o e-mail antes usavam
+percentual sem casa decimal). `GET /agenda/ocupacao` também aceita percentual acima de 1.
+Em caso de inconsistência na grade, a engine pode produzir ocupação acima de 100%.
+O bloco é devolvido com o valor real (percentuais só têm limite inferior, `>= 0`):
+`abaixo_da_meta` fica `false`, um aviso de ocupação acima de 100% entra em `avisos` (e no
+texto) e, em `ocupacao_profissional`, `inconsistencia` fica `true`.
+Os blocos não contêm nomes nem IDs de pacientes; IDs de profissionais são opacos.
+Ambiguidade, profissional não encontrada, ausência de agenda, especialidade desconhecida
+ou erro devolvem apenas texto, com `blocos: []`. Há no máximo dez blocos por turno.
+
+Exemplos de cada variante (`ocupacao_profissional`, `pacientes_por_profissional` com
+escopo semana e dia, `ocupacao_agregada`) e o JSON Schema de `BlocoRelatorio` ficam em
+`docs/exemplos-blocos/`, gerados com dados fictícios por
+`uv run python scripts/gerar_exemplos_blocos.py`; um teste falha se ficarem desatualizados.
+
+`GET /agenda/chat/{conversa_id}` devolve `blocos` associados a cada resposta do agente
+(lista vazia nas mensagens do usuário). São armazenados separados do histórico textual,
+e não enviados ao modelo nas rodadas seguintes. Clientes antigos podem ignorar o campo.
+
+**O RealocAI não desenha relatórios nem gera PDF ou Excel.** O app visual de outro projeto
+renderiza os dados e implementa a exportação. Se o usuário pedir exportação, com
+`renderiza_relatorios: true` o agente informa que o relatório na tela tem botões
+"Exportar"; com `false`, informa que a exportação não está disponível neste canal.
+As duas variantes proíbem afirmar que um arquivo foi exportado ou enviado e oferecer
+exportação por conta própria. O envio de relatório no corpo de e-mail já existente
+continua sendo uma funcionalidade separada.
+
+Em `uv run python scripts/chat_manual.py --verbose`, cada turno também imprime o
+tipo e o título dos blocos, além do rastro de tools. Por padrão o script usa a variante
+de texto completo do prompt (`renderiza_relatorios: false`); com `--renderiza`, cria o
+agente com `renderiza_relatorios=True`, a variante curta usada por clientes que mostram
+os blocos na tela. As flags combinam:
+`uv run python scripts/chat_manual.py 2026-10-05 --renderiza --verbose`.
+
+Textos voltados ao usuário nos blocos (`titulo`, `resumo[].exibicao`, `avisos`, nomes de
+tabelas) usam datas em dd/mm/aaaa, por exemplo "Ocupação de 05/10/2026"; datas ISO
+aparecem só nos campos de dados (`periodo`, `data`, `dias_nao_lidos`, colunas de formato
+`data`). As salas seguem ordem natural pelo número (Sala 1, Sala 2, Sala 10) no texto de
+`consultar_ocupacao`, em `dados.por_sala` e na tabela **Por sala**.
 
 ### `POST /relatorio/enviar`
 
@@ -185,6 +264,20 @@ erro interno do Resend na resposta.
 O mesmo envio também pode ser disparado **por conversa com o agente** (`/agenda/chat`),
 através da tool `enviar_relatorio` — o agente só a aciona quando o pedido for claro e
 explícito (ex.: "manda o relatório de hoje").
+
+**A tool só existe quando o Resend está configurado.** `criar_tools` registra
+`enviar_relatorio` apenas se `RESEND_API_KEY` e `REPORT_EMAIL_FROM` estiverem preenchidos
+(`envio_de_email_configurado()` em `app/ai/tools.py`). A decisão é por configuração, não por
+tentativa: sem as duas variáveis, o agente nem vê a tool, e o prompt de sistema (nas duas
+variantes) diz que o envio por e-mail não está disponível neste ambiente, que o agente não deve
+oferecê-lo e que, se pedirem, responde em uma frase que não está disponível. Com o Resend
+configurado, a tool e o prompt voltam ao comportamento descrito acima, incluindo a regra de não
+oferecer o e-mail por conta própria. Os valores de exemplo do `.env.example` não estão vazios:
+para desligar o envio, deixe as duas variáveis em branco. Esta regra vale só para o agente; o
+endpoint `POST /relatorio/enviar` não foi alterado.
+
+Para revisar o e-mail sem o Resend, use `scripts/preview_email.py` (ver
+[Scripts exploratórios](#scripts-exploratórios)).
 
 ### Ocupação de uma profissional (tool `consultar_ocupacao_profissional`)
 
@@ -280,6 +373,49 @@ planilha compartilhada com o e-mail da service account (basta permissão de leit
 
 O relatório é impresso no terminal e salvo em `scripts/output/sheet_inspection.txt`. Essa pasta
 é git-ignorada — o output contém dados reais de pacientes e profissionais.
+
+### `scripts/preview_email.py`
+
+Gera localmente o e-mail do relatório de ocupação de uma data (padrão: hoje), com a planilha
+real (`GoogleSheetsDataSource`), **sem usar o Resend e sem enviar nada**. Grava o HTML e o texto
+do corpo em `scripts/output/preview_email.html` e `scripts/output/preview_email.txt` e imprime os
+caminhos.
+
+```bash
+uv run python scripts/preview_email.py [AAAA-MM-DD]
+```
+
+Exige só as credenciais do Google Sheets. O relatório traz salas, especialidades e contagens,
+sem nomes de pacientes, mas vem da agenda real: por isso a saída fica em `scripts/output/`, que
+é git-ignorada.
+
+### `scripts/avaliar_prompt_renderiza.py`
+
+Avalia a variante do prompt com renderização (`renderiza_relatorios=True`) com o **modelo real**
+e a **planilha real**. Repete cada pergunta N vezes (padrão 3), sempre em conversa nova:
+"Qual a ocupação da Rossana?", "Quantos pacientes cada profissional atende por dia?",
+"Ocupação por especialidade hoje" e "Exporta isso em Excel". Para cada execução imprime, só no
+terminal, o número de frases da resposta, as tools chamadas, as tools além da esperada (a de
+exportação não espera nenhuma), os blocos gerados e se todo número com vírgula decimal citado
+aparece no texto da tool, e se a resposta oferece e-mail (qualquer menção a "e-mail", com
+qualquer hífen ou nenhum, conta como falha, já que nenhuma pergunta pede e-mail); no fim, um
+resumo por pergunta (até 3 frases, só as tools esperadas, números fiéis, sem oferta de e-mail). Não imprime o texto da resposta nem o das tools, e não grava arquivo. O envio
+de e-mail é substituído por um registro local: se o agente chamar `enviar_relatorio`, aparece
+como tool extra e nenhum e-mail é enviado.
+
+```bash
+uv run python scripts/avaliar_prompt_renderiza.py [AAAA-MM-DD] [--repeticoes N]
+```
+
+**Não roda em CI** nem no `uv run pytest` (só as funções puras de contagem têm teste): exige
+`AI_PROVIDER` com a chave e o modelo do provedor, além das credenciais do Google Sheets.
+**Custo aproximado de uma rodada padrão** (4 perguntas × 3 = 12 conversas, em geral 2 chamadas
+ao modelo cada): o prompt de sistema e os schemas das tools somam cerca de 5 mil tokens por
+chamada, mais o resultado das tools, o que dá por volta de 150 mil tokens de entrada e poucos
+milhares de saída. Num modelo de US$ 2,50 por milhão de tokens de entrada e US$ 10 por milhão
+de saída, isso fica em torno de US$ 0,40 por rodada; o custo escala linearmente com
+`--repeticoes`. Com `AI_PROVIDER=google` no tier gratuito, não há custo, mas as ~24 chamadas
+podem esbarrar no limite de requisições por minuto.
 
 ## Qualidade
 

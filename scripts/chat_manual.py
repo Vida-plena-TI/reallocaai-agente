@@ -7,13 +7,15 @@ pela suíte de testes (`uv run pytest`). Exige `OPENAI_API_KEY` e
 credenciais do Google Sheets já usadas por `scripts/inspect_sheet.py`.
 
 Uso:
-    uv run python scripts/chat_manual.py [AAAA-MM-DD] [--verbose]
+    uv run python scripts/chat_manual.py [AAAA-MM-DD] [--verbose] [--renderiza]
 
 Sem data, usa a data de hoje como referência da conversa. Com `--verbose`,
 imprime no terminal, após cada resposta, as tools chamadas no turno (nome,
 argumentos e o começo do resultado) — só na tela, nunca em arquivo ou log,
-porque o rastro contém nomes de pacientes. Digite `sair` (ou Ctrl+C) para
-encerrar.
+porque o rastro contém nomes de pacientes. Com `--renderiza`, o agente é
+criado com `renderiza_relatorios=True` (variante curta do prompt, como um
+cliente que mostra os blocos de relatório na tela); sem a flag, a variante de
+texto completo. Digite `sair` (ou Ctrl+C) para encerrar.
 """
 
 import argparse
@@ -63,7 +65,7 @@ def reconfigurar_para_utf8(entrada: TextIO, *saidas: TextIO) -> None:
             saida.reconfigure(encoding="utf-8", errors="replace")
 
 
-def _argumentos() -> argparse.Namespace:
+def _argumentos(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Conversa manual com o agente RealocAI.")
     parser.add_argument(
         "data",
@@ -75,9 +77,17 @@ def _argumentos() -> argparse.Namespace:
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="Mostra, após cada resposta, as tools chamadas no turno.",
+        help="Mostra, após cada resposta, as tools chamadas no turno e os blocos de relatório.",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--renderiza",
+        action="store_true",
+        help=(
+            "Cria o agente com renderiza_relatorios=True (variante curta do prompt, "
+            "para cliente que mostra os blocos de relatório na tela)."
+        ),
+    )
+    return parser.parse_args(argv)
 
 
 def formatar_rastro_de_tools(mensagens_do_turno: list[BaseMessage]) -> str:
@@ -102,10 +112,19 @@ def main() -> None:
     fonte = GoogleSheetsDataSource()
     continuidade = SemHistoricoContinuidadeDataSource()
     agente = criar_agente(
-        fonte, continuidade, criar_chat_model(), data_referencia, enviar_relatorio_por_email
+        fonte,
+        continuidade,
+        criar_chat_model(),
+        data_referencia,
+        enviar_relatorio_por_email,
+        renderiza_relatorios=argumentos.renderiza,
     )
 
-    print(f"RealocAI — conversa manual (referência: {data_referencia.strftime('%d/%m/%Y')})")
+    variante = "relatórios na tela" if argumentos.renderiza else "texto completo"
+    print(
+        f"RealocAI — conversa manual (referência: {data_referencia.strftime('%d/%m/%Y')}; "
+        f"prompt: {variante})"
+    )
     print("Digite 'sair' para encerrar.\n")
 
     historico: list[BaseMessage] = []
@@ -122,12 +141,14 @@ def main() -> None:
             break
 
         historico.append(HumanMessage(pergunta))
-        resposta, mensagens = perguntar_com_mensagens(agente, historico)
+        resposta, mensagens, blocos = perguntar_com_mensagens(agente, historico)
         mensagens_do_turno = mensagens[len(historico) :]
         historico.append(AIMessage(resposta))
         print(f"RealocAI: {resposta}\n")
         if argumentos.verbose:
             print(f"[tools do turno]\n{formatar_rastro_de_tools(mensagens_do_turno)}\n")
+            for bloco in blocos:
+                print(f"[relatório] {bloco.tipo}: {bloco.titulo}")
 
 
 if __name__ == "__main__":

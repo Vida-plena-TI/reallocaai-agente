@@ -18,17 +18,20 @@ explicitamente, junto com `model`, para manter a mesma validação de
 configuração dos dois provedores).
 """
 
+import logging
 from datetime import date
 from typing import Any
 
 from langchain.agents import create_agent
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
+from pydantic import ValidationError
 
-from app.ai.prompts import PROMPT_SISTEMA
+from app.ai.prompts import prompt_de_sistema
+from app.ai.relatorios import BlocoRelatorio
 from app.ai.tools import DIAS_DA_SEMANA, EnviarRelatorio, criar_tools
 from app.config import exigir, get_settings
 from app.data_sources.continuidade import ContinuidadeDataSource
@@ -39,6 +42,7 @@ from app.domain import ScheduleDataSource
 #: quatro parâmetros genéricos (estado, contexto, entrada, saída) porque só
 #: chamamos `.invoke` sobre ele, nunca inspecionamos esses tipos.
 Agente = CompiledStateGraph[Any, Any, Any, Any]
+logger = logging.getLogger(__name__)
 
 
 def criar_chat_model() -> BaseChatModel:
@@ -81,6 +85,7 @@ def criar_agente(
     chat_model: BaseChatModel,
     data_referencia: date,
     enviar_relatorio: EnviarRelatorio,
+    renderiza_relatorios: bool = False,
 ) -> Agente:
     """Monta o agente RealocAI: tools da Parte B + prompt de sistema da Parte C.
 
@@ -91,7 +96,12 @@ def criar_agente(
     de não ser importado direto de `app.reports`).
     """
     tools = criar_tools(fonte, continuidade, data_referencia, enviar_relatorio)
-    prompt = PROMPT_SISTEMA.format(
+    # O prompt só cita o envio por e-mail quando a tool foi registrada.
+    variante = prompt_de_sistema(
+        renderiza_relatorios=renderiza_relatorios,
+        envio_email=any(item.name == "enviar_relatorio" for item in tools),
+    )
+    prompt = variante.format(
         data_referencia=data_referencia.strftime("%d/%m/%Y"),
         dia_da_semana=DIAS_DA_SEMANA[data_referencia.weekday()],
     )
@@ -126,14 +136,14 @@ def perguntar(agente: Agente, historico_mensagens: list[BaseMessage]) -> str:
     Sem gerenciamento de sessão aqui: quem chama já manda o histórico
     completo da conversa a cada turno (decisão já tomada nesta fase).
     """
-    resposta, _ = perguntar_com_mensagens(agente, historico_mensagens)
+    resposta, _, _ = perguntar_com_mensagens(agente, historico_mensagens)
     return resposta
 
 
 def perguntar_com_mensagens(
     agente: Agente, historico_mensagens: list[BaseMessage]
-) -> tuple[str, list[BaseMessage]]:
-    """Como `perguntar`, mas devolve também a lista completa de mensagens do grafo.
+) -> tuple[str, list[BaseMessage], list[BlocoRelatorio]]:
+    """Como `perguntar`, com mensagens do grafo e blocos apenas do turno atual.
 
     A lista inclui o histórico de entrada seguido das mensagens geradas no
     turno (chamadas de tool e seus retornos) — útil para inspecionar quais
@@ -141,4 +151,31 @@ def perguntar_com_mensagens(
     """
     resultado = agente.invoke({"messages": historico_mensagens})
     mensagens: list[BaseMessage] = resultado["messages"]
-    return _extrair_texto_da_resposta(mensagens[-1]), mensagens
+    return _extrair_texto_da_resposta(mensagens[-1]), mensagens, extrair_blocos_do_turno(mensagens)
+
+
+def extrair_blocos_do_turno(mensagens: list[BaseMessage]) -> list[BlocoRelatorio]:
+    """Valida artifacts depois da última pergunta, em ordem, com limite de dez."""
+    inicio = next(
+        (
+            i + 1
+            for i in range(len(mensagens) - 1, -1, -1)
+            if isinstance(mensagens[i], HumanMessage)
+        ),
+        len(mensagens),
+    )
+    blocos: list[BlocoRelatorio] = []
+    for mensagem in mensagens[inicio:]:
+        if not isinstance(mensagem, ToolMessage) or mensagem.artifact is None:
+            continue
+        try:
+            bloco = BlocoRelatorio.model_validate(mensagem.artifact)
+        except ValidationError:
+            # Não imprime o artifact nem os valores da falha de validação.
+            logger.warning("Artefato inválido de relatório ignorado.")
+            continue
+        if len(blocos) >= 10:
+            logger.warning("Limite de 10 blocos por turno excedido; bloco ignorado.")
+            continue
+        blocos.append(bloco)
+    return blocos
