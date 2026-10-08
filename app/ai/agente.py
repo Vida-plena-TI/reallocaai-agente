@@ -31,6 +31,7 @@ from langgraph.graph.state import CompiledStateGraph
 from pydantic import ValidationError
 
 from app.ai.prompts import prompt_de_sistema
+from app.ai.rastreamento import desligar_rastreamento_externo
 from app.ai.relatorios import BlocoRelatorio
 from app.ai.tools import DIAS_DA_SEMANA, EnviarRelatorio, criar_tools
 from app.config import exigir, get_settings
@@ -58,6 +59,8 @@ def criar_chat_model() -> BaseChatModel:
     modelo reais configurados. Quem precisa testar o agente sem rede injeta
     outro `BaseChatModel` direto em `criar_agente`.
     """
+    # Antes de existir o modelo: nenhuma conversa pode sair por tracing/debug.
+    desligar_rastreamento_externo()
     settings = get_settings()
     # Os campos de credencial/modelo são `None` em `Settings` até aqui —
     # validados só neste ponto de uso, não na classe, para `Settings()`

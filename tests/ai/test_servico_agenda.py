@@ -235,7 +235,9 @@ def test_sugerir_realocacao_por_id_retorna_none_para_id_inexistente(
         resultado = sugerir_realocacao_por_id(origem, DIA, "atendimento-fantasma")
 
     assert resultado is None
-    assert "atendimento-fantasma" in caplog.text
+    assert "Atendimento não encontrado" in caplog.text
+    # O id vem do argumento da tool (escrito pelo modelo) e não vai para o log.
+    assert "atendimento-fantasma" not in caplog.text
 
 
 def test_sugerir_realocacao_por_id_encontra_realocacao_valida() -> None:

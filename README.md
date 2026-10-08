@@ -55,7 +55,8 @@ app/
 ├── api/           # Rotas HTTP (FastAPI): routers, schemas de request/response, dependências.
 ├── reports/       # Geração e envio de relatórios (Resend): resumos de ocupação e sugestões.
 ├── config.py      # Variáveis de ambiente centralizadas via pydantic-settings.
-└── main.py        # Instância FastAPI e endpoint GET /health.
+├── main.py        # Instância FastAPI (`criar_app`) e endpoint GET /health.
+└── __main__.py    # Servidor de produção: `python -m app` (valida a config e sobe o uvicorn).
 
 tests/             # Espelha a estrutura de app/ (tests/domain, tests/engine, ...).
 ```
@@ -103,7 +104,7 @@ A API sobe em `http://127.0.0.1:8000`. Verifique com:
 
 ```bash
 curl http://127.0.0.1:8000/health
-# {"status":"ok","service":"realocai"}
+# {"status":"ok"}
 ```
 
 Documentação interativa em `http://127.0.0.1:8000/docs`.
@@ -244,6 +245,9 @@ Corpo da requisição (ambos os campos opcionais):
 - `data`: omitida (ou `null`) para usar a data de hoje.
 - `destinatarios`: omitida para usar a lista padrão configurada em `REPORT_EMAIL_TO`; uma
   lista explícita substitui esse padrão.
+
+Sem `RESEND_API_KEY`/`REPORT_EMAIL_FROM` no ambiente, devolve **503**
+`{"detail": "O envio de e-mail não está configurado neste ambiente."}`.
 
 O relatório contém **apenas a ocupação por sala/especialidade** (mesmo dado de
 `/agenda/ocupacao`) — sem lista de atendimentos aguardando autorização nem sugestões de
@@ -427,6 +431,24 @@ uv run ruff format .       # formatação
 uv run mypy                # checagem de tipos
 ```
 
+## Deploy (Docker / Easypanel)
+
+```bash
+docker build -t realocai .
+docker run --env-file .env.producao -p 8000:8000 realocai
+```
+
+- **Porta interna:** `8000` (ou `PORT`). **Health check:** `GET /health`, público.
+- **1 worker, de propósito:** conversas (TTL 4 h) e cache da agenda (TTL 60 s) vivem na memória
+  do processo. Não aumente workers nem réplicas: uma conversa cairia num processo que não a
+  conhece. Pelo mesmo motivo, **todo deploy/restart apaga as conversas em andamento**.
+- **Nada é gravado em disco:** não há volume nem banco/Redis. A credencial do Google vai em
+  `GOOGLE_SERVICE_ACCOUNT_JSON` (ex.: `base64 -w0 credentials/google-service-account.json`).
+- O container roda como usuário não-root (UID 10001), atrás do Traefik com `--proxy-headers`
+  (`FORWARDED_ALLOW_IPS="*"`: não publique a porta do container direto na internet).
+- Debug/verbose do LangChain e tracing do LangSmith são forçados para desligado na
+  inicialização, mesmo que `LANGCHAIN_TRACING_V2` esteja no ambiente.
+
 ## Limitações conhecidas / próximos passos
 
 Decisões já tomadas ao longo do projeto, documentadas aqui para quem for planejar o que vem
@@ -452,19 +474,27 @@ depois — nenhum destes pontos é um problema em aberto de "esqueceram de fazer
 
 Veja `.env.example`. Resumo:
 
-| Variável | Camada | Descrição |
+| Variável | Obrigatória | Descrição |
 | --- | --- | --- |
-| `APP_ENV` | — | `development` (padrão), `staging` ou `production` |
-| `AI_PROVIDER` | `app/ai` | Provedor de chat model: `openai` ou `google` (sem padrão) |
-| `OPENAI_API_KEY` | `app/ai` | Chave da OpenAI usada pelo `langchain-openai` |
-| `OPENAI_MODEL` | `app/ai` | Modelo da OpenAI, exigido quando `AI_PROVIDER=openai` |
-| `GOOGLE_API_KEY` | `app/ai` | Chave do Google AI Studio, exigida quando `AI_PROVIDER=google` |
-| `GOOGLE_MODEL` | `app/ai` | Modelo Gemini, exigido quando `AI_PROVIDER=google` |
-| `GOOGLE_SHEETS_CREDENTIALS_PATH` | `app/data_sources` | Caminho do JSON da service account do Google |
-| `GOOGLE_SHEETS_SPREADSHEET_ID` | `app/data_sources` | ID da planilha da agenda |
-| `RESEND_API_KEY` | `app/reports` | Chave da API do Resend |
-| `REPORT_EMAIL_FROM` | `app/reports` | Remetente dos relatórios |
-| `REPORT_EMAIL_TO` | `app/reports` | Destinatários, separados por vírgula |
+| `APP_ENV` | não | `development` (padrão), `staging` ou `production` (padrão na imagem Docker) |
+| `INTERNAL_API_KEY` | **sim** | Chave exigida no header `X-API-Key` (todas as rotas, menos `/health`) |
+| `AI_PROVIDER` | **sim** | `openai` ou `google` |
+| `OPENAI_API_KEY` / `OPENAI_MODEL` | se `AI_PROVIDER=openai` | Chave e modelo da OpenAI |
+| `GOOGLE_API_KEY` / `GOOGLE_MODEL` | se `AI_PROVIDER=google` | Chave e modelo do Google AI Studio |
+| `GOOGLE_SHEETS_SPREADSHEET_ID` | **sim** | ID da planilha da agenda |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | uma das duas | JSON da service account (puro ou base64); prioridade sobre o arquivo, só em memória |
+| `GOOGLE_SHEETS_CREDENTIALS_PATH` | uma das duas | Caminho do JSON da service account (uso local) |
+| `CORS_ALLOWED_ORIGINS` | **em production** | Origens liberadas, separadas por vírgula (`*` é recusado) |
+| `RESEND_API_KEY` / `REPORT_EMAIL_FROM` | não (as duas juntas) | Envio do relatório por e-mail; vazias = envio desligado |
+| `REPORT_EMAIL_TO` | não | Destinatários padrão, separados por vírgula |
+| `LOG_LEVEL` | não | `DEBUG`, `INFO` (padrão), `WARNING`, `ERROR`, `CRITICAL` |
+| `DOCS_ENABLED` | não | Força `/docs`, `/redoc`, `/openapi.json`; sem valor, ligados só em `development` |
+| `PORT` | não | Porta do servidor (padrão 8000) |
+| `CACHE_TTL_SEGUNDOS` | não | TTL do cache em memória da agenda (padrão 60) |
+
+A configuração é validada na inicialização (`validar_configuracao` em `app/config.py`): se
+faltar algo, o servidor não sobe e lista **todas** as variáveis com problema, sem imprimir
+valores.
 
 O arquivo `.env` e as credenciais da service account estão no `.gitignore` — **nunca** os
 versione.

@@ -148,10 +148,11 @@ def _ler_dias(fonte: ScheduleDataSource, dias: list[date]) -> tuple[list[_DiaLid
         except Exception as erro:
             ultimo_erro = erro
             com_falha.append(dia)
+            # Só o tipo do erro: a mensagem pode repetir dados da planilha.
             logger.warning(
                 "Falha ao ler a agenda de %s ao contar pacientes por profissional: %s",
                 dia.isoformat(),
-                erro,
+                type(erro).__name__,
             )
     if not lidos and ultimo_erro is not None:
         raise ultimo_erro

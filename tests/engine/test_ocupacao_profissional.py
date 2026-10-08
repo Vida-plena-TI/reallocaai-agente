@@ -196,7 +196,8 @@ def test_falha_em_um_dia_deixa_a_semana_parcial(caplog: pytest.LogCaptureFixture
     assert TERCA not in ocupacao.dias_sem_agenda
     assert ocupacao.parcial is True
     assert ocupacao.slots_escalados == 10
-    assert "falha simulada" in caplog.text
+    assert "RuntimeError" in caplog.text
+    assert "falha simulada" not in caplog.text
 
 
 def test_falha_em_todos_os_dias_levanta_o_erro() -> None:

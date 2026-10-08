@@ -123,10 +123,9 @@ def construir_relatorio_ocupacao_do_dia(
             sala_id = sala_por_profissional_e_slot.get((atendimento.profissional_id, slot))
             if sala_id is None:
                 logger.warning(
-                    "Atendimento %r do profissional %r cobre %s sem entrada "
-                    "correspondente na grade de %s: contando como ocupado mesmo assim.",
+                    "Atendimento %r cobre %s sem entrada correspondente na grade de %s: "
+                    "contando como ocupado mesmo assim.",
                     atendimento.id,
-                    atendimento.profissional_id,
                     slot,
                     dia.isoformat(),
                 )

@@ -177,19 +177,19 @@ def parse_worksheet_data(
                 sala = _sala_de_fallback(_normalizar(titulo_da_aba), analise.id)
                 if sala is None:
                     colunas_sem_sala.append(coluna)
+                    # Só o endereço: o texto da célula (nome do profissional)
+                    # não vai para o log.
                     logger.warning(
-                        "Coluna %s tem o profissional %r no bloco da linha %d, mas nenhuma sala "
+                        "Coluna %s tem profissional no bloco da linha %d, mas nenhuma sala "
                         "no cabeçalho: coluna ignorada.",
                         rotulo_da_coluna(coluna),
-                        analise.nome,
                         bloco.linha_das_salas + 1,
                     )
                     continue
                 logger.info(
-                    "Coluna %s não tem sala no cabeçalho, mas %r está no mapa de fallback da aba "
-                    "%r: coluna atribuída à %s.",
+                    "Coluna %s não tem sala no cabeçalho, mas o profissional está no mapa de "
+                    "fallback da aba %r: coluna atribuída à %s.",
                     rotulo_da_coluna(coluna),
-                    analise.nome,
                     titulo_da_aba,
                     sala.nome,
                 )
@@ -203,9 +203,9 @@ def parse_worksheet_data(
             )
             if especialidade is None:
                 logger.warning(
-                    "Não dá para saber a especialidade de %r (coluna %s, linha %d) e o nome não "
-                    "aparece com especialidade em nenhum outro bloco do dia: coluna ignorada.",
-                    analise.nome,
+                    "Não dá para saber a especialidade do profissional da coluna %s, linha %d, "
+                    "e o nome não aparece com especialidade em nenhum outro bloco do dia: "
+                    "coluna ignorada.",
                     rotulo_da_coluna(coluna),
                     bloco.linha_dos_profissionais + 1,
                 )
@@ -562,16 +562,14 @@ def _analisar_profissionais(
             # Info, não warning: o descarte é pedido da clínica e se repete a
             # cada leitura da planilha.
             logger.info(
-                "Coluna %s (%r) está em COLUNAS_IGNORADAS_PROFISSIONAL: coluna ignorada no bloco.",
+                "Coluna %s está em COLUNAS_IGNORADAS_PROFISSIONAL: coluna ignorada no bloco.",
                 rotulo_da_coluna(coluna),
-                texto,
             )
             continue
         if analise is None:
             logger.warning(
-                "Célula %s (%r) não resolve para um único profissional: coluna ignorada no bloco.",
+                "Célula %s não resolve para um único profissional: coluna ignorada no bloco.",
                 _endereco_a1(linha, coluna),
-                texto,
             )
             continue
         analises[coluna] = analise
@@ -718,7 +716,7 @@ def _nomes_de_paciente(texto: str, endereco: str) -> list[str]:
     if not texto:
         return []
     if not any(caractere.isalpha() for caractere in texto):
-        logger.warning("Célula %s tem só %r, sem nome nenhum: tratada como vazia.", endereco, texto)
+        logger.warning("Célula %s não tem nome nenhum: tratada como vazia.", endereco)
         return []
     nomes: list[str] = []
     for parte in texto.split("/"):

@@ -10,6 +10,7 @@ O chat model (Fase 6b) é diferente: `obter_chat_model` o constrói sob
 demanda, na primeira requisição que precisar dele (ver a própria função).
 """
 
+import secrets
 import threading
 from typing import Annotated, cast
 
@@ -46,7 +47,10 @@ def validar_api_key(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(erro)
         ) from erro
 
-    if not x_api_key or x_api_key != chave_esperada:
+    # Comparação em tempo constante (em bytes: `compare_digest` com `str` só aceita ASCII).
+    if not x_api_key or not secrets.compare_digest(
+        x_api_key.encode("utf-8"), chave_esperada.encode("utf-8")
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="X-API-Key ausente ou inválida.",

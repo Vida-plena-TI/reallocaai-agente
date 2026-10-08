@@ -174,10 +174,9 @@ def _ocupacao_do_dia(
                 ocupados_por_posto[min(postos_escalados)] += 1
             else:
                 logger.warning(
-                    "Atendimento %r do profissional %r cobre %s sem entrada "
-                    "correspondente na grade de %s: contando como ocupado mesmo assim.",
+                    "Atendimento %r cobre %s sem entrada correspondente na grade de %s: "
+                    "contando como ocupado mesmo assim.",
                     atendimento.id,
-                    profissional_id,
                     slot,
                     dia.isoformat(),
                 )
@@ -247,11 +246,11 @@ def construir_ocupacao_semanal_profissional(
         except Exception as erro:
             ultimo_erro = erro
             dias_com_falha.append(dia)
+            # Só o tipo do erro: a mensagem pode repetir dados da planilha.
             logger.warning(
-                "Falha ao ler a agenda de %s ao calcular a ocupação de %r: %s",
+                "Falha ao ler a agenda de %s ao calcular a ocupação de um profissional: %s",
                 dia.isoformat(),
-                profissional_id,
-                erro,
+                type(erro).__name__,
             )
             continue
 

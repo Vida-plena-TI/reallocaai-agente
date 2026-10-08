@@ -86,7 +86,8 @@ def test_dia_com_falha_e_pulado(caplog: pytest.LogCaptureFixture) -> None:
         resultado = localizar_profissional(origem, QUARTA, "Joana")
 
     assert resultado == ProfissionalEncontrado(profissional_id="joana", nome="Joana")
-    assert "falha simulada" in caplog.text
+    assert "RuntimeError" in caplog.text
+    assert "falha simulada" not in caplog.text
 
 
 def test_falha_em_todos_os_dias_levanta_o_erro() -> None:

@@ -32,6 +32,12 @@ API_KEY = "chave-de-teste"
 HEADERS_AUTENTICADOS = {"X-API-Key": API_KEY}
 
 
+#: Resend "configurado" com valores falsos: o envio real é sempre substituído nos
+#: testes. Sem isso, `POST /relatorio/enviar` devolveria 503 ou não conforme o `.env`.
+RESEND_API_KEY_TESTE = "re_test_key"
+REPORT_EMAIL_FROM_TESTE = "relatorios@exemplo.com.br"
+
+
 @pytest.fixture
 def fonte() -> FakeScheduleDataSource:
     return FakeScheduleDataSource()
@@ -67,7 +73,10 @@ def client(
     app.dependency_overrides[obter_armazenamento_conversas] = lambda: conversas
     app.dependency_overrides[obter_chat_model] = lambda: chat_model
     app.dependency_overrides[get_settings] = lambda: Settings(
-        openai_model="gpt-4o-mini", internal_api_key=API_KEY
+        openai_model="gpt-4o-mini",
+        internal_api_key=API_KEY,
+        resend_api_key=RESEND_API_KEY_TESTE,
+        report_email_from=REPORT_EMAIL_FROM_TESTE,
     )
     try:
         yield TestClient(app)

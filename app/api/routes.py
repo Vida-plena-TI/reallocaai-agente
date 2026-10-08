@@ -49,6 +49,7 @@ router = APIRouter(dependencies=[Depends(validar_api_key)])
 _MENSAGEM_CONVERSA_INEXISTENTE = (
     "conversa não encontrada ou expirada, inicie uma nova sem informar conversa_id"
 )
+_MENSAGEM_EMAIL_NAO_CONFIGURADO = "O envio de e-mail não está configurado neste ambiente."
 
 
 def _rotulo_especialidade(especialidade: Especialidade) -> str:
@@ -228,8 +229,9 @@ def obter_historico_da_conversa(
         "Monta o relatório de ocupação do dia (por sala e por especialidade, já "
         "calculado pela engine) e envia por e-mail via Resend. Omita `data` para "
         "usar a data de hoje, e `destinatarios` para usar a lista padrão "
-        "configurada em REPORT_EMAIL_TO. Falhas no envio (Resend fora do ar, "
-        "credencial inválida etc.) devolvem 502, sem detalhar o erro interno."
+        "configurada em REPORT_EMAIL_TO. Sem o Resend configurado no ambiente, "
+        "devolve 503. Falhas no envio (Resend fora do ar, credencial inválida "
+        "etc.) devolvem 502, sem detalhar o erro interno."
     ),
 )
 def enviar_relatorio(
@@ -237,6 +239,12 @@ def enviar_relatorio(
     fonte: Annotated[ScheduleDataSource, Depends(obter_fonte)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> EnviarRelatorioResponse:
+    if not settings.envio_de_email_configurado:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=_MENSAGEM_EMAIL_NAO_CONFIGURADO,
+        )
+
     data_efetiva = corpo.data if corpo.data is not None else date.today()
     destinatarios_efetivos = (
         corpo.destinatarios if corpo.destinatarios is not None else settings.report_email_to

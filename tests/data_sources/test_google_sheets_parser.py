@@ -160,7 +160,8 @@ def test_profissional_sem_especialidade_em_lugar_nenhum_e_pulado(
         dados = analisar(SEGUNDA_FICTICIA)
 
     assert "fabio" not in {item.id for item in dados.profissionais}
-    assert "Fábio" in caplog.text
+    assert "coluna F, linha 10" in caplog.text
+    assert "Fábio" not in caplog.text
 
 
 def test_coluna_com_dois_profissionais_e_pulada(caplog: pytest.LogCaptureFixture) -> None:
@@ -392,7 +393,7 @@ def test_celula_so_com_pontuacao_e_tratada_como_vazia(
 
     assert [item for item in dados.atendimentos if item.sala_id == "sala-4"] == []
     assert time(8, 0) in horarios_na_grade(segunda, "sala-4", "elis")
-    assert "sem nome nenhum" in caplog.text
+    assert "não tem nome nenhum" in caplog.text
 
 
 # --- convênio por cor de fonte ----------------------------------------------
@@ -500,7 +501,8 @@ def test_coluna_sem_sala_fora_do_mapa_continua_sendo_pulada(
 
     assert "kelly" not in {item.id for item in dados.profissionais}
     assert atendimento_de(dados, "paciente-tres") == []
-    assert "'Kelly'" in caplog.text
+    assert "Coluna D tem profissional" in caplog.text
+    assert "Kelly" not in caplog.text
     assert "nenhuma sala no cabeçalho: coluna ignorada" in caplog.text
 
 

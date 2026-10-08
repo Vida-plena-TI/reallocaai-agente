@@ -1,0 +1,43 @@
+# Só entram na imagem: pyproject.toml, uv.lock, .python-version, README.md e app/.
+
+# Segredos
+.env
+.env.*
+credentials/
+*service-account*.json
+*service_account*.json
+client_secret*.json
+*.pem
+*.key
+token.json
+
+# Controle de versão e ferramentas
+.git
+.gitignore
+.claude/
+.vscode/
+.idea/
+
+# Ambiente e caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Fora da produção
+tests/
+docs/
+scripts/
+scripts/output/
+logs/
+*.log
+
+# Docker
+Dockerfile
+.dockerignore
