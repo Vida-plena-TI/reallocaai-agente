@@ -13,7 +13,7 @@ def test_health_continua_publico_sem_exigir_api_key(client: TestClient) -> None:
     resposta = client.get("/health")
 
     assert resposta.status_code == 200
-    assert resposta.json() == {"status": "ok", "service": "realocai"}
+    assert resposta.json() == {"status": "ok"}
 
 
 def test_disponibilidade_retorna_401_sem_api_key(client: TestClient) -> None:

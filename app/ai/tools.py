@@ -703,8 +703,7 @@ def envio_de_email_configurado() -> bool:
     o envio não está disponível), em vez de ser oferecida ao agente e só falhar
     quando alguém pedir o envio.
     """
-    settings = get_settings()
-    return bool(settings.resend_api_key) and bool(settings.report_email_from)
+    return get_settings().envio_de_email_configurado
 
 
 def criar_tools(

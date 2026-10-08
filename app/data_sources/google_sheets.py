@@ -16,7 +16,7 @@ from typing import Any, Final
 import gspread
 from google.oauth2.service_account import Credentials
 
-from app.config import get_settings
+from app.config import carregar_credencial_google_json, get_settings
 from app.data_sources.google_sheets_parser import (
     DadosAgendaDoDia,
     encontrar_titulo_da_aba,
@@ -48,27 +48,44 @@ _COR_DE_FONTE_PADRAO: Final[str] = "#000000"
 
 
 def abrir_planilha() -> gspread.Spreadsheet:
-    """Autentica com a service account e abre a planilha configurada no `.env`."""
+    """Autentica com a service account e abre a planilha configurada.
+
+    A credencial vem de `GOOGLE_SERVICE_ACCOUNT_JSON` (produção, só em memória)
+    quando preenchida; senão, do arquivo em `GOOGLE_SHEETS_CREDENTIALS_PATH`
+    (uso local).
+    """
     settings = get_settings()
 
     if not settings.google_sheets_spreadsheet_id:
         raise ValueError("GOOGLE_SHEETS_SPREADSHEET_ID não está definido no .env")
-    if not settings.google_sheets_credentials_path:
-        raise ValueError("GOOGLE_SHEETS_CREDENTIALS_PATH não está definido no .env")
 
-    caminho = Path(settings.google_sheets_credentials_path).expanduser()
+    # `google-auth` publica py.typed, mas os construtores de Credentials não têm
+    # anotações; daí o ignore pontual.
+    if settings.google_service_account_json:
+        info = carregar_credencial_google_json(settings.google_service_account_json)
+        credenciais = Credentials.from_service_account_info(  # type: ignore[no-untyped-call]
+            info, scopes=SCOPES
+        )
+    else:
+        credenciais = Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
+            str(_caminho_da_credencial(settings.google_sheets_credentials_path)), scopes=SCOPES
+        )
+    cliente = gspread.authorize(credenciais)
+    return cliente.open_by_key(settings.google_sheets_spreadsheet_id)
+
+
+def _caminho_da_credencial(caminho_configurado: str | None) -> Path:
+    """Resolve `GOOGLE_SHEETS_CREDENTIALS_PATH` relativo à raiz do projeto."""
+    if not caminho_configurado:
+        raise ValueError(
+            "Nem GOOGLE_SERVICE_ACCOUNT_JSON nem GOOGLE_SHEETS_CREDENTIALS_PATH estão definidos"
+        )
+    caminho = Path(caminho_configurado).expanduser()
     if not caminho.is_absolute():
         caminho = (_RAIZ_DO_PROJETO / caminho).resolve()
     if not caminho.is_file():
         raise FileNotFoundError(f"Credencial da service account não encontrada em {caminho}")
-
-    # `google-auth` publica py.typed, mas os construtores de Credentials não têm
-    # anotações; daí o ignore pontual.
-    credenciais = Credentials.from_service_account_file(  # type: ignore[no-untyped-call]
-        str(caminho), scopes=SCOPES
-    )
-    cliente = gspread.authorize(credenciais)
-    return cliente.open_by_key(settings.google_sheets_spreadsheet_id)
+    return caminho
 
 
 class GoogleSheetsDataSource:

@@ -86,8 +86,14 @@ def test_coluna_ignorada_gera_log_info_e_nenhum_warning(
     with caplog.at_level(logging.INFO, logger=google_sheets_parser.__name__):
         parse_worksheet_data(SABADO, VALORES, MERGES, {})
 
-    registros = [registro for registro in caplog.records if "Rui Avulso" in registro.getMessage()]
+    mensagens = [registro.getMessage() for registro in caplog.records]
+    registros = [
+        registro
+        for registro in caplog.records
+        if "COLUNAS_IGNORADAS_PROFISSIONAL" in registro.getMessage()
+    ]
     assert [registro.levelno for registro in registros] == [logging.INFO]
+    assert not [mensagem for mensagem in mensagens if "Rui Avulso" in mensagem]
     assert not [registro for registro in caplog.records if registro.levelno >= logging.WARNING]
 
 

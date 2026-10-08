@@ -36,6 +36,12 @@ _VARIAVEIS_DE_SETTINGS = (
     "INTERNAL_API_KEY",
     "CORS_ALLOWED_ORIGINS",
     "CACHE_TTL_SEGUNDOS",
+    "AI_PROVIDER",
+    "GOOGLE_API_KEY",
+    "GOOGLE_MODEL",
+    "GOOGLE_SERVICE_ACCOUNT_JSON",
+    "LOG_LEVEL",
+    "DOCS_ENABLED",
 )
 
 #: Roda dentro do subprocesso: importa `app.main`, chama `/health` (pública) e
@@ -93,7 +99,7 @@ def test_app_e_importavel_e_health_funciona_sem_nenhuma_variavel_de_ambiente(
     saida = json.loads(resultado.stdout.strip().splitlines()[-1])
 
     assert saida["health_status"] == 200
-    assert saida["health_body"] == {"status": "ok", "service": "realocai"}
+    assert saida["health_body"] == {"status": "ok"}
 
     # 500 (problema operacional: chave não configurada), nunca 401 (que
     # sugeriria, enganosamente, que a chave enviada está só errada).

@@ -98,4 +98,5 @@ def test_dia_com_falha_de_leitura_e_pulado(caplog: pytest.LogCaptureFixture) -> 
     localizacao = localizar_paciente(origem, SEXTA, "Theo Souza")
 
     assert localizacao.outros_dias == [SEGUNDA]
-    assert "aba indisponível" in caplog.text
+    assert "RuntimeError" in caplog.text
+    assert "aba indisponível" not in caplog.text

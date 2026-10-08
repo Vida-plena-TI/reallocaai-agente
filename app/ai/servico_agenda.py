@@ -108,8 +108,11 @@ def localizar_paciente(
             pacientes_por_dia[dia] = fonte.listar_pacientes(dia)
         except Exception as erro:
             ultimo_erro = erro
+            # Só o tipo do erro: a mensagem pode repetir nomes de pacientes.
             logger.warning(
-                "Falha ao ler os pacientes de %s ao localizar paciente: %s", dia.isoformat(), erro
+                "Falha ao ler os pacientes de %s ao localizar paciente: %s",
+                dia.isoformat(),
+                type(erro).__name__,
             )
     if not pacientes_por_dia and ultimo_erro is not None:
         raise ultimo_erro
@@ -216,7 +219,7 @@ def localizar_profissional(
             logger.warning(
                 "Falha ao ler os profissionais de %s ao localizar profissional: %s",
                 dia.isoformat(),
-                erro,
+                type(erro).__name__,
             )
             continue
         algum_dia_lido = True
@@ -419,9 +422,9 @@ def sugerir_realocacao_por_id(
         (item for item in fonte.listar_atendimentos(data) if item.id == atendimento_id), None
     )
     if atendimento is None:
+        # Sem o id: ele vem do argumento da tool, escrito pelo modelo.
         logger.warning(
-            "Atendimento %r não encontrado na agenda de %s: nada para realocar.",
-            atendimento_id,
+            "Atendimento não encontrado na agenda de %s: nada para realocar.",
             data.isoformat(),
         )
         return None

@@ -55,11 +55,12 @@ def enviar_relatorio_por_email(
             }
         )
     except Exception as erro:
+        # Sem endereços nem a mensagem do Resend, que pode repeti-los.
         logger.error(
-            "Falha ao enviar relatório de ocupação de %s por e-mail para %r: %s",
+            "Falha ao enviar relatório de ocupação de %s por e-mail para %d destinatário(s): %s",
             data.isoformat(),
-            destinatarios_efetivos,
-            erro,
+            len(destinatarios_efetivos),
+            type(erro).__name__,
         )
         raise ReportsEnvioError(
             f"Falha ao enviar relatório de ocupação de {data.isoformat()} por e-mail."
