@@ -1,5 +1,34 @@
 {
   "$defs": {
+    "AguardandoProfissionalDia": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "format": "date",
+          "title": "Data",
+          "type": "string"
+        },
+        "dia_semana": {
+          "title": "Dia Semana",
+          "type": "string"
+        },
+        "profissional": {
+          "$ref": "#/$defs/ProfissionalRelatorio"
+        },
+        "sessoes": {
+          "title": "Sessoes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "data",
+        "dia_semana",
+        "profissional",
+        "sessoes"
+      ],
+      "title": "AguardandoProfissionalDia",
+      "type": "object"
+    },
     "ClinicaDia": {
       "additionalProperties": false,
       "properties": {
@@ -54,6 +83,111 @@
         "formato"
       ],
       "title": "ColunaTabela",
+      "type": "object"
+    },
+    "DadosAgendaPaciente": {
+      "additionalProperties": false,
+      "properties": {
+        "tipo": {
+          "const": "agenda_paciente",
+          "default": "agenda_paciente",
+          "title": "Tipo",
+          "type": "string"
+        },
+        "paciente": {
+          "$ref": "#/$defs/PacienteRelatorio"
+        },
+        "dias": {
+          "items": {
+            "$ref": "#/$defs/DiaAgendaPacienteRelatorio"
+          },
+          "title": "Dias",
+          "type": "array"
+        },
+        "total_sessoes": {
+          "title": "Total Sessoes",
+          "type": "integer"
+        },
+        "minutos_em_intervalos": {
+          "title": "Minutos Em Intervalos",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "paciente",
+        "dias",
+        "total_sessoes",
+        "minutos_em_intervalos"
+      ],
+      "title": "DadosAgendaPaciente",
+      "type": "object"
+    },
+    "DadosConvenio": {
+      "additionalProperties": false,
+      "properties": {
+        "tipo": {
+          "const": "convenio",
+          "default": "convenio",
+          "title": "Tipo",
+          "type": "string"
+        },
+        "por_convenio": {
+          "items": {
+            "$ref": "#/$defs/ItemConvenio"
+          },
+          "title": "Por Convenio",
+          "type": "array"
+        },
+        "aguardando": {
+          "items": {
+            "$ref": "#/$defs/AguardandoProfissionalDia"
+          },
+          "title": "Aguardando",
+          "type": "array"
+        }
+      },
+      "required": [
+        "por_convenio",
+        "aguardando"
+      ],
+      "title": "DadosConvenio",
+      "type": "object"
+    },
+    "DadosDisponibilidade": {
+      "additionalProperties": false,
+      "properties": {
+        "tipo": {
+          "const": "disponibilidade",
+          "default": "disponibilidade",
+          "title": "Tipo",
+          "type": "string"
+        },
+        "minutos_por_janela": {
+          "minimum": 30,
+          "title": "Minutos Por Janela",
+          "type": "integer"
+        },
+        "faixas": {
+          "items": {
+            "$ref": "#/$defs/FaixaVaga"
+          },
+          "title": "Faixas",
+          "type": "array"
+        },
+        "por_dia": {
+          "items": {
+            "$ref": "#/$defs/VagasDiaPeriodo"
+          },
+          "title": "Por Dia",
+          "type": "array"
+        }
+      },
+      "required": [
+        "minutos_por_janela",
+        "faixas",
+        "por_dia"
+      ],
+      "title": "DadosDisponibilidade",
       "type": "object"
     },
     "DadosOcupacaoAgregada": {
@@ -182,6 +316,138 @@
       "title": "DadosPacientesProfissional",
       "type": "object"
     },
+    "DadosQualidadeAgenda": {
+      "additionalProperties": false,
+      "properties": {
+        "tipo": {
+          "const": "qualidade_agenda",
+          "default": "qualidade_agenda",
+          "title": "Tipo",
+          "type": "string"
+        },
+        "por_profissional": {
+          "items": {
+            "$ref": "#/$defs/QualidadeProfissional"
+          },
+          "title": "Por Profissional",
+          "type": "array"
+        },
+        "por_dia": {
+          "items": {
+            "$ref": "#/$defs/QualidadeProfissionalDiaRelatorio"
+          },
+          "title": "Por Dia",
+          "type": "array"
+        }
+      },
+      "required": [
+        "por_profissional",
+        "por_dia"
+      ],
+      "title": "DadosQualidadeAgenda",
+      "type": "object"
+    },
+    "DadosTabelaGenerica": {
+      "additionalProperties": false,
+      "properties": {
+        "tipo": {
+          "const": "tabela_generica",
+          "default": "tabela_generica",
+          "title": "Tipo",
+          "type": "string"
+        },
+        "relatorio": {
+          "title": "Relatorio",
+          "type": "string"
+        },
+        "dimensoes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Dimensoes",
+          "type": "array"
+        },
+        "metricas": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Metricas",
+          "type": "array"
+        },
+        "colunas": {
+          "items": {
+            "$ref": "#/$defs/ColunaTabela"
+          },
+          "title": "Colunas",
+          "type": "array"
+        },
+        "linhas": {
+          "items": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object"
+          },
+          "title": "Linhas",
+          "type": "array"
+        },
+        "total": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": "Total",
+          "type": "object"
+        },
+        "linhas_omitidas": {
+          "minimum": 0,
+          "title": "Linhas Omitidas",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "relatorio",
+        "dimensoes",
+        "metricas",
+        "colunas",
+        "linhas",
+        "total",
+        "linhas_omitidas"
+      ],
+      "title": "DadosTabelaGenerica",
+      "type": "object"
+    },
     "DataRelatorio": {
       "additionalProperties": false,
       "properties": {
@@ -200,6 +466,42 @@
         "dia_semana"
       ],
       "title": "DataRelatorio",
+      "type": "object"
+    },
+    "DiaAgendaPacienteRelatorio": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "format": "date",
+          "title": "Data",
+          "type": "string"
+        },
+        "dia_semana": {
+          "title": "Dia Semana",
+          "type": "string"
+        },
+        "sessoes": {
+          "items": {
+            "$ref": "#/$defs/SessaoAgendaPaciente"
+          },
+          "title": "Sessoes",
+          "type": "array"
+        },
+        "intervalos": {
+          "items": {
+            "$ref": "#/$defs/IntervaloAgendaPaciente"
+          },
+          "title": "Intervalos",
+          "type": "array"
+        }
+      },
+      "required": [
+        "data",
+        "dia_semana",
+        "sessoes",
+        "intervalos"
+      ],
+      "title": "DiaAgendaPacienteRelatorio",
       "type": "object"
     },
     "DiaOcupacao": {
@@ -302,6 +604,150 @@
         "slots_ocupados"
       ],
       "title": "DiaPacientes",
+      "type": "object"
+    },
+    "FaixaVaga": {
+      "additionalProperties": false,
+      "description": "Vagas seguidas do mesmo profissional, sala e posto.",
+      "properties": {
+        "data": {
+          "format": "date",
+          "title": "Data",
+          "type": "string"
+        },
+        "dia_semana": {
+          "title": "Dia Semana",
+          "type": "string"
+        },
+        "periodo": {
+          "enum": [
+            "manha",
+            "tarde"
+          ],
+          "title": "Periodo",
+          "type": "string"
+        },
+        "profissional": {
+          "$ref": "#/$defs/ProfissionalRelatorio"
+        },
+        "sala_id": {
+          "title": "Sala Id",
+          "type": "string"
+        },
+        "sala_nome": {
+          "title": "Sala Nome",
+          "type": "string"
+        },
+        "posto": {
+          "minimum": 1,
+          "title": "Posto",
+          "type": "integer"
+        },
+        "inicio": {
+          "pattern": "^\\d{2}:\\d{2}$",
+          "title": "Inicio",
+          "type": "string"
+        },
+        "fim": {
+          "pattern": "^\\d{2}:\\d{2}$",
+          "title": "Fim",
+          "type": "string"
+        },
+        "slots": {
+          "minimum": 1,
+          "title": "Slots",
+          "type": "integer"
+        },
+        "cabem": {
+          "minimum": 0,
+          "title": "Cabem",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "data",
+        "dia_semana",
+        "periodo",
+        "profissional",
+        "sala_id",
+        "sala_nome",
+        "posto",
+        "inicio",
+        "fim",
+        "slots",
+        "cabem"
+      ],
+      "title": "FaixaVaga",
+      "type": "object"
+    },
+    "IntervaloAgendaPaciente": {
+      "additionalProperties": false,
+      "properties": {
+        "inicio": {
+          "pattern": "^\\d{2}:\\d{2}$",
+          "title": "Inicio",
+          "type": "string"
+        },
+        "fim": {
+          "pattern": "^\\d{2}:\\d{2}$",
+          "title": "Fim",
+          "type": "string"
+        },
+        "minutos": {
+          "title": "Minutos",
+          "type": "integer"
+        },
+        "minutos_de_pausa": {
+          "title": "Minutos De Pausa",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "inicio",
+        "fim",
+        "minutos",
+        "minutos_de_pausa"
+      ],
+      "title": "IntervaloAgendaPaciente",
+      "type": "object"
+    },
+    "ItemConvenio": {
+      "additionalProperties": false,
+      "properties": {
+        "convenio": {
+          "title": "Convenio",
+          "type": "string"
+        },
+        "rotulo": {
+          "title": "Rotulo",
+          "type": "string"
+        },
+        "sessoes": {
+          "title": "Sessoes",
+          "type": "integer"
+        },
+        "pacientes_distintos": {
+          "title": "Pacientes Distintos",
+          "type": "integer"
+        },
+        "slots_ocupados": {
+          "title": "Slots Ocupados",
+          "type": "integer"
+        },
+        "aguardando_autorizacao": {
+          "title": "Aguardando Autorizacao",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "convenio",
+        "rotulo",
+        "sessoes",
+        "pacientes_distintos",
+        "slots_ocupados",
+        "aguardando_autorizacao"
+      ],
+      "title": "ItemConvenio",
       "type": "object"
     },
     "ItemOcupacaoAgregada": {
@@ -432,6 +878,32 @@
       "title": "MetricasOcupacao",
       "type": "object"
     },
+    "PacienteRelatorio": {
+      "additionalProperties": false,
+      "properties": {
+        "nome": {
+          "title": "Nome",
+          "type": "string"
+        },
+        "convenio": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Convenio"
+        }
+      },
+      "required": [
+        "nome",
+        "convenio"
+      ],
+      "title": "PacienteRelatorio",
+      "type": "object"
+    },
     "PacientesProfissional": {
       "additionalProperties": false,
       "properties": {
@@ -548,6 +1020,123 @@
       "title": "ProfissionalRelatorio",
       "type": "object"
     },
+    "QualidadeProfissional": {
+      "additionalProperties": false,
+      "properties": {
+        "profissional": {
+          "$ref": "#/$defs/ProfissionalRelatorio"
+        },
+        "slots_escalados": {
+          "title": "Slots Escalados",
+          "type": "integer"
+        },
+        "slots_ocupados": {
+          "title": "Slots Ocupados",
+          "type": "integer"
+        },
+        "vagas_livres": {
+          "title": "Vagas Livres",
+          "type": "integer"
+        },
+        "buracos": {
+          "title": "Buracos",
+          "type": "integer"
+        },
+        "slots_em_buracos": {
+          "title": "Slots Em Buracos",
+          "type": "integer"
+        },
+        "slots_isolados": {
+          "title": "Slots Isolados",
+          "type": "integer"
+        },
+        "faixas_livres": {
+          "title": "Faixas Livres",
+          "type": "integer"
+        },
+        "maior_faixa_livre": {
+          "title": "Maior Faixa Livre",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "profissional",
+        "slots_escalados",
+        "slots_ocupados",
+        "vagas_livres",
+        "buracos",
+        "slots_em_buracos",
+        "slots_isolados",
+        "faixas_livres",
+        "maior_faixa_livre"
+      ],
+      "title": "QualidadeProfissional",
+      "type": "object"
+    },
+    "QualidadeProfissionalDiaRelatorio": {
+      "additionalProperties": false,
+      "properties": {
+        "profissional": {
+          "$ref": "#/$defs/ProfissionalRelatorio"
+        },
+        "slots_escalados": {
+          "title": "Slots Escalados",
+          "type": "integer"
+        },
+        "slots_ocupados": {
+          "title": "Slots Ocupados",
+          "type": "integer"
+        },
+        "vagas_livres": {
+          "title": "Vagas Livres",
+          "type": "integer"
+        },
+        "buracos": {
+          "title": "Buracos",
+          "type": "integer"
+        },
+        "slots_em_buracos": {
+          "title": "Slots Em Buracos",
+          "type": "integer"
+        },
+        "slots_isolados": {
+          "title": "Slots Isolados",
+          "type": "integer"
+        },
+        "faixas_livres": {
+          "title": "Faixas Livres",
+          "type": "integer"
+        },
+        "maior_faixa_livre": {
+          "title": "Maior Faixa Livre",
+          "type": "integer"
+        },
+        "data": {
+          "format": "date",
+          "title": "Data",
+          "type": "string"
+        },
+        "dia_semana": {
+          "title": "Dia Semana",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profissional",
+        "slots_escalados",
+        "slots_ocupados",
+        "vagas_livres",
+        "buracos",
+        "slots_em_buracos",
+        "slots_isolados",
+        "faixas_livres",
+        "maior_faixa_livre",
+        "data",
+        "dia_semana"
+      ],
+      "title": "QualidadeProfissionalDiaRelatorio",
+      "type": "object"
+    },
     "SalaPostoRelatorio": {
       "additionalProperties": false,
       "properties": {
@@ -581,6 +1170,47 @@
         "posto"
       ],
       "title": "SalaPostoRelatorio",
+      "type": "object"
+    },
+    "SessaoAgendaPaciente": {
+      "additionalProperties": false,
+      "properties": {
+        "inicio": {
+          "pattern": "^\\d{2}:\\d{2}$",
+          "title": "Inicio",
+          "type": "string"
+        },
+        "fim": {
+          "pattern": "^\\d{2}:\\d{2}$",
+          "title": "Fim",
+          "type": "string"
+        },
+        "profissional_nome": {
+          "title": "Profissional Nome",
+          "type": "string"
+        },
+        "especialidade": {
+          "title": "Especialidade",
+          "type": "string"
+        },
+        "sala_nome": {
+          "title": "Sala Nome",
+          "type": "string"
+        },
+        "aguardando_autorizacao": {
+          "title": "Aguardando Autorizacao",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "inicio",
+        "fim",
+        "profissional_nome",
+        "especialidade",
+        "sala_nome",
+        "aguardando_autorizacao"
+      ],
+      "title": "SessaoAgendaPaciente",
       "type": "object"
     },
     "TabelaExportacao": {
@@ -650,6 +1280,57 @@
       ],
       "title": "TurnoOcupacao",
       "type": "object"
+    },
+    "VagasDiaPeriodo": {
+      "additionalProperties": false,
+      "properties": {
+        "data": {
+          "format": "date",
+          "title": "Data",
+          "type": "string"
+        },
+        "dia_semana": {
+          "title": "Dia Semana",
+          "type": "string"
+        },
+        "periodo": {
+          "enum": [
+            "manha",
+            "tarde"
+          ],
+          "title": "Periodo",
+          "type": "string"
+        },
+        "vagas_livres": {
+          "title": "Vagas Livres",
+          "type": "integer"
+        },
+        "horas_livres": {
+          "title": "Horas Livres",
+          "type": "number"
+        },
+        "janelas": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Janelas"
+        }
+      },
+      "required": [
+        "data",
+        "dia_semana",
+        "periodo",
+        "vagas_livres",
+        "horas_livres",
+        "janelas"
+      ],
+      "title": "VagasDiaPeriodo",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -666,7 +1347,12 @@
       "enum": [
         "ocupacao_profissional",
         "pacientes_por_profissional",
-        "ocupacao_agregada"
+        "ocupacao_agregada",
+        "disponibilidade",
+        "convenio",
+        "agenda_paciente",
+        "qualidade_agenda",
+        "tabela_generica"
       ],
       "title": "Tipo",
       "type": "string"
@@ -718,9 +1404,14 @@
     "dados": {
       "discriminator": {
         "mapping": {
+          "agenda_paciente": "#/$defs/DadosAgendaPaciente",
+          "convenio": "#/$defs/DadosConvenio",
+          "disponibilidade": "#/$defs/DadosDisponibilidade",
           "ocupacao_agregada": "#/$defs/DadosOcupacaoAgregada",
           "ocupacao_profissional": "#/$defs/DadosOcupacaoProfissional",
-          "pacientes_por_profissional": "#/$defs/DadosPacientesProfissional"
+          "pacientes_por_profissional": "#/$defs/DadosPacientesProfissional",
+          "qualidade_agenda": "#/$defs/DadosQualidadeAgenda",
+          "tabela_generica": "#/$defs/DadosTabelaGenerica"
         },
         "propertyName": "tipo"
       },
@@ -733,6 +1424,21 @@
         },
         {
           "$ref": "#/$defs/DadosOcupacaoAgregada"
+        },
+        {
+          "$ref": "#/$defs/DadosDisponibilidade"
+        },
+        {
+          "$ref": "#/$defs/DadosConvenio"
+        },
+        {
+          "$ref": "#/$defs/DadosAgendaPaciente"
+        },
+        {
+          "$ref": "#/$defs/DadosQualidadeAgenda"
+        },
+        {
+          "$ref": "#/$defs/DadosTabelaGenerica"
         }
       ],
       "title": "Dados"

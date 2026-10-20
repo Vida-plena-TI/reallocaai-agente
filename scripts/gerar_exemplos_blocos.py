@@ -1,7 +1,8 @@
 """Gera `docs/exemplos-blocos/`: um JSON de cada variante de bloco e o JSON Schema.
 
-Os exemplos saem das tools reais rodando sobre a agenda fictícia dos testes
-(`tests/support/relatorios.py`) — nenhum dado da planilha, nenhum nome real.
+Os exemplos saem das tools reais rodando sobre as agendas fictícias dos testes
+(`tests/support/relatorios.py` e, para `gerar_relatorio`,
+`tests/support/agenda_clinica.py`) — nenhum dado da planilha, nenhum nome real.
 `tests/ai/test_exemplos_blocos.py` falha se os arquivos versionados ficarem
 desatualizados em relação ao contrato.
 
@@ -20,7 +21,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from tests.support.agenda_semanal import SEGUNDA  # noqa: E402
+from tests.support.agenda_clinica import fonte_clinica  # noqa: E402
+from tests.support.agenda_semanal import SEGUNDA, SEXTA  # noqa: E402
 from tests.support.relatorios import fonte_relatorios  # noqa: E402
 
 from app.ai.relatorios import BlocoRelatorio  # noqa: E402
@@ -39,6 +41,30 @@ VARIANTES: dict[str, tuple[str, dict[str, Any]]] = {
     ),
     "ocupacao_agregada.json": ("consultar_ocupacao", {"data": SEGUNDA.isoformat()}),
 }
+
+#: Arquivo -> argumentos de `gerar_relatorio` (sobre `fonte_clinica`).
+VARIANTES_GERAIS: dict[str, dict[str, Any]] = {
+    "disponibilidade_vagas.json": {
+        "relatorio": "vagas_livres",
+        "inicio": SEGUNDA.isoformat(),
+        "fim": SEXTA.isoformat(),
+    },
+    "disponibilidade_janelas.json": {"relatorio": "janelas_continuas", "duracao_minutos": 90},
+    "convenio.json": {"relatorio": "convenios"},
+    "agenda_paciente.json": {
+        "relatorio": "agenda_paciente",
+        "paciente": "Paciente Ficticio Alfa",
+    },
+    "qualidade_agenda.json": {"relatorio": "qualidade_agenda"},
+    "tabela_generica_ranking.json": {"relatorio": "ranking_ocupacao", "limite": 3},
+    "tabela_generica_capacidade.json": {"relatorio": "capacidade_especialidade"},
+    "tabela_generica_personalizado.json": {
+        "relatorio": "personalizado",
+        "dimensoes": ["dia", "especialidade"],
+        "metricas": ["ocupacao", "vagas_livres", "pacientes_distintos"],
+        "periodo_do_dia": "tarde",
+    },
+}
 ARQUIVO_SCHEMA = "bloco_relatorio.schema.json"
 
 
@@ -54,9 +80,21 @@ def gerar_exemplos() -> dict[str, str]:
             fonte_relatorios(), SemHistoricoContinuidadeDataSource(), SEGUNDA, lambda *_: None
         )
     }
+    gerais = {
+        t.name: t
+        for t in criar_tools(
+            fonte_clinica(), SemHistoricoContinuidadeDataSource(), SEGUNDA, lambda *_: None
+        )
+    }
+    chamadas = [(arquivo, tools, nome, args) for arquivo, (nome, args) in VARIANTES.items()]
+    chamadas += [
+        (arquivo, gerais, "gerar_relatorio", args) for arquivo, args in VARIANTES_GERAIS.items()
+    ]
     arquivos: dict[str, str] = {}
-    for arquivo, (nome, args) in VARIANTES.items():
-        mensagem = tools[nome].invoke({"name": nome, "args": args, "id": "c1", "type": "tool_call"})
+    for arquivo, disponiveis, nome, args in chamadas:
+        mensagem = disponiveis[nome].invoke(
+            {"name": nome, "args": args, "id": "c1", "type": "tool_call"}
+        )
         bloco = BlocoRelatorio.model_validate(mensagem.artifact)
         arquivos[arquivo] = _serializar(bloco.model_dump(mode="json"))
     arquivos[ARQUIVO_SCHEMA] = _serializar(BlocoRelatorio.model_json_schema())

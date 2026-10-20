@@ -1,0 +1,252 @@
+{
+  "versao": 1,
+  "tipo": "tabela_generica",
+  "titulo": "Ranking de ocupação por profissional de 28/09/2026 a 03/10/2026",
+  "periodo": {
+    "inicio": "2026-09-28",
+    "fim": "2026-10-03"
+  },
+  "meta": 0.8,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da semana, sem datas); os números refletem a grade vigente, não uma semana específica do calendário."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Ocupação (total)",
+      "valor": 0.23595505617977527,
+      "formato": "percentual",
+      "exibicao": "23,6%"
+    },
+    {
+      "rotulo": "Slots ocupados (total)",
+      "valor": 42,
+      "formato": "inteiro",
+      "exibicao": "42"
+    },
+    {
+      "rotulo": "Slots escalados (total)",
+      "valor": 178,
+      "formato": "inteiro",
+      "exibicao": "178"
+    },
+    {
+      "rotulo": "Vagas livres (total)",
+      "valor": 136,
+      "formato": "inteiro",
+      "exibicao": "136"
+    },
+    {
+      "rotulo": "Slots para a meta (total)",
+      "valor": 101,
+      "formato": "inteiro",
+      "exibicao": "101"
+    }
+  ],
+  "dados": {
+    "tipo": "tabela_generica",
+    "relatorio": "ranking_ocupacao",
+    "dimensoes": [
+      "profissional"
+    ],
+    "metricas": [
+      "ocupacao",
+      "slots_ocupados",
+      "slots_escalados",
+      "vagas_livres",
+      "slots_para_meta"
+    ],
+    "colunas": [
+      {
+        "chave": "profissional",
+        "rotulo": "Profissional",
+        "formato": "texto"
+      },
+      {
+        "chave": "ocupacao",
+        "rotulo": "Ocupação",
+        "formato": "percentual"
+      },
+      {
+        "chave": "slots_ocupados",
+        "rotulo": "Slots ocupados",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "slots_escalados",
+        "rotulo": "Slots escalados",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "vagas_livres",
+        "rotulo": "Vagas livres",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "slots_para_meta",
+        "rotulo": "Slots para a meta",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "abaixo_da_meta",
+        "rotulo": "Abaixo da meta",
+        "formato": "texto"
+      }
+    ],
+    "linhas": [
+      {
+        "profissional": "Diva Rocha",
+        "ocupacao": 0.3333333333333333,
+        "slots_ocupados": 6,
+        "slots_escalados": 18,
+        "vagas_livres": 12,
+        "slots_para_meta": 9,
+        "abaixo_da_meta": true
+      },
+      {
+        "profissional": "Ana Lima",
+        "ocupacao": 0.26,
+        "slots_ocupados": 13,
+        "slots_escalados": 50,
+        "vagas_livres": 37,
+        "slots_para_meta": 27,
+        "abaixo_da_meta": true
+      },
+      {
+        "profissional": "Cau Melo",
+        "ocupacao": 0.22,
+        "slots_ocupados": 11,
+        "slots_escalados": 50,
+        "vagas_livres": 39,
+        "slots_para_meta": 29,
+        "abaixo_da_meta": true
+      }
+    ],
+    "total": {
+      "ocupacao": 0.23595505617977527,
+      "slots_ocupados": 42,
+      "slots_escalados": 178,
+      "vagas_livres": 136,
+      "slots_para_meta": 101,
+      "abaixo_da_meta": true
+    },
+    "linhas_omitidas": 1
+  },
+  "tabelas": [
+    {
+      "nome": "Resultado",
+      "colunas": [
+        {
+          "chave": "profissional",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "ocupacao",
+          "rotulo": "Ocupação",
+          "formato": "percentual"
+        },
+        {
+          "chave": "slots_ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_escalados",
+          "rotulo": "Slots escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "vagas_livres",
+          "rotulo": "Vagas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_para_meta",
+          "rotulo": "Slots para a meta",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "abaixo_da_meta",
+          "rotulo": "Abaixo da meta",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "profissional": "Diva Rocha",
+          "ocupacao": 0.3333333333333333,
+          "slots_ocupados": 6,
+          "slots_escalados": 18,
+          "vagas_livres": 12,
+          "slots_para_meta": 9,
+          "abaixo_da_meta": true
+        },
+        {
+          "profissional": "Ana Lima",
+          "ocupacao": 0.26,
+          "slots_ocupados": 13,
+          "slots_escalados": 50,
+          "vagas_livres": 37,
+          "slots_para_meta": 27,
+          "abaixo_da_meta": true
+        },
+        {
+          "profissional": "Cau Melo",
+          "ocupacao": 0.22,
+          "slots_ocupados": 11,
+          "slots_escalados": 50,
+          "vagas_livres": 39,
+          "slots_para_meta": 29,
+          "abaixo_da_meta": true
+        }
+      ]
+    },
+    {
+      "nome": "Total",
+      "colunas": [
+        {
+          "chave": "ocupacao",
+          "rotulo": "Ocupação",
+          "formato": "percentual"
+        },
+        {
+          "chave": "slots_ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_escalados",
+          "rotulo": "Slots escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "vagas_livres",
+          "rotulo": "Vagas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_para_meta",
+          "rotulo": "Slots para a meta",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "abaixo_da_meta",
+          "rotulo": "Abaixo da meta",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "ocupacao": 0.23595505617977527,
+          "slots_ocupados": 42,
+          "slots_escalados": 178,
+          "vagas_livres": 136,
+          "slots_para_meta": 101,
+          "abaixo_da_meta": true
+        }
+      ]
+    }
+  ]
+}

@@ -231,6 +231,9 @@ class LinhaRelatorio(BaseModel):
     valores: dict[Metrica, ValorMetrica]
     #: Só quando a meta se aplica (ocupação ou slots para a meta pedidos).
     abaixo_da_meta: bool | None = None
+    #: (ocupados, escalados) quando a ocupação foi pedida: a exibição em
+    #: percentual sai dos inteiros, nunca do float.
+    razao_ocupacao: tuple[int, int] | None = None
 
 
 class ResultadoRelatorio(BaseModel):
@@ -246,6 +249,7 @@ class ResultadoRelatorio(BaseModel):
     #: Calculado sobre todos os slots do recorte (não é a soma das linhas).
     total: dict[Metrica, ValorMetrica]
     total_abaixo_da_meta: bool | None
+    total_razao_ocupacao: tuple[int, int] | None = None
     #: Linhas que ficaram de fora por causa de `limite`.
     linhas_omitidas: int = Field(ge=0)
     meta: float | None
@@ -398,6 +402,32 @@ def _meta_se_aplica(metricas: Iterable[Metrica]) -> bool:
     return bool({Metrica.OCUPACAO, Metrica.SLOTS_PARA_META} & set(metricas))
 
 
+def _valores_do_grupo(
+    slots: list[SlotFotografado], consulta: ConsultaRelatorio, meta: float | None
+) -> tuple[dict[Metrica, ValorMetrica], bool | None, tuple[int, int] | None]:
+    """Métricas pedidas, se está abaixo da meta e a razão (ocupados, escalados).
+
+    Com meta, "slots para a meta" é sempre calculado (decide `abaixo_da_meta`);
+    com ocupação, escalados e ocupados também. Só ficam nos valores se pedidos.
+    """
+    auxiliares: list[Metrica] = []
+    if meta is not None:
+        auxiliares.append(Metrica.SLOTS_PARA_META)
+    if Metrica.OCUPACAO in consulta.metricas:
+        auxiliares += [Metrica.SLOTS_OCUPADOS, Metrica.SLOTS_ESCALADOS]
+    calculadas = calcular_metricas(
+        slots, dict.fromkeys([*consulta.metricas, *auxiliares]), consulta.slots_por_janela
+    )
+    abaixo = int(calculadas[Metrica.SLOTS_PARA_META]) > 0 if meta is not None else None
+    razao = (
+        (int(calculadas[Metrica.SLOTS_OCUPADOS]), int(calculadas[Metrica.SLOTS_ESCALADOS]))
+        if Metrica.OCUPACAO in consulta.metricas
+        else None
+    )
+    valores = {metrica: calculadas[metrica] for metrica in consulta.metricas}
+    return valores, abaixo, razao
+
+
 def gerar_relatorio(foto: FotografiaPeriodo, consulta: ConsultaRelatorio) -> ResultadoRelatorio:
     """Agrupa os slots da fotografia por `consulta.dimensoes` e calcula as métricas.
 
@@ -435,27 +465,15 @@ def gerar_relatorio(foto: FotografiaPeriodo, consulta: ConsultaRelatorio) -> Res
         grupos[chave].append(slot)
 
     meta = META_OCUPACAO_POR_SALA if _meta_se_aplica(consulta.metricas) else None
-    # Com meta, "slots para a meta" é sempre calculado (decide `abaixo_da_meta`)
-    # e só fica nos valores quando foi pedido.
-    calcular = list(consulta.metricas)
-    if meta is not None and Metrica.SLOTS_PARA_META not in calcular:
-        calcular.append(Metrica.SLOTS_PARA_META)
     linhas: list[LinhaRelatorio] = []
-    acima_de_cem = False
     for chave, slots in grupos.items():
-        valores = calcular_metricas(slots, calcular, consulta.slots_por_janela)
-        abaixo: bool | None = None
-        if meta is not None:
-            abaixo = int(valores[Metrica.SLOTS_PARA_META]) > 0
-            if Metrica.SLOTS_PARA_META not in consulta.metricas:
-                del valores[Metrica.SLOTS_PARA_META]
-        if Metrica.OCUPACAO in valores and float(valores[Metrica.OCUPACAO]) > 1:
-            acima_de_cem = True
+        valores, abaixo, razao = _valores_do_grupo(slots, consulta, meta)
         linhas.append(
             LinhaRelatorio(
                 chaves=dict(zip(consulta.dimensoes, chave, strict=True)),
                 valores=valores,
                 abaixo_da_meta=abaixo,
+                razao_ocupacao=razao,
             )
         )
 
@@ -479,15 +497,14 @@ def gerar_relatorio(foto: FotografiaPeriodo, consulta: ConsultaRelatorio) -> Res
         omitidas = len(linhas) - consulta.limite
         linhas = linhas[: consulta.limite]
 
-    total = calcular_metricas(recorte, calcular, consulta.slots_por_janela)
-    total_abaixo: bool | None = None
-    if meta is not None:
-        total_abaixo = int(total[Metrica.SLOTS_PARA_META]) > 0
-        if Metrica.SLOTS_PARA_META not in consulta.metricas:
-            del total[Metrica.SLOTS_PARA_META]
-    if Metrica.OCUPACAO in total and float(total[Metrica.OCUPACAO]) > 1:
-        acima_de_cem = True
-    if acima_de_cem:
+    total, total_abaixo, total_razao = _valores_do_grupo(recorte, consulta, meta)
+    if any(
+        escalados and ocupados > escalados
+        for ocupados, escalados in [
+            linha.razao_ocupacao for linha in linhas if linha.razao_ocupacao is not None
+        ]
+        + ([total_razao] if total_razao is not None else [])
+    ):
         avisos.append(AVISO_ACIMA_DE_CEM)
 
     return ResultadoRelatorio(
@@ -498,6 +515,7 @@ def gerar_relatorio(foto: FotografiaPeriodo, consulta: ConsultaRelatorio) -> Res
         linhas=linhas,
         total=total,
         total_abaixo_da_meta=total_abaixo,
+        total_razao_ocupacao=total_razao,
         linhas_omitidas=omitidas,
         meta=meta,
         slots_por_janela=consulta.slots_por_janela,

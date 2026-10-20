@@ -1,0 +1,1228 @@
+{
+  "versao": 1,
+  "tipo": "disponibilidade",
+  "titulo": "Vagas livres de 28/09/2026 a 02/10/2026",
+  "periodo": {
+    "inicio": "2026-09-28",
+    "fim": "2026-10-02"
+  },
+  "meta": null,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da semana, sem datas); os números refletem a grade vigente, não uma semana específica do calendário."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Vagas livres",
+      "valor": 130,
+      "formato": "inteiro",
+      "exibicao": "130"
+    },
+    {
+      "rotulo": "Horas livres",
+      "valor": 65.0,
+      "formato": "decimal",
+      "exibicao": "65,0 h"
+    }
+  ],
+  "dados": {
+    "tipo": "disponibilidade",
+    "minutos_por_janela": 30,
+    "faixas": [
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "07:00",
+        "fim": "08:00",
+        "slots": 2,
+        "cabem": 2
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 1,
+        "inicio": "07:00",
+        "fim": "08:00",
+        "slots": 2,
+        "cabem": 2
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "09:00",
+        "fim": "09:30",
+        "slots": 1,
+        "cabem": 1
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 1,
+        "inicio": "09:30",
+        "fim": "12:00",
+        "slots": 5,
+        "cabem": 5
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "10:00",
+        "fim": "10:30",
+        "slots": 1,
+        "cabem": 1
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "11:30",
+        "fim": "12:00",
+        "slots": 1,
+        "cabem": 1
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 1,
+        "inicio": "14:00",
+        "fim": "15:00",
+        "slots": 2,
+        "cabem": 2
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 2,
+        "inicio": "14:00",
+        "fim": "14:30",
+        "slots": 1,
+        "cabem": 1
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 2,
+        "inicio": "15:00",
+        "fim": "18:00",
+        "slots": 6,
+        "cabem": 6
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 1,
+        "inicio": "15:30",
+        "fim": "18:00",
+        "slots": 5,
+        "cabem": 5
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "07:00",
+        "fim": "08:00",
+        "slots": 2,
+        "cabem": 2
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 1,
+        "inicio": "07:00",
+        "fim": "08:00",
+        "slots": 2,
+        "cabem": 2
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "09:00",
+        "fim": "10:00",
+        "slots": 2,
+        "cabem": 2
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 1,
+        "inicio": "09:30",
+        "fim": "12:00",
+        "slots": 5,
+        "cabem": 5
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "11:00",
+        "fim": "12:00",
+        "slots": 2,
+        "cabem": 2
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 2,
+        "inicio": "13:00",
+        "fim": "14:00",
+        "slots": 2,
+        "cabem": 2
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 1,
+        "inicio": "13:30",
+        "fim": "18:00",
+        "slots": 9,
+        "cabem": 9
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 2,
+        "inicio": "14:30",
+        "fim": "15:00",
+        "slots": 1,
+        "cabem": 1
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 2,
+        "inicio": "16:30",
+        "fim": "18:00",
+        "slots": 3,
+        "cabem": 3
+      },
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "07:00",
+        "fim": "12:00",
+        "slots": 10,
+        "cabem": 10
+      },
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 1,
+        "inicio": "07:00",
+        "fim": "12:00",
+        "slots": 10,
+        "cabem": 10
+      },
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 1,
+        "inicio": "13:00",
+        "fim": "14:00",
+        "slots": 2,
+        "cabem": 2
+      },
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 2,
+        "inicio": "13:30",
+        "fim": "18:00",
+        "slots": 9,
+        "cabem": 9
+      },
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 1,
+        "inicio": "15:00",
+        "fim": "18:00",
+        "slots": 6,
+        "cabem": 6
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "08:00",
+        "fim": "12:00",
+        "slots": 8,
+        "cabem": 8
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 2,
+        "inicio": "13:00",
+        "fim": "16:00",
+        "slots": 6,
+        "cabem": 6
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "9f767b2539be0bca1e48d23ead1d9646f3698151a4c27eb02371cf03e0cd556f",
+          "nome": "Diva Rocha",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-10",
+        "sala_nome": "Sala 10",
+        "posto": 1,
+        "inicio": "15:00",
+        "fim": "18:00",
+        "slots": 6,
+        "cabem": 6
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 2,
+        "inicio": "17:00",
+        "fim": "18:00",
+        "slots": 2,
+        "cabem": 2
+      },
+      {
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "07:00",
+        "fim": "09:00",
+        "slots": 4,
+        "cabem": 4
+      },
+      {
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira",
+        "periodo": "manha",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sala_id": "sala-1",
+        "sala_nome": "Sala 1",
+        "posto": 1,
+        "inicio": "10:00",
+        "fim": "12:00",
+        "slots": 4,
+        "cabem": 4
+      },
+      {
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira",
+        "periodo": "tarde",
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "sala_id": "sala-2",
+        "sala_nome": "Sala 2",
+        "posto": 2,
+        "inicio": "13:30",
+        "fim": "18:00",
+        "slots": 9,
+        "cabem": 9
+      }
+    ],
+    "por_dia": [
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "manha",
+        "vagas_livres": 12,
+        "horas_livres": 6.0,
+        "janelas": null
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "periodo": "tarde",
+        "vagas_livres": 14,
+        "horas_livres": 7.0,
+        "janelas": null
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "manha",
+        "vagas_livres": 13,
+        "horas_livres": 6.5,
+        "janelas": null
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "periodo": "tarde",
+        "vagas_livres": 15,
+        "horas_livres": 7.5,
+        "janelas": null
+      },
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "periodo": "manha",
+        "vagas_livres": 20,
+        "horas_livres": 10.0,
+        "janelas": null
+      },
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "periodo": "tarde",
+        "vagas_livres": 17,
+        "horas_livres": 8.5,
+        "janelas": null
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira",
+        "periodo": "manha",
+        "vagas_livres": 8,
+        "horas_livres": 4.0,
+        "janelas": null
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira",
+        "periodo": "tarde",
+        "vagas_livres": 14,
+        "horas_livres": 7.0,
+        "janelas": null
+      },
+      {
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira",
+        "periodo": "manha",
+        "vagas_livres": 8,
+        "horas_livres": 4.0,
+        "janelas": null
+      },
+      {
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira",
+        "periodo": "tarde",
+        "vagas_livres": 9,
+        "horas_livres": 4.5,
+        "janelas": null
+      }
+    ]
+  },
+  "tabelas": [
+    {
+      "nome": "Vagas",
+      "colunas": [
+        {
+          "chave": "data",
+          "rotulo": "Data",
+          "formato": "data"
+        },
+        {
+          "chave": "dia_semana",
+          "rotulo": "Dia da semana",
+          "formato": "texto"
+        },
+        {
+          "chave": "periodo",
+          "rotulo": "Período",
+          "formato": "texto"
+        },
+        {
+          "chave": "profissional",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "sala",
+          "rotulo": "Sala",
+          "formato": "texto"
+        },
+        {
+          "chave": "posto",
+          "rotulo": "Posto",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "inicio",
+          "rotulo": "Início",
+          "formato": "texto"
+        },
+        {
+          "chave": "fim",
+          "rotulo": "Fim",
+          "formato": "texto"
+        },
+        {
+          "chave": "slots",
+          "rotulo": "Slots livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "cabem",
+          "rotulo": "Cabem (30 min)",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "07:00",
+          "fim": "08:00",
+          "slots": 2,
+          "cabem": 2
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Manhã",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "posto": 1,
+          "inicio": "07:00",
+          "fim": "08:00",
+          "slots": 2,
+          "cabem": 2
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "09:00",
+          "fim": "09:30",
+          "slots": 1,
+          "cabem": 1
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Manhã",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "posto": 1,
+          "inicio": "09:30",
+          "fim": "12:00",
+          "slots": 5,
+          "cabem": 5
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "10:00",
+          "fim": "10:30",
+          "slots": 1,
+          "cabem": 1
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "11:30",
+          "fim": "12:00",
+          "slots": 1,
+          "cabem": 1
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Tarde",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "posto": 1,
+          "inicio": "14:00",
+          "fim": "15:00",
+          "slots": 2,
+          "cabem": 2
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Tarde",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional",
+          "sala": "Sala 2",
+          "posto": 2,
+          "inicio": "14:00",
+          "fim": "14:30",
+          "slots": 1,
+          "cabem": 1
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Tarde",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional",
+          "sala": "Sala 2",
+          "posto": 2,
+          "inicio": "15:00",
+          "fim": "18:00",
+          "slots": 6,
+          "cabem": 6
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Tarde",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "posto": 1,
+          "inicio": "15:30",
+          "fim": "18:00",
+          "slots": 5,
+          "cabem": 5
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "07:00",
+          "fim": "08:00",
+          "slots": 2,
+          "cabem": 2
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Manhã",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "posto": 1,
+          "inicio": "07:00",
+          "fim": "08:00",
+          "slots": 2,
+          "cabem": 2
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "09:00",
+          "fim": "10:00",
+          "slots": 2,
+          "cabem": 2
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Manhã",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "posto": 1,
+          "inicio": "09:30",
+          "fim": "12:00",
+          "slots": 5,
+          "cabem": 5
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "11:00",
+          "fim": "12:00",
+          "slots": 2,
+          "cabem": 2
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Tarde",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional",
+          "sala": "Sala 2",
+          "posto": 2,
+          "inicio": "13:00",
+          "fim": "14:00",
+          "slots": 2,
+          "cabem": 2
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Tarde",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "posto": 1,
+          "inicio": "13:30",
+          "fim": "18:00",
+          "slots": 9,
+          "cabem": 9
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Tarde",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional",
+          "sala": "Sala 2",
+          "posto": 2,
+          "inicio": "14:30",
+          "fim": "15:00",
+          "slots": 1,
+          "cabem": 1
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Tarde",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional",
+          "sala": "Sala 2",
+          "posto": 2,
+          "inicio": "16:30",
+          "fim": "18:00",
+          "slots": 3,
+          "cabem": 3
+        },
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "07:00",
+          "fim": "12:00",
+          "slots": 10,
+          "cabem": 10
+        },
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "periodo": "Manhã",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "posto": 1,
+          "inicio": "07:00",
+          "fim": "12:00",
+          "slots": 10,
+          "cabem": 10
+        },
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "periodo": "Tarde",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "posto": 1,
+          "inicio": "13:00",
+          "fim": "14:00",
+          "slots": 2,
+          "cabem": 2
+        },
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "periodo": "Tarde",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional",
+          "sala": "Sala 2",
+          "posto": 2,
+          "inicio": "13:30",
+          "fim": "18:00",
+          "slots": 9,
+          "cabem": 9
+        },
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "periodo": "Tarde",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "posto": 1,
+          "inicio": "15:00",
+          "fim": "18:00",
+          "slots": 6,
+          "cabem": 6
+        },
+        {
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "08:00",
+          "fim": "12:00",
+          "slots": 8,
+          "cabem": 8
+        },
+        {
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "periodo": "Tarde",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional",
+          "sala": "Sala 2",
+          "posto": 2,
+          "inicio": "13:00",
+          "fim": "16:00",
+          "slots": 6,
+          "cabem": 6
+        },
+        {
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "periodo": "Tarde",
+          "profissional": "Diva Rocha",
+          "especialidade": "Psicologia",
+          "sala": "Sala 10",
+          "posto": 1,
+          "inicio": "15:00",
+          "fim": "18:00",
+          "slots": 6,
+          "cabem": 6
+        },
+        {
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "periodo": "Tarde",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional",
+          "sala": "Sala 2",
+          "posto": 2,
+          "inicio": "17:00",
+          "fim": "18:00",
+          "slots": 2,
+          "cabem": 2
+        },
+        {
+          "data": "2026-10-02",
+          "dia_semana": "sexta-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "07:00",
+          "fim": "09:00",
+          "slots": 4,
+          "cabem": 4
+        },
+        {
+          "data": "2026-10-02",
+          "dia_semana": "sexta-feira",
+          "periodo": "Manhã",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "posto": 1,
+          "inicio": "10:00",
+          "fim": "12:00",
+          "slots": 4,
+          "cabem": 4
+        },
+        {
+          "data": "2026-10-02",
+          "dia_semana": "sexta-feira",
+          "periodo": "Tarde",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional",
+          "sala": "Sala 2",
+          "posto": 2,
+          "inicio": "13:30",
+          "fim": "18:00",
+          "slots": 9,
+          "cabem": 9
+        }
+      ]
+    },
+    {
+      "nome": "Resumo por dia",
+      "colunas": [
+        {
+          "chave": "data",
+          "rotulo": "Data",
+          "formato": "data"
+        },
+        {
+          "chave": "dia_semana",
+          "rotulo": "Dia da semana",
+          "formato": "texto"
+        },
+        {
+          "chave": "periodo",
+          "rotulo": "Período",
+          "formato": "texto"
+        },
+        {
+          "chave": "vagas_livres",
+          "rotulo": "Vagas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "horas_livres",
+          "rotulo": "Horas livres",
+          "formato": "decimal"
+        },
+        {
+          "chave": "janelas",
+          "rotulo": "Cabem (30 min)",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Manhã",
+          "vagas_livres": 12,
+          "horas_livres": 6.0,
+          "janelas": null
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "periodo": "Tarde",
+          "vagas_livres": 14,
+          "horas_livres": 7.0,
+          "janelas": null
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Manhã",
+          "vagas_livres": 13,
+          "horas_livres": 6.5,
+          "janelas": null
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "periodo": "Tarde",
+          "vagas_livres": 15,
+          "horas_livres": 7.5,
+          "janelas": null
+        },
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "periodo": "Manhã",
+          "vagas_livres": 20,
+          "horas_livres": 10.0,
+          "janelas": null
+        },
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "periodo": "Tarde",
+          "vagas_livres": 17,
+          "horas_livres": 8.5,
+          "janelas": null
+        },
+        {
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "periodo": "Manhã",
+          "vagas_livres": 8,
+          "horas_livres": 4.0,
+          "janelas": null
+        },
+        {
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "periodo": "Tarde",
+          "vagas_livres": 14,
+          "horas_livres": 7.0,
+          "janelas": null
+        },
+        {
+          "data": "2026-10-02",
+          "dia_semana": "sexta-feira",
+          "periodo": "Manhã",
+          "vagas_livres": 8,
+          "horas_livres": 4.0,
+          "janelas": null
+        },
+        {
+          "data": "2026-10-02",
+          "dia_semana": "sexta-feira",
+          "periodo": "Tarde",
+          "vagas_livres": 9,
+          "horas_livres": 4.5,
+          "janelas": null
+        }
+      ]
+    }
+  ]
+}

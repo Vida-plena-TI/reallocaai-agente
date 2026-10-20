@@ -1,0 +1,333 @@
+{
+  "versao": 1,
+  "tipo": "tabela_generica",
+  "titulo": "Ocupação, vagas livres e pacientes distintos por dia e especialidade (tarde) de 28/09/2026 a 03/10/2026",
+  "periodo": {
+    "inicio": "2026-09-28",
+    "fim": "2026-10-03"
+  },
+  "meta": 0.8,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da semana, sem datas); os números refletem a grade vigente, não uma semana específica do calendário."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Ocupação (total)",
+      "valor": 0.23333333333333334,
+      "formato": "percentual",
+      "exibicao": "23,3%"
+    },
+    {
+      "rotulo": "Vagas livres (total)",
+      "valor": 69,
+      "formato": "inteiro",
+      "exibicao": "69"
+    },
+    {
+      "rotulo": "Pacientes distintos (total)",
+      "valor": 8,
+      "formato": "inteiro",
+      "exibicao": "8"
+    }
+  ],
+  "dados": {
+    "tipo": "tabela_generica",
+    "relatorio": "personalizado",
+    "dimensoes": [
+      "dia",
+      "especialidade"
+    ],
+    "metricas": [
+      "ocupacao",
+      "vagas_livres",
+      "pacientes_distintos"
+    ],
+    "colunas": [
+      {
+        "chave": "data",
+        "rotulo": "Data",
+        "formato": "data"
+      },
+      {
+        "chave": "dia_semana",
+        "rotulo": "Dia da semana",
+        "formato": "texto"
+      },
+      {
+        "chave": "especialidade",
+        "rotulo": "Especialidade",
+        "formato": "texto"
+      },
+      {
+        "chave": "ocupacao",
+        "rotulo": "Ocupação",
+        "formato": "percentual"
+      },
+      {
+        "chave": "vagas_livres",
+        "rotulo": "Vagas livres",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "pacientes_distintos",
+        "rotulo": "Pacientes distintos",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "abaixo_da_meta",
+        "rotulo": "Abaixo da meta",
+        "formato": "texto"
+      }
+    ],
+    "linhas": [
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "especialidade": "Fonoaudiologia",
+        "ocupacao": 0.3,
+        "vagas_livres": 7,
+        "pacientes_distintos": 2,
+        "abaixo_da_meta": true
+      },
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "especialidade": "Terapia Ocupacional",
+        "ocupacao": 0.3,
+        "vagas_livres": 7,
+        "pacientes_distintos": 2,
+        "abaixo_da_meta": true
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "especialidade": "Fonoaudiologia",
+        "ocupacao": 0.1,
+        "vagas_livres": 9,
+        "pacientes_distintos": 1,
+        "abaixo_da_meta": true
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "especialidade": "Terapia Ocupacional",
+        "ocupacao": 0.4,
+        "vagas_livres": 6,
+        "pacientes_distintos": 2,
+        "abaixo_da_meta": true
+      },
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "especialidade": "Fonoaudiologia",
+        "ocupacao": 0.2,
+        "vagas_livres": 8,
+        "pacientes_distintos": 1,
+        "abaixo_da_meta": true
+      },
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "especialidade": "Terapia Ocupacional",
+        "ocupacao": 0.1,
+        "vagas_livres": 9,
+        "pacientes_distintos": 1,
+        "abaixo_da_meta": true
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira",
+        "especialidade": "Psicologia",
+        "ocupacao": 0.4,
+        "vagas_livres": 6,
+        "pacientes_distintos": 1,
+        "abaixo_da_meta": true
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira",
+        "especialidade": "Terapia Ocupacional",
+        "ocupacao": 0.2,
+        "vagas_livres": 8,
+        "pacientes_distintos": 1,
+        "abaixo_da_meta": true
+      },
+      {
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira",
+        "especialidade": "Terapia Ocupacional",
+        "ocupacao": 0.1,
+        "vagas_livres": 9,
+        "pacientes_distintos": 1,
+        "abaixo_da_meta": true
+      }
+    ],
+    "total": {
+      "ocupacao": 0.23333333333333334,
+      "vagas_livres": 69,
+      "pacientes_distintos": 8,
+      "abaixo_da_meta": true
+    },
+    "linhas_omitidas": 0
+  },
+  "tabelas": [
+    {
+      "nome": "Resultado",
+      "colunas": [
+        {
+          "chave": "data",
+          "rotulo": "Data",
+          "formato": "data"
+        },
+        {
+          "chave": "dia_semana",
+          "rotulo": "Dia da semana",
+          "formato": "texto"
+        },
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "ocupacao",
+          "rotulo": "Ocupação",
+          "formato": "percentual"
+        },
+        {
+          "chave": "vagas_livres",
+          "rotulo": "Vagas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "pacientes_distintos",
+          "rotulo": "Pacientes distintos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "abaixo_da_meta",
+          "rotulo": "Abaixo da meta",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "especialidade": "Fonoaudiologia",
+          "ocupacao": 0.3,
+          "vagas_livres": 7,
+          "pacientes_distintos": 2,
+          "abaixo_da_meta": true
+        },
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "especialidade": "Terapia Ocupacional",
+          "ocupacao": 0.3,
+          "vagas_livres": 7,
+          "pacientes_distintos": 2,
+          "abaixo_da_meta": true
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "especialidade": "Fonoaudiologia",
+          "ocupacao": 0.1,
+          "vagas_livres": 9,
+          "pacientes_distintos": 1,
+          "abaixo_da_meta": true
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "especialidade": "Terapia Ocupacional",
+          "ocupacao": 0.4,
+          "vagas_livres": 6,
+          "pacientes_distintos": 2,
+          "abaixo_da_meta": true
+        },
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "especialidade": "Fonoaudiologia",
+          "ocupacao": 0.2,
+          "vagas_livres": 8,
+          "pacientes_distintos": 1,
+          "abaixo_da_meta": true
+        },
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "especialidade": "Terapia Ocupacional",
+          "ocupacao": 0.1,
+          "vagas_livres": 9,
+          "pacientes_distintos": 1,
+          "abaixo_da_meta": true
+        },
+        {
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "especialidade": "Psicologia",
+          "ocupacao": 0.4,
+          "vagas_livres": 6,
+          "pacientes_distintos": 1,
+          "abaixo_da_meta": true
+        },
+        {
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "especialidade": "Terapia Ocupacional",
+          "ocupacao": 0.2,
+          "vagas_livres": 8,
+          "pacientes_distintos": 1,
+          "abaixo_da_meta": true
+        },
+        {
+          "data": "2026-10-02",
+          "dia_semana": "sexta-feira",
+          "especialidade": "Terapia Ocupacional",
+          "ocupacao": 0.1,
+          "vagas_livres": 9,
+          "pacientes_distintos": 1,
+          "abaixo_da_meta": true
+        }
+      ]
+    },
+    {
+      "nome": "Total",
+      "colunas": [
+        {
+          "chave": "ocupacao",
+          "rotulo": "Ocupação",
+          "formato": "percentual"
+        },
+        {
+          "chave": "vagas_livres",
+          "rotulo": "Vagas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "pacientes_distintos",
+          "rotulo": "Pacientes distintos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "abaixo_da_meta",
+          "rotulo": "Abaixo da meta",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "ocupacao": 0.23333333333333334,
+          "vagas_livres": 69,
+          "pacientes_distintos": 8,
+          "abaixo_da_meta": true
+        }
+      ]
+    }
+  ]
+}

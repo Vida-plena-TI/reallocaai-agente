@@ -1,0 +1,266 @@
+{
+  "versao": 1,
+  "tipo": "agenda_paciente",
+  "titulo": "Agenda de Paciente Ficticio Alfa de 28/09/2026 a 03/10/2026",
+  "periodo": {
+    "inicio": "2026-09-28",
+    "fim": "2026-10-03"
+  },
+  "meta": null,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da semana, sem datas); os números refletem a grade vigente, não uma semana específica do calendário."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Sessões",
+      "valor": 5,
+      "formato": "inteiro",
+      "exibicao": "5"
+    },
+    {
+      "rotulo": "Espera entre terapias (sem o almoço)",
+      "valor": 210,
+      "formato": "inteiro",
+      "exibicao": "210 min"
+    }
+  ],
+  "dados": {
+    "tipo": "agenda_paciente",
+    "paciente": {
+      "nome": "Paciente Ficticio Alfa",
+      "convenio": "Unimed"
+    },
+    "dias": [
+      {
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira",
+        "sessoes": [
+          {
+            "inicio": "08:00",
+            "fim": "09:00",
+            "profissional_nome": "Ana Lima",
+            "especialidade": "Psicologia",
+            "sala_nome": "Sala 1",
+            "aguardando_autorizacao": false
+          }
+        ],
+        "intervalos": []
+      },
+      {
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira",
+        "sessoes": [
+          {
+            "inicio": "08:00",
+            "fim": "09:00",
+            "profissional_nome": "Ana Lima",
+            "especialidade": "Psicologia",
+            "sala_nome": "Sala 1",
+            "aguardando_autorizacao": false
+          },
+          {
+            "inicio": "13:00",
+            "fim": "13:30",
+            "profissional_nome": "Beto Reis",
+            "especialidade": "Fonoaudiologia",
+            "sala_nome": "Sala 2",
+            "aguardando_autorizacao": false
+          },
+          {
+            "inicio": "14:00",
+            "fim": "14:30",
+            "profissional_nome": "Cau Melo",
+            "especialidade": "Terapia Ocupacional",
+            "sala_nome": "Sala 2",
+            "aguardando_autorizacao": false
+          }
+        ],
+        "intervalos": [
+          {
+            "inicio": "09:00",
+            "fim": "13:00",
+            "minutos": 240,
+            "minutos_de_pausa": 60
+          },
+          {
+            "inicio": "13:30",
+            "fim": "14:00",
+            "minutos": 30,
+            "minutos_de_pausa": 0
+          }
+        ]
+      },
+      {
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira",
+        "sessoes": [
+          {
+            "inicio": "09:00",
+            "fim": "10:00",
+            "profissional_nome": "Ana Lima",
+            "especialidade": "Psicologia",
+            "sala_nome": "Sala 1",
+            "aguardando_autorizacao": false
+          }
+        ],
+        "intervalos": []
+      }
+    ],
+    "total_sessoes": 5,
+    "minutos_em_intervalos": 210
+  },
+  "tabelas": [
+    {
+      "nome": "Sessões",
+      "colunas": [
+        {
+          "chave": "data",
+          "rotulo": "Data",
+          "formato": "data"
+        },
+        {
+          "chave": "dia_semana",
+          "rotulo": "Dia da semana",
+          "formato": "texto"
+        },
+        {
+          "chave": "inicio",
+          "rotulo": "Início",
+          "formato": "texto"
+        },
+        {
+          "chave": "fim",
+          "rotulo": "Fim",
+          "formato": "texto"
+        },
+        {
+          "chave": "profissional",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "sala",
+          "rotulo": "Sala",
+          "formato": "texto"
+        },
+        {
+          "chave": "aguardando_autorizacao",
+          "rotulo": "Aguardando autorização",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "inicio": "08:00",
+          "fim": "09:00",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "aguardando_autorizacao": false
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "inicio": "08:00",
+          "fim": "09:00",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "aguardando_autorizacao": false
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "inicio": "13:00",
+          "fim": "13:30",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia",
+          "sala": "Sala 2",
+          "aguardando_autorizacao": false
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "inicio": "14:00",
+          "fim": "14:30",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional",
+          "sala": "Sala 2",
+          "aguardando_autorizacao": false
+        },
+        {
+          "data": "2026-10-02",
+          "dia_semana": "sexta-feira",
+          "inicio": "09:00",
+          "fim": "10:00",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia",
+          "sala": "Sala 1",
+          "aguardando_autorizacao": false
+        }
+      ]
+    },
+    {
+      "nome": "Intervalos",
+      "colunas": [
+        {
+          "chave": "data",
+          "rotulo": "Data",
+          "formato": "data"
+        },
+        {
+          "chave": "dia_semana",
+          "rotulo": "Dia da semana",
+          "formato": "texto"
+        },
+        {
+          "chave": "inicio",
+          "rotulo": "Início",
+          "formato": "texto"
+        },
+        {
+          "chave": "fim",
+          "rotulo": "Fim",
+          "formato": "texto"
+        },
+        {
+          "chave": "minutos",
+          "rotulo": "Minutos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "minutos_de_pausa",
+          "rotulo": "Minutos de pausa (almoço)",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "inicio": "09:00",
+          "fim": "13:00",
+          "minutos": 240,
+          "minutos_de_pausa": 60
+        },
+        {
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "inicio": "13:30",
+          "fim": "14:00",
+          "minutos": 30,
+          "minutos_de_pausa": 0
+        }
+      ]
+    }
+  ]
+}
