@@ -8,6 +8,8 @@ sem rede.
 """
 
 import logging
+import threading
+import time
 from collections.abc import Mapping, Sequence
 from datetime import date
 from pathlib import Path
@@ -24,7 +26,14 @@ from app.data_sources.google_sheets_parser import (
     parse_worksheet_data,
     rotulo_da_coluna,
 )
-from app.domain import Atendimento, EntradaGrade, Paciente, Profissional, Sala
+from app.domain import (
+    Atendimento,
+    EntradaGrade,
+    Paciente,
+    Profissional,
+    Sala,
+    dias_da_semana_de,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,15 +100,25 @@ def _caminho_da_credencial(caminho_configurado: str | None) -> Path:
 class GoogleSheetsDataSource:
     """`ScheduleDataSource` apoiado na planilha da clínica.
 
-    Cada dia é buscado uma vez por instância: os quatro métodos leem do mesmo
-    resultado em cache, então montar a agenda de um dia custa uma chamada à API,
-    não quatro. O cache vive na instância — nada é compartilhado entre processos.
+    A API devolve todas as abas numa chamada só, então montar um dia já traz
+    a semana inteira: a busca de um dia preenche os seis dias (segunda a
+    sábado) da semana dele. Os cinco métodos leem do mesmo resultado em cache.
+
+    `ttl_segundos` limita a validade desse cache; `None` (padrão, usado pelos
+    scripts) guarda para sempre. Um lock serializa as buscas: leituras em
+    paralelo de dias da mesma semana custam uma chamada à API, não seis. O
+    cache vive na instância — nada é compartilhado entre processos.
     """
 
-    def __init__(self, planilha: gspread.Spreadsheet | None = None) -> None:
+    def __init__(
+        self, planilha: gspread.Spreadsheet | None = None, ttl_segundos: float | None = None
+    ) -> None:
         #: Injetável para testes e scripts; quando ausente, é aberta sob demanda.
         self._planilha = planilha
-        self._cache: dict[date, DadosAgendaDoDia] = {}
+        self._ttl_segundos = ttl_segundos
+        #: Dia -> (instante monotônico da busca, resultado do parsing).
+        self._cache: dict[date, tuple[float, DadosAgendaDoDia]] = {}
+        self._lock = threading.Lock()
 
     @property
     def planilha(self) -> gspread.Spreadsheet:
@@ -128,30 +147,78 @@ class GoogleSheetsDataSource:
         """Pacientes que aparecem na agenda do dia, com o convênio que a cor indicou."""
         return self._dados_do_dia(dia).pacientes
 
-    def _dados_do_dia(self, dia: date) -> DadosAgendaDoDia:
-        """Resultado do parsing do dia, buscando na planilha só na primeira vez."""
-        if dia not in self._cache:
-            self._cache[dia] = self._carregar(dia)
-        return self._cache[dia]
+    def _em_cache(self, dia: date) -> DadosAgendaDoDia | None:
+        em_cache = self._cache.get(dia)
+        if em_cache is None:
+            return None
+        buscado_em, dados = em_cache
+        if self._ttl_segundos is not None and time.monotonic() - buscado_em >= self._ttl_segundos:
+            return None
+        return dados
 
-    def _carregar(self, dia: date) -> DadosAgendaDoDia:
-        """Busca a aba do dia e entrega os dados crus ao parser."""
+    def _dados_do_dia(self, dia: date) -> DadosAgendaDoDia:
+        """Resultado do parsing do dia, buscando na planilha só quando o cache não vale."""
         if nome_da_aba(dia) is None:
             logger.debug("%s é domingo: a clínica não abre, nada a buscar.", dia.isoformat())
             return DadosAgendaDoDia()
+        dados = self._em_cache(dia)
+        if dados is not None:
+            return dados
+        with self._lock:
+            # Outra thread pode ter buscado a semana enquanto esta esperava.
+            dados = self._em_cache(dia)
+            if dados is None:
+                dados = self._carregar_semana(dia)
+        return dados
 
+    def _carregar_semana(self, dia: date) -> DadosAgendaDoDia:
+        """Busca todas as abas uma vez e guarda os dias da semana de `dia`.
+
+        Só o dia pedido propaga erro de parsing: os outros dias da semana que
+        falharem ficam fora do cache e são tentados de novo quando pedidos.
+        """
+        buscado_em = time.monotonic()
         abas: Sequence[Mapping[str, Any]] = self.planilha.fetch_sheet_metadata(
             params={"includeGridData": "true", "fields": _CAMPOS_DA_GRADE}
         ).get("sheets", [])
         titulos = [str(aba.get("properties", {}).get("title", "")) for aba in abas]
 
+        pedido = DadosAgendaDoDia()
+        for outro_dia in dias_da_semana_de(dia):
+            try:
+                dados = self._parsear_dia(outro_dia, abas, titulos, avisar=outro_dia == dia)
+            except Exception as erro:
+                if outro_dia == dia:
+                    raise
+                # Só o tipo do erro: a mensagem pode repetir dados da planilha.
+                logger.warning(
+                    "Falha ao interpretar a aba de %s (%s); será lida de novo quando pedida.",
+                    outro_dia.isoformat(),
+                    type(erro).__name__,
+                )
+                continue
+            self._cache[outro_dia] = (buscado_em, dados)
+            if outro_dia == dia:
+                pedido = dados
+        return pedido
+
+    def _parsear_dia(
+        self,
+        dia: date,
+        abas: Sequence[Mapping[str, Any]],
+        titulos: list[str],
+        *,
+        avisar: bool,
+    ) -> DadosAgendaDoDia:
+        """Entrega ao parser os dados crus da aba de `dia`."""
         titulo = encontrar_titulo_da_aba(dia, titulos)
         if titulo is None:
-            logger.warning(
-                "A planilha não tem aba %r para %s: agenda do dia vazia.",
-                nome_da_aba(dia),
-                dia.isoformat(),
-            )
+            if avisar:
+                logger.warning(
+                    "A planilha não tem aba %r para %s: agenda do dia vazia.",
+                    nome_da_aba(dia),
+                    dia.isoformat(),
+                )
             return DadosAgendaDoDia()
 
         aba = abas[titulos.index(titulo)]

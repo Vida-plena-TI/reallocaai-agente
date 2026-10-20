@@ -168,3 +168,57 @@ def test_valores_e_cores_so_registra_cor_de_celula_com_texto() -> None:
 )
 def test_grid_range_vira_notacao_a1(intervalo: dict[str, int], esperado: str) -> None:
     assert _intervalo_para_a1(intervalo) == esperado
+
+
+def test_uma_busca_preenche_a_semana_inteira() -> None:
+    abas = [
+        payload_da_aba(nome, SEGUNDA_FICTICIA, MERGES_DA_SEGUNDA)
+        for nome in ("Segunda", "Terça", "Quarta")
+    ]
+    origem, planilha = fonte(abas)
+
+    for deslocamento in range(6):
+        origem.listar_grade(date.fromordinal(SEGUNDA.toordinal() + deslocamento))
+
+    assert planilha.chamadas == 1
+    assert origem.listar_grade(date(2026, 9, 9)) != []
+
+
+def test_ttl_vencido_busca_de_novo(monkeypatch: pytest.MonkeyPatch) -> None:
+    planilha = PlanilhaFalsa([payload_da_aba("Segunda", SEGUNDA_FICTICIA, MERGES_DA_SEGUNDA)])
+    origem = GoogleSheetsDataSource(cast(gspread.Spreadsheet, planilha), ttl_segundos=60)
+    agora = [1000.0]
+    monkeypatch.setattr("app.data_sources.google_sheets.time.monotonic", lambda: agora[0])
+
+    origem.listar_grade(SEGUNDA)
+    agora[0] += 59
+    origem.listar_grade(SEGUNDA)
+    assert planilha.chamadas == 1
+
+    agora[0] += 1
+    origem.listar_grade(SEGUNDA)
+    assert planilha.chamadas == 2
+
+
+def test_sem_ttl_o_cache_nao_expira(monkeypatch: pytest.MonkeyPatch) -> None:
+    origem, planilha = fonte([payload_da_aba("Segunda", SEGUNDA_FICTICIA, MERGES_DA_SEGUNDA)])
+    agora = [1000.0]
+    monkeypatch.setattr("app.data_sources.google_sheets.time.monotonic", lambda: agora[0])
+
+    origem.listar_grade(SEGUNDA)
+    agora[0] += 10_000
+    origem.listar_grade(SEGUNDA)
+
+    assert planilha.chamadas == 1
+
+
+def test_leituras_paralelas_da_mesma_semana_fazem_uma_busca() -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    origem, planilha = fonte([payload_da_aba("Segunda", SEGUNDA_FICTICIA, MERGES_DA_SEGUNDA)])
+    dias = [date.fromordinal(SEGUNDA.toordinal() + deslocamento) for deslocamento in range(6)]
+
+    with ThreadPoolExecutor(max_workers=6) as executor:
+        list(executor.map(origem.listar_grade, dias))
+
+    assert planilha.chamadas == 1

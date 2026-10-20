@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # Falha aqui, listando tudo o que falta, em vez de na primeira requisição.
     validar_configuracao(settings_atual)
 
-    fonte_real = GoogleSheetsDataSource()
+    fonte_real = GoogleSheetsDataSource(ttl_segundos=settings_atual.cache_ttl_segundos)
     app.state.fonte_agenda = CacheadoScheduleDataSource(
         fonte_real, ttl_segundos=settings_atual.cache_ttl_segundos
     )
