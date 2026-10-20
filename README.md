@@ -9,7 +9,7 @@ regras operacionais da clínica.
 
 ## Estado do projeto
 
-Fases 1 a 8 concluídas:
+Fases 1 a 9 concluídas:
 
 | Fase | Entrega |
 | --- | --- |
@@ -24,6 +24,7 @@ Fases 1 a 8 concluídas:
 | 6b | Endpoint de conversa com o agente (`/agenda/chat`) e sessão em memória. |
 | 7 | Relatório de ocupação por e-mail via Resend. |
 | 8 | Cobertura de testes, teste de integração ponta a ponta, verificação automática das fronteiras arquiteturais (`tests/test_arquitetura.py`) e este fechamento da documentação. |
+| 9 | Relatórios gerais: fotografia do período e motor de relatório genérico (`app/engine/fotografia.py`, `relatorio_generico.py`, `relatorios_prontos.py`), tools `gerar_relatorio` e `consultar_catalogo` e cinco tipos de bloco novos. |
 
 ## Princípio central: IA sugere, o motor decide
 
@@ -162,11 +163,15 @@ rodar o agente (rede, modelo) devolve `502`, sem vazar detalhes internos na resp
 
 O campo `blocos` está sempre presente, mesmo quando vazio e independentemente de
 `renderiza_relatorios`. As consultas de ocupação profissional, pacientes por profissional
-e ocupação agregada devolvem dados tipados em `app/ai/relatorios.py`, versão 1:
+e ocupação agregada, e todos os relatórios de `gerar_relatorio` (ver
+[Relatórios gerais](#relatórios-gerais-tools-gerar_relatorio-e-consultar_catalogo)), devolvem
+dados tipados em `app/ai/relatorios.py`, versão 1:
 
 - `tipo`, `titulo`, `periodo` (início e fim ISO), `meta`, `parcial` e `avisos`;
-- `meta`: `0.8` em `ocupacao_profissional` e `ocupacao_agregada`; `null` em
-  `pacientes_por_profissional`, que não tem meta (suas tabelas não têm coluna de meta);
+- `meta`: sempre `0.8` em `ocupacao_profissional` e `ocupacao_agregada`; sempre `null` em
+  `pacientes_por_profissional`, `disponibilidade`, `convenio`, `agenda_paciente` e
+  `qualidade_agenda` (suas tabelas não têm coluna de meta); em `tabela_generica`, `0.8`
+  quando a ocupação (ou slots para a meta) foi pedida e `null` caso contrário;
 - `dias_nao_lidos`: datas ISO, ordenadas, dos dias cuja leitura falhou; lista vazia
   exatamente quando `parcial` é `false`;
 - `resumo`: valores e strings de exibição já formatadas;
@@ -197,12 +202,15 @@ Em caso de inconsistência na grade, a engine pode produzir ocupação acima de 
 O bloco é devolvido com o valor real (percentuais só têm limite inferior, `>= 0`):
 `abaixo_da_meta` fica `false`, um aviso de ocupação acima de 100% entra em `avisos` (e no
 texto) e, em `ocupacao_profissional`, `inconsistencia` fica `true`.
-Os blocos não contêm nomes nem IDs de pacientes; IDs de profissionais são opacos.
+Os blocos não contêm nomes nem IDs de pacientes, com uma única exceção: `agenda_paciente`
+traz o nome do paciente que o usuário pediu explicitamente. IDs de profissionais são opacos.
 Ambiguidade, profissional não encontrada, ausência de agenda, especialidade desconhecida
 ou erro devolvem apenas texto, com `blocos: []`. Há no máximo dez blocos por turno.
 
 Exemplos de cada variante (`ocupacao_profissional`, `pacientes_por_profissional` com
-escopo semana e dia, `ocupacao_agregada`) e o JSON Schema de `BlocoRelatorio` ficam em
+escopo semana e dia, `ocupacao_agregada`, `disponibilidade` de vagas e de janelas,
+`convenio`, `agenda_paciente`, `qualidade_agenda` e `tabela_generica` de ranking,
+capacidade e personalizado) e o JSON Schema de `BlocoRelatorio` ficam em
 `docs/exemplos-blocos/`, gerados com dados fictícios por
 `uv run python scripts/gerar_exemplos_blocos.py`; um teste falha se ficarem desatualizados.
 
@@ -335,6 +343,74 @@ padrão é a semana de hoje, todas as profissionais, com o detalhe por dia.
   leitura falhe é sinalizado e os números ficam marcados como parciais. A resposta nunca traz
   nome de paciente, e no escopo `semana` termina com a mesma ressalva da grade semanal.
 
+### Relatórios gerais (tools `gerar_relatorio` e `consultar_catalogo`)
+
+Em vez de uma tool fixa por relatório (e uma chamada por dia), o agente responde qualquer
+pedido de período ou combinado com **uma** chamada a `gerar_relatorio`. "Horários vagos de
+segunda a sexta" passou de 5 chamadas a `consultar_disponibilidade` e ~110 s (com a
+planilha real e o modelo de produção) para 1 chamada e 13 a 18 s ponta a ponta; a tool em
+si leva ~2 s com o cache frio, e o resto é o modelo.
+
+**Como funciona** (camadas):
+
+1. `fotografar_periodo` (`app/engine/fotografia.py`) lê cada dia do intervalo **uma vez**,
+   em paralelo (até 6), sem domingo, e normaliza tudo por slot: data, profissional,
+   especialidade, sala, posto, manhã/tarde, estado (`livre`, `ocupado` ou `fechado` = posto
+   sem ninguém escalado), convênio e autorização. Um dia ilegível entra em `dias_nao_lidos`
+   e o resto segue (relatório parcial). O id do paciente é interno: nunca sai.
+2. `gerar_relatorio` (`app/engine/relatorio_generico.py`) agrupa por **dimensões** (`dia`,
+   `profissional`, `especialidade`, `sala`, `posto`, `periodo`, `convenio`) e calcula
+   **métricas** (`ocupacao`, `slots_escalados`, `slots_ocupados`, `vagas_livres`,
+   `slots_para_meta`, `slots_fechados`, `pacientes_distintos`, `sessoes`, `horas_*`,
+   `aguardando_autorizacao`, `janelas_livres`), com filtros (profissional, especialidade,
+   sala, convênio, dia da semana, manhã/tarde), ordenação e limite. O total é recalculado
+   sobre o recorte inteiro (pacientes distintos não são a soma das linhas; a ocupação é
+   ponderada, nunca média de percentuais).
+3. `app/engine/relatorios_prontos.py`: `vagas_livres`, `janelas_continuas` (1 h, 1 h 30...),
+   `ranking_ocupacao`, `comparativo_dias`, `convenios` (com aguardando autorização),
+   `qualidade_agenda` (buracos e vagas isoladas), `salas_ociosas`,
+   `capacidade_especialidade` (sobrando / equilibrada / no limite, a partir de 95%) e
+   `agenda_paciente`.
+
+**Regras de contagem** — as mesmas das engines antigas, e um teste de equivalência
+(`tests/engine/test_equivalencia_relatorios.py`) garante que, no mesmo recorte, os números
+batem exatamente com `consultar_ocupacao`, `consultar_ocupacao_profissional`,
+`consultar_pacientes_por_profissional` e `consultar_disponibilidade`:
+
+- slots de 30 min; cada posto da sala é uma vaga independente; sessão em grupo ocupa o slot
+  uma vez e cada paciente conta;
+- atendimento em outro posto do mesmo profissional vai para o menor posto escalado dele no
+  horário; atendimento sem grade conta como ocupado, mas fica fora das quebras por sala e
+  posto (com aviso);
+- janela contínua = vagas seguidas do mesmo profissional, sala e posto, sem atravessar a
+  pausa; `janelas_livres` conta quantos atendimentos de N slots cabem (`floor(faixa / N)`);
+- buraco = faixa livre com atendimento imediatamente antes e depois no mesmo posto;
+- convênio só existe em slot ocupado, por isso não combina com métricas de oferta (a tool
+  explica isso ao modelo).
+
+**A tool** (`app/ai/tools_relatorios.py`) recebe `relatorio`, `inicio`/`fim` (padrão: a
+semana de hoje; só `inicio` = um dia; até 62 dias), filtros por nome em texto livre
+(resolvidos como em `consultar_ocupacao_profissional`, com pergunta em caso de
+ambiguidade) e, em `personalizado`, `dimensoes`, `metricas`, `ordenar_por`, `ordem` e
+`limite`. Usa `response_format="content_and_artifact"`: o bloco vai como artefato e o modelo
+recebe só um resumo curto (total, destaques e até 10 linhas), com percentuais formatados a
+partir dos inteiros. Parâmetro inválido, inclusive erro de schema, volta como mensagem útil;
+parâmetro que só sobra num relatório pronto é ignorado com uma nota, sem nova chamada.
+
+`consultar_catalogo` descreve a semana: profissionais por especialidade (dias e salas),
+salas e postos, convênios por cor, dias com agenda e a definição de cada métrica e
+relatório. Não traz pacientes.
+
+**Privacidade:** `agenda_paciente` é o único relatório que cita um paciente, e só o pedido
+pelo nome (correspondência exata, sem sugerir nomes parecidos). Os demais mostram apenas
+contagens. Testes cobrem os blocos, o texto devolvido ao modelo e os logs.
+
+**Blocos novos** (aditivos na versão 1; clientes antigos podem ignorar tipos que não
+conhecem): `disponibilidade` (faixas de vagas por dia, profissional, sala e posto, e resumo
+por dia/manhã/tarde), `convenio`, `agenda_paciente`, `qualidade_agenda` e `tabela_generica`
+(dimensões x métricas, com `colunas`, `linhas`, `total` e `linhas_omitidas`). Todos seguem
+o mesmo contrato e trazem `tabelas` para exportação em Excel (uma aba por tabela).
+
 A documentação interativa completa (`/docs`) descreve o schema exato de cada endpoint,
 incluindo os campos de `/agenda/disponibilidade` e `/agenda/ocupacao`.
 
@@ -440,7 +516,9 @@ docker run --env-file .env.producao -p 8000:8000 realocai
 
 - **Porta interna:** `8000` (ou `PORT`). **Health check:** `GET /health`, público.
 - **1 worker, de propósito:** conversas (TTL 4 h) e cache da agenda (TTL 60 s) vivem na memória
-  do processo. Não aumente workers nem réplicas: uma conversa cairia num processo que não a
+  do processo. Como a API do Sheets devolve todas as abas numa chamada, a leitura de um dia
+  já guarda a semana inteira (segunda a sábado); o cache de `GoogleSheetsDataSource` respeita
+  `CACHE_TTL_SEGUNDOS` (antes guardava cada dia até o restart). Não aumente workers nem réplicas: uma conversa cairia num processo que não a
   conhece. Pelo mesmo motivo, **todo deploy/restart apaga as conversas em andamento**.
 - **Nada é gravado em disco:** não há volume nem banco/Redis. A credencial do Google vai em
   `GOOGLE_SERVICE_ACCOUNT_JSON` (ex.: `base64 -w0 credentials/google-service-account.json`).

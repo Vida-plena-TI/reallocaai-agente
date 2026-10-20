@@ -338,7 +338,12 @@ def _avisos(foto: FotografiaPeriodo) -> list[str]:
     return avisos
 
 
-def _validar_combinacao(args: ArgsGerarRelatorio) -> None:
+def _ajustar_combinacao(args: ArgsGerarRelatorio) -> tuple[ArgsGerarRelatorio, list[str]]:
+    """Recusa o que não faz sentido e ignora, com nota, o que só sobra.
+
+    Parâmetro a mais num relatório pronto (ex.: `metricas` em `convenios`) não
+    vale uma segunda chamada: é ignorado e a nota vai no texto para o modelo.
+    """
     if args.paciente is not None and args.relatorio != "agenda_paciente":
         raise _ParametroInvalidoError(
             "paciente só vale com relatorio='agenda_paciente'; os demais relatórios nunca "
@@ -351,17 +356,29 @@ def _validar_combinacao(args: ArgsGerarRelatorio) -> None:
             "personalizado exige 'metricas' (ex.: ['vagas_livres']) e, opcionalmente, "
             "'dimensoes' (ex.: ['dia', 'especialidade'])."
         )
-    if args.relatorio not in ("personalizado", "ranking_ocupacao") and (
-        args.dimensoes or args.metricas
-    ):
-        raise _ParametroInvalidoError(
-            "dimensoes e metricas só valem em relatorio='personalizado' (ranking_ocupacao "
-            "aceita uma dimensão). Use o relatório pronto sem elas, ou 'personalizado'."
-        )
     if args.relatorio == "ranking_ocupacao" and args.dimensoes and len(args.dimensoes) != 1:
         raise _ParametroInvalidoError("ranking_ocupacao aceita exatamente uma dimensão.")
-    if args.duracao_minutos is not None and args.relatorio != "janelas_continuas":
-        raise _ParametroInvalidoError("duracao_minutos só vale em relatorio='janelas_continuas'.")
+
+    # "Vagas de 1 h" é pedido de janela contínua.
+    if args.relatorio == "vagas_livres" and args.duracao_minutos is not None:
+        args = args.model_copy(update={"relatorio": "janelas_continuas"})
+
+    ignorados: list[str] = []
+    if args.relatorio != "personalizado" and args.metricas:
+        ignorados.append("metricas")
+    if args.relatorio not in ("personalizado", "ranking_ocupacao") and args.dimensoes:
+        ignorados.append("dimensoes")
+    if args.relatorio != "personalizado" and args.ordenar_por:
+        ignorados.append("ordenar_por")
+    if args.relatorio != "janelas_continuas" and args.duracao_minutos is not None:
+        ignorados.append("duracao_minutos")
+    if not ignorados:
+        return args, []
+    nota = (
+        f"Obs.: {', '.join(ignorados)} ignorado(s): o relatório {args.relatorio} já traz as "
+        "próprias colunas. Para escolher dimensões e métricas, use 'personalizado'."
+    )
+    return args.model_copy(update=dict.fromkeys(ignorados)), [nota]
 
 
 def _slots_da_janela(duracao_minutos: int | None) -> int:
@@ -392,7 +409,7 @@ def _ordenar_por(valor: str | None) -> Metrica | Dimensao | None:
 def _executar(
     fonte: ScheduleDataSource, hoje: date, args: ArgsGerarRelatorio
 ) -> tuple[str, dict[str, Any] | None]:
-    _validar_combinacao(args)
+    args, notas = _ajustar_combinacao(args)
     inicio, fim = _periodo(args.inicio, args.fim, hoje)
     janela = _slots_da_janela(args.duracao_minutos) if args.relatorio == "janelas_continuas" else 1
     ordenar_por = _ordenar_por(args.ordenar_por)
@@ -504,7 +521,7 @@ def _executar(
         len(foto.dias_consultados),
         time.perf_counter() - comeco,
     )
-    return texto, bloco.model_dump(mode="json")
+    return "\n".join([texto, *notas]), bloco.model_dump(mode="json")
 
 
 def _catalogo(foto: FotografiaPeriodo) -> str:

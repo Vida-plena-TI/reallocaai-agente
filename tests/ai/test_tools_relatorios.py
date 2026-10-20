@@ -166,8 +166,6 @@ def test_filtros_por_nome_texto_livre_e_titulo_com_recorte() -> None:
         ({"relatorio": "convenios", "convenios": ["bradesco"]}, "não reconhecido"),
         ({"relatorio": "vagas_livres", "paciente": "Alguém"}, "nunca trazem pacientes"),
         ({"relatorio": "agenda_paciente"}, "exige o nome"),
-        ({"relatorio": "vagas_livres", "metricas": ["sessoes"]}, "só valem em"),
-        ({"relatorio": "vagas_livres", "duracao_minutos": 60}, "só vale em"),
         ({"relatorio": "janelas_continuas", "duracao_minutos": 600}, "deve ficar entre"),
         (
             {"relatorio": "vagas_livres", "inicio": "2026-10-02", "fim": "2026-09-28"},
@@ -285,3 +283,19 @@ def test_contrato_de_meta_dos_tipos_novos() -> None:
         BlocoRelatorio.model_validate({**convenio.model_dump(mode="json"), "meta": 0.8})
     # tabela_generica aceita meta (quando pede ocupação) ou não.
     BlocoRelatorio.model_validate({**tabela.model_dump(mode="json"), "meta": 0.8})
+
+
+def test_parametro_que_sobra_num_relatorio_pronto_e_ignorado_com_nota() -> None:
+    texto, bloco = _gerar(
+        relatorio="convenios", metricas=["aguardando_autorizacao"], dimensoes=["dia"]
+    )
+
+    assert bloco is not None and bloco.tipo == "convenio"
+    assert "Obs.: metricas, dimensoes ignorado(s)" in texto
+
+
+def test_vagas_com_duracao_viram_janelas_continuas() -> None:
+    _, bloco = _gerar(relatorio="vagas_livres", duracao_minutos=90)
+
+    assert bloco is not None
+    assert bloco.titulo.startswith("Janelas livres de 1 h 30")
