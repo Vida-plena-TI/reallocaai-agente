@@ -4,7 +4,6 @@ Só projeções explícitas dos resultados da engine: nunca texto analisado,
 entidades de pacientes, arquivos ou desenho. IDs de profissionais são opacos.
 """
 
-import re
 from datetime import date
 from hashlib import sha256
 from typing import Annotated, Literal
@@ -12,7 +11,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.constants import META_OCUPACAO_POR_SALA
-from app.domain.formatacao import formatar_razao
+from app.domain.formatacao import chave_natural, formatar_razao
 from app.engine.carga_profissionais import CargaProfissionais, CargaProfissional
 from app.engine.ocupacao import OcupacaoAgregada, RelatorioOcupacaoDoDia
 from app.engine.ocupacao_profissional import OcupacaoSemanalProfissional
@@ -237,14 +236,6 @@ def ocupacao_agregada_acima_de_cem(resultado: RelatorioOcupacaoDoDia) -> bool:
     )
 
 
-def _chave_natural(texto: str) -> tuple[str | int, ...]:
-    """`Sala 10` -> `("sala ", 10, "")`: números comparados como números (Sala 2 < Sala 10)."""
-    return tuple(
-        int(parte) if i % 2 else parte
-        for i, parte in enumerate(re.split(r"(\d+)", texto.casefold()))
-    )
-
-
 def salas_em_ordem_natural(
     por_sala: dict[str, OcupacaoAgregada], nomes_salas: dict[str, str]
 ) -> list[tuple[str, OcupacaoAgregada]]:
@@ -253,7 +244,7 @@ def salas_em_ordem_natural(
         (nomes_salas.get(sala_id, sala_id), agregada)
         for sala_id, agregada in sorted(
             por_sala.items(),
-            key=lambda par: (_chave_natural(nomes_salas.get(par[0], par[0])), par[0]),
+            key=lambda par: (chave_natural(nomes_salas.get(par[0], par[0])), par[0]),
         )
     ]
 
