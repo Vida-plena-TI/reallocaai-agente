@@ -12,8 +12,7 @@ from typing import Any
 import pytest
 from langchain_core.tools import BaseTool
 
-from app.ai.tools import EnviarRelatorio, criar_tools
-from app.config import Settings
+from app.ai.tools import criar_tools
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import (
     Atendimento,
@@ -26,18 +25,10 @@ from app.domain import (
     ScheduleDataSource,
     Slot,
 )
-from app.reports.exceptions import ReportsEnvioError
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
-from tests.support.resend import configurar_resend
 
 DIA = date(2026, 9, 8)
 PACIENTE_UM = Paciente(id="paciente-um", nome="Paciente Um")
-
-
-def _enviar_relatorio_nao_usado(fonte: Any, data: date, destinatarios: list[str] | None) -> None:
-    """Padrão para testes que não exercitam a tool `enviar_relatorio`: chamar
-    isto é sempre um erro de teste, nunca um cenário esperado."""
-    raise AssertionError("enviar_relatorio não deveria ter sido chamado neste teste")
 
 
 @dataclass
@@ -72,12 +63,9 @@ def _tool(
     continuidade: ContinuidadeDataSource,
     nome: str,
     data_referencia: date = DIA,
-    enviar_relatorio: EnviarRelatorio = _enviar_relatorio_nao_usado,
 ) -> BaseTool:
     return next(
-        item
-        for item in criar_tools(fonte, continuidade, data_referencia, enviar_relatorio)
-        if item.name == nome
+        item for item in criar_tools(fonte, continuidade, data_referencia) if item.name == nome
     )
 
 
@@ -634,98 +622,20 @@ def test_sugerir_realocacao_tool_sem_alternativa_disponivel() -> None:
     assert "Não há horário alternativo" in resultado
 
 
-# ---- enviar_relatorio ----
+# ---- sem envio de e-mail ----
 
 
-def _nomes_das_tools() -> list[str]:
-    return [
-        item.name
-        for item in criar_tools(
-            FakeScheduleDataSource(), _continuidade_vazia(), DIA, _enviar_relatorio_nao_usado
-        )
+def test_nao_existe_tool_de_envio_de_email(monkeypatch: pytest.MonkeyPatch) -> None:
+    """O RealocAI não envia e-mails: nem com variáveis antigas do Resend no ambiente."""
+    monkeypatch.setenv("RESEND_API_KEY", "re_teste")
+    monkeypatch.setenv("REPORT_EMAIL_FROM", "relatorios@exemplo.com.br")
+
+    nomes = [
+        item.name for item in criar_tools(FakeScheduleDataSource(), _continuidade_vazia(), DIA)
     ]
 
-
-def test_enviar_relatorio_nao_e_registrada_sem_resend_configurado() -> None:
-    nomes = _nomes_das_tools()
     assert "enviar_relatorio" not in nomes
     assert "consultar_ocupacao" in nomes
-
-
-@pytest.mark.parametrize(
-    "api_key,remetente",
-    [("re_test_key", None), (None, "r@exemplo.com.br"), ("", "r@exemplo.com.br")],
-)
-def test_enviar_relatorio_exige_as_duas_variaveis_preenchidas(
-    monkeypatch: pytest.MonkeyPatch, api_key: str | None, remetente: str | None
-) -> None:
-    settings = Settings(resend_api_key=api_key, report_email_from=remetente)
-    monkeypatch.setattr("app.ai.tools.get_settings", lambda: settings)
-    assert "enviar_relatorio" not in _nomes_das_tools()
-
-
-def test_enviar_relatorio_e_registrada_com_resend_configurado(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    configurar_resend(monkeypatch, ativo=True)
-    assert _nomes_das_tools()[-1] == "enviar_relatorio"
-
-
-@pytest.fixture
-def _resend_ligado(monkeypatch: pytest.MonkeyPatch) -> None:
-    configurar_resend(monkeypatch, ativo=True)
-
-
-@pytest.mark.usefixtures("_resend_ligado")
-def test_enviar_relatorio_tool_sucesso_confirma_quantidade_de_destinatarios() -> None:
-    chamadas: list[tuple[Any, date, list[str] | None]] = []
-    origem = FakeScheduleDataSource()
-    tool = _tool(
-        origem,
-        _continuidade_vazia(),
-        "enviar_relatorio",
-        enviar_relatorio=lambda fonte, data, destinatarios: chamadas.append(
-            (fonte, data, destinatarios)
-        ),
-    )
-
-    resultado = tool.invoke({"destinatarios": ["a@b.com", "c@d.com"]})
-
-    assert "2" in resultado
-    assert len(chamadas) == 1
-    assert chamadas[0][2] == ["a@b.com", "c@d.com"]
-
-
-@pytest.mark.usefixtures("_resend_ligado")
-def test_enviar_relatorio_tool_sem_data_usa_data_de_referencia_da_conversa() -> None:
-    chamadas: list[tuple[Any, date, list[str] | None]] = []
-    origem = FakeScheduleDataSource()
-    tool = _tool(
-        origem,
-        _continuidade_vazia(),
-        "enviar_relatorio",
-        data_referencia=DIA,
-        enviar_relatorio=lambda fonte, data, destinatarios: chamadas.append(
-            (fonte, data, destinatarios)
-        ),
-    )
-
-    tool.invoke({})
-
-    assert chamadas[0][1] == DIA
-
-
-@pytest.mark.usefixtures("_resend_ligado")
-def test_enviar_relatorio_tool_erro_devolve_mensagem_clara() -> None:
-    def _levanta_erro(fonte: Any, data: date, destinatarios: list[str] | None) -> None:
-        raise ReportsEnvioError("falha simulada")
-
-    origem = FakeScheduleDataSource()
-    tool = _tool(origem, _continuidade_vazia(), "enviar_relatorio", enviar_relatorio=_levanta_erro)
-
-    resultado = tool.invoke({})
-
-    assert "erro" in resultado.lower()
 
 
 # ---- erro inesperado da fonte de dados ----

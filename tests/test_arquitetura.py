@@ -7,8 +7,7 @@ importado/executado de verdade) e confirma duas coisas:
    listadas como permitidas, nunca "para cima".
 2. Isolamento de bibliotecas externas: bibliotecas de terceiros específicas de
    uma camada (langchain* em `app/ai`, fastapi/starlette em `app/api`,
-   gspread/google.auth em `app/data_sources`, resend em `app/reports`) não
-   vazam para o resto do código.
+   gspread/google.auth em `app/data_sources`) não vazam para o resto do código.
 
 `scripts/` fica fora do escopo: nem é `app/`, nem é varrido aqui.
 """
@@ -21,7 +20,7 @@ import pytest
 
 RAIZ_APP = Path(__file__).resolve().parent.parent / "app"
 
-_CAMADAS = ("domain", "engine", "data_sources", "ai", "reports", "api")
+_CAMADAS = ("domain", "engine", "data_sources", "ai", "api")
 
 #: Para cada camada, o conjunto de outras camadas de `app.*` que ela pode importar.
 _PERMITIDO_POR_CAMADA: dict[str, frozenset[str]] = {
@@ -29,8 +28,7 @@ _PERMITIDO_POR_CAMADA: dict[str, frozenset[str]] = {
     "engine": frozenset({"domain"}),
     "data_sources": frozenset({"domain"}),
     "ai": frozenset({"domain", "engine", "data_sources"}),
-    "reports": frozenset({"domain", "engine", "data_sources"}),
-    "api": frozenset({"domain", "engine", "data_sources", "ai", "reports"}),
+    "api": frozenset({"domain", "engine", "data_sources", "ai"}),
 }
 
 #: Prefixo do módulo importado -> camada (relativa a `app/`) onde ele é permitido.
@@ -42,7 +40,6 @@ _BIBLIOTECAS_RESTRITAS: dict[str, str] = {
     "gspread": "data_sources",
     "google.oauth2": "data_sources",
     "google.auth": "data_sources",
-    "resend": "reports",
 }
 
 #: Exceções revisadas e aceitas (Fase 8) ao isolamento de bibliotecas externas:

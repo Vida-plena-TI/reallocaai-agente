@@ -1,7 +1,7 @@
 """Janela semanal da agenda: segunda a sábado (domingo não tem agenda).
 
-Mora no domínio porque tanto a camada de IA (`localizar_paciente`,
-`localizar_profissional`) quanto a engine (ocupação semanal por profissional)
+Mora no domínio porque tanto a camada de IA (`localizar_paciente` e as tools
+semanais) quanto a engine (ocupação semanal por profissional)
 precisam da mesma definição de "semana", e a engine não pode importar de
 `app.ai`.
 """

@@ -1,4 +1,4 @@
-"""Testes de `construir_carga_profissionais`: pacientes por profissional, por dia e na semana."""
+"""Testes dos pacientes por profissional (`visoes_fotografia.carga_profissionais`)."""
 
 from dataclasses import dataclass, field
 from datetime import date
@@ -15,8 +15,7 @@ from app.domain import (
     Slot,
     dias_da_semana_de,
 )
-from app.engine.carga_profissionais import CargaProfissional, construir_carga_profissionais
-from app.engine.ocupacao_profissional import construir_ocupacao_semanal_profissional
+from app.engine.carga_profissionais import CargaProfissional
 from tests.support.agenda_semanal import (
     DOMINGO,
     LUCIANA,
@@ -34,6 +33,7 @@ from tests.support.agenda_semanal import (
     horas_da_tarde,
 )
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
+from tests.support.visoes import construir_carga, ocupacao_semanal
 
 AMANDA = Profissional(id="amanda", nome="Amanda", especialidade=Especialidade.PSICOLOGIA)
 ELIS = Profissional(id="elis", nome="Élis", especialidade=Especialidade.PSICOLOGIA)
@@ -41,7 +41,7 @@ BRUNO = Profissional(id="bruno", nome="Bruno", especialidade=Especialidade.FONOA
 
 
 def _carga(fonte: FakeScheduleDataSource, profissional_id: str = "luciana") -> CargaProfissional:
-    resultado = construir_carga_profissionais(fonte, SEMANA)
+    resultado = construir_carga(fonte, SEMANA)
     return next(item for item in resultado.profissionais if item.profissional_id == profissional_id)
 
 
@@ -134,7 +134,7 @@ def test_sem_agenda_no_periodo_nao_aparece_e_com_agenda_sem_paciente_aparece_com
         grade={SEGUNDA: grade(SEGUNDA, horas_da_manha(SEGUNDA), profissional=BRUNO)},
     )
 
-    resultado = construir_carga_profissionais(fonte, SEMANA)
+    resultado = construir_carga(fonte, SEMANA)
 
     assert [item.profissional_id for item in resultado.profissionais] == ["bruno"]
     (bruno,) = resultado.profissionais
@@ -168,7 +168,7 @@ def test_pacientes_distintos_da_clinica_nao_contam_duas_vezes_quem_passa_por_dua
         },
     )
 
-    resultado = construir_carga_profissionais(fonte, SEMANA)
+    resultado = construir_carga(fonte, SEMANA)
 
     soma_das_linhas = sum(item.dias[0].pacientes for item in resultado.profissionais)
     clinica = {item.data: item.pacientes_distintos_clinica for item in resultado.por_dia}
@@ -197,7 +197,7 @@ def test_ordem_por_especialidade_e_nome_sem_acento_nem_caixa() -> None:
         },
     )
 
-    resultado = construir_carga_profissionais(fonte, SEMANA)
+    resultado = construir_carga(fonte, SEMANA)
 
     assert [item.nome for item in resultado.profissionais] == ["Bruno", "Amanda", "Élis", "zélia"]
 
@@ -205,7 +205,7 @@ def test_ordem_por_especialidade_e_nome_sem_acento_nem_caixa() -> None:
 def test_domingo_e_datas_repetidas_sao_descartados() -> None:
     fonte = FakeScheduleDataSource(grade={SEGUNDA: grade(SEGUNDA, horas_da_manha(SEGUNDA))})
 
-    resultado = construir_carga_profissionais(fonte, [DOMINGO, SEGUNDA, SEGUNDA])
+    resultado = construir_carga(fonte, [DOMINGO, SEGUNDA, SEGUNDA])
 
     assert resultado.dias == [SEGUNDA]
     assert [item.data for item in resultado.por_dia] == [SEGUNDA]
@@ -249,11 +249,11 @@ def test_slots_ocupados_iguais_aos_da_ocupacao_por_profissional() -> None:
         },
     )
 
-    resultado = construir_carga_profissionais(fonte, SEMANA)
+    resultado = construir_carga(fonte, SEMANA)
 
     assert {item.profissional_id for item in resultado.profissionais} == {"luciana", "bruno"}
     for carga in resultado.profissionais:
-        ocupacao = construir_ocupacao_semanal_profissional(fonte, carga.profissional_id, SEGUNDA)
+        ocupacao = ocupacao_semanal(fonte, carga.profissional_id, SEGUNDA)
         assert {dia.data: dia.slots_ocupados for dia in carga.dias} == {
             dia.data: dia.slots_ocupados for dia in ocupacao.dias
         }
@@ -321,13 +321,15 @@ def _fonte_com_profissionais(quantidade: int) -> _FonteQueContaChamadas:
 def test_leituras_a_fonte_nao_crescem_com_o_numero_de_profissionais() -> None:
     poucas, muitas = _fonte_com_profissionais(3), _fonte_com_profissionais(30)
 
-    resultado_poucas = construir_carga_profissionais(poucas, SEMANA)
-    resultado_muitas = construir_carga_profissionais(muitas, SEMANA)
+    resultado_poucas = construir_carga(poucas, SEMANA)
+    resultado_muitas = construir_carga(muitas, SEMANA)
 
     assert len(resultado_poucas.profissionais) == 3
     assert len(resultado_muitas.profissionais) == 30
     assert poucas.chamadas == muitas.chamadas
-    assert sum(muitas.chamadas.values()) == 3 * len(SEMANA)
+    # A fotografia lê as cinco listas de cada dia uma vez (salas e pacientes
+    # inclusive), não importa quantos profissionais haja.
+    assert sum(muitas.chamadas.values()) == 5 * len(SEMANA)
 
 
 def test_falha_em_um_dia_deixa_os_numeros_parciais_e_avisa(
@@ -339,7 +341,7 @@ def test_falha_em_um_dia_deixa_os_numeros_parciais_e_avisa(
         dias_com_falha={TERCA},
     )
 
-    resultado = construir_carga_profissionais(fonte, SEMANA)
+    resultado = construir_carga(fonte, SEMANA)
 
     carga = resultado.profissionais[0]
     assert resultado.parcial
@@ -356,4 +358,4 @@ def test_falha_em_todos_os_dias_levanta_o_erro() -> None:
     fonte = FakeScheduleDataSource(dias_com_falha=set(dias_da_semana_de(SEGUNDA)))
 
     with pytest.raises(RuntimeError, match="falha simulada"):
-        construir_carga_profissionais(fonte, SEMANA)
+        construir_carga(fonte, SEMANA)

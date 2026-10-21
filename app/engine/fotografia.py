@@ -11,8 +11,8 @@ As regras de atribuição são as mesmas da engine que já existia:
 
 - ocupado = coberto por um `Atendimento` do mesmo profissional, sala, posto e
   slot (`listar_disponibilidade`); escalado no horário, mas noutro posto, vai
-  para o menor posto escalado dele naquele slot
-  (`construir_ocupacao_semanal_profissional`);
+  para o menor posto escalado dele naquele slot (a mesma regra da ocupação
+  semanal por profissional);
 - atendimento sem entrada de grade do profissional no slot vira uma linha
   `na_grade=False` ocupada, com warning — conta como ocupado, como em
   `construir_relatorio_ocupacao_do_dia`;
@@ -137,6 +137,19 @@ class FotografiaPeriodo(BaseModel):
     #: Internos: só a agenda de um paciente pedido explicitamente os usa.
     atendimentos: list[Atendimento] = Field(default_factory=list, repr=False, exclude=True)
     pacientes: dict[str, Paciente] = Field(default_factory=dict, repr=False, exclude=True)
+    #: Interno: mensagem do erro de cada dia de `dias_nao_lidos`. Pode repetir
+    #: dados da planilha, então nunca vai para log nem para bloco; só as tools
+    #: antigas a devolvem, como já faziam, quando o dia pedido não pôde ser lido.
+    erros_de_leitura: dict[date, str] = Field(default_factory=dict, repr=False, exclude=True)
+    #: Internos: ids listados por `listar_salas` e `listar_profissionais` em cada
+    #: dia lido. As tools antigas nomeiam sala e profissional só com a lista do
+    #: próprio dia (fora dela, mostram o id), e isso é preservado.
+    salas_por_dia: dict[date, frozenset[str]] = Field(
+        default_factory=dict, repr=False, exclude=True
+    )
+    profissionais_por_dia: dict[date, frozenset[str]] = Field(
+        default_factory=dict, repr=False, exclude=True
+    )
 
     @property
     def parcial(self) -> bool:
@@ -214,16 +227,18 @@ def _ler_dia(fonte: ScheduleDataSource, dia: date) -> _DiaLido:
     )
 
 
-def _ler_dias(fonte: ScheduleDataSource, dias: list[date]) -> tuple[list[_DiaLido], list[date]]:
-    """Lê os dias em paralelo; os que falham voltam à parte, com warning.
+def _ler_dias(
+    fonte: ScheduleDataSource, dias: list[date]
+) -> tuple[list[_DiaLido], dict[date, Exception]]:
+    """Lê os dias em paralelo; os que falham voltam à parte (com o erro), com warning.
 
     Se todos falharem, o último erro sobe (o mesmo contrato das leituras de
     vários dias que já existiam na engine).
     """
     if not dias:
-        return [], []
+        return [], {}
     lidos: list[_DiaLido] = []
-    com_falha: list[date] = []
+    com_falha: dict[date, Exception] = {}
     ultimo_erro: Exception | None = None
     trabalhadores = min(MAX_LEITURAS_PARALELAS, len(dias))
     with ThreadPoolExecutor(max_workers=trabalhadores) as executor:
@@ -233,7 +248,7 @@ def _ler_dias(fonte: ScheduleDataSource, dias: list[date]) -> tuple[list[_DiaLid
                 lidos.append(futuro.result())
             except Exception as erro:
                 ultimo_erro = erro
-                com_falha.append(dia)
+                com_falha[dia] = erro
                 # Só o tipo do erro: a mensagem pode repetir dados da planilha.
                 logger.warning(
                     "Falha ao ler a agenda de %s ao montar a fotografia do período: %s",
@@ -401,6 +416,11 @@ def fotografar_periodo(fonte: ScheduleDataSource, inicio: date, fim: date) -> Fo
         dias_consultados=dias,
         dias_lidos=sorted(lido.data for lido in lidos),
         dias_nao_lidos=sorted(com_falha),
+        erros_de_leitura={dia: str(erro) for dia, erro in com_falha.items()},
+        salas_por_dia={lido.data: frozenset(s.id for s in lido.salas) for lido in lidos},
+        profissionais_por_dia={
+            lido.data: frozenset(p.id for p in lido.profissionais) for lido in lidos
+        },
         slots=slots,
         profissionais=profissionais,
         salas=salas,

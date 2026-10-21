@@ -12,6 +12,7 @@ demanda, na primeira requisição que precisar dele (ver a própria função).
 
 import secrets
 import threading
+from datetime import date
 from typing import Annotated, cast
 
 from fastapi import Depends, Header, HTTPException, Request, status
@@ -98,3 +99,8 @@ def obter_chat_model(request: Request) -> BaseChatModel:
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(erro)
                 ) from erro
         return cast(BaseChatModel, estado.chat_model)
+
+
+def obter_data_de_hoje() -> date:
+    """ "Hoje" das rotas de relatório (padrão do período); substituível nos testes."""
+    return date.today()

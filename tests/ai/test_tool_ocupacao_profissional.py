@@ -33,10 +33,6 @@ SALA_12 = Sala(id="sala-12", nome="Sala 12", capacidade_simultanea=2)
 SALA_3 = Sala(id="sala-3", nome="Sala 3")
 
 
-def _enviar_relatorio_nao_usado(fonte: Any, data: date, destinatarios: list[str] | None) -> None:
-    raise AssertionError("enviar_relatorio não deveria ter sido chamado neste teste")
-
-
 def _tool(fonte: ScheduleDataSource, data_referencia: date = QUARTA) -> BaseTool:
     return next(
         item
@@ -44,7 +40,6 @@ def _tool(fonte: ScheduleDataSource, data_referencia: date = QUARTA) -> BaseTool
             fonte,
             SemHistoricoContinuidadeDataSource(),
             data_referencia,
-            _enviar_relatorio_nao_usado,
         )
         if item.name == "consultar_ocupacao_profissional"
     )
@@ -222,7 +217,6 @@ def test_descricoes_separam_ocupacao_da_profissional_da_ocupacao_geral() -> None
             FakeScheduleDataSource(),
             SemHistoricoContinuidadeDataSource(),
             QUARTA,
-            _enviar_relatorio_nao_usado,
         )
     }
 

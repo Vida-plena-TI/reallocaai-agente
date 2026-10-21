@@ -16,7 +16,6 @@ preenche via function calling. `create_agent` (Parte D) espera uma lista de
 
 import math
 from collections import Counter
-from collections.abc import Callable
 from datetime import date, time
 from typing import Any, Literal
 
@@ -42,16 +41,11 @@ from app.ai.servico_agenda import (
     ResultadoExato,
     buscar_encaixe,
     buscar_paciente,
-    consultar_carga_profissionais,
-    consultar_disponibilidade_do_dia,
-    consultar_ocupacao_do_dia,
-    consultar_ocupacao_semanal_profissional,
     localizar_paciente,
-    localizar_profissional,
+    resolver_profissional,
     sugerir_realocacao_por_id,
 )
 from app.ai.tools_relatorios import criar_tools_relatorios
-from app.config import get_settings
 from app.data_sources.continuidade import (
     ContinuidadeDataSource,
     SemHistoricoContinuidadeDataSource,
@@ -73,20 +67,16 @@ from app.domain.constants import (
     META_OCUPACAO_POR_SALA,
 )
 from app.domain.formatacao import formatar_razao
+from app.engine import visoes_fotografia
 from app.engine.carga_profissionais import CargaProfissionais, CargaProfissional
 from app.engine.disponibilidade import SlotDisponivel
 from app.engine.encaixe import CenarioSugestao, ItemEncaixeResolvido, OpcaoEncaixe
+from app.engine.fotografia import FotografiaPeriodo, fotografar_periodo
 from app.engine.ocupacao import OcupacaoAgregada
 from app.engine.ocupacao_profissional import (
     OcupacaoDiaProfissional,
     OcupacaoSemanalProfissional,
 )
-
-#: Assinatura de `enviar_relatorio_por_email` (`app.reports.envio`), recebida
-#: como parâmetro em vez de importada direto: `app.ai` não pode depender de
-#: `app.reports` (ver `tests/test_arquitetura.py`), então quem monta as tools
-#: (a rota `/agenda/chat`) é quem decide qual implementação injetar.
-EnviarRelatorio = Callable[[ScheduleDataSource, date, list[str] | None], None]
 
 #: Nome do dia da semana por `date.weekday()` — usado no prompt de sistema
 #: (ver `criar_agente`) e nas mensagens das tools.
@@ -155,11 +145,16 @@ def _nome_sala(fonte: ScheduleDataSource, dia: date, sala_id: str) -> str:
     return sala.nome if sala is not None else sala_id
 
 
-def _resolver_profissional_id(fonte: ScheduleDataSource, dia: date, nome_ou_id: str) -> str | None:
-    """Id do profissional cujo id normalizado casa com `nome_ou_id`, sem fuzzy matching."""
-    alvo = normalizar_id(nome_ou_id)
-    profissional = next((item for item in fonte.listar_profissionais(dia) if item.id == alvo), None)
-    return profissional.id if profissional is not None else None
+def _nome_na_foto(foto: FotografiaPeriodo, profissional_id: str) -> str:
+    """Nome do profissional, ou o próprio id quando ele não está na agenda do dia."""
+    profissional = foto.profissionais.get(profissional_id)
+    return profissional.nome if profissional is not None else profissional_id
+
+
+def _semana_na_foto(fonte: ScheduleDataSource, data: date) -> FotografiaPeriodo:
+    """Fotografia de segunda a sábado da semana de `data`: uma leitura de cada dia."""
+    semana = dias_da_semana_de(data)
+    return fotografar_periodo(fonte, semana[0], semana[-1])
 
 
 def _sufixo_posto_do_item(grade: list[EntradaGrade], item: ItemEncaixeResolvido) -> str:
@@ -672,48 +667,17 @@ class ArgsSugerirRealocacao(BaseModel):
     )
 
 
-class ArgsEnviarRelatorio(BaseModel):
-    data: date | None = Field(
-        default=None,
-        description=(
-            "Data do relatório, no formato AAAA-MM-DD. Deixe em branco para usar a data "
-            "de referência da conversa (hoje)."
-        ),
-    )
-    destinatarios: list[str] | None = Field(
-        default=None,
-        description=(
-            "Lista de e-mails destinatários. Deixe em branco para usar a lista padrão "
-            "já configurada na clínica."
-        ),
-    )
-
-
-def envio_de_email_configurado() -> bool:
-    """`True` quando o Resend está configurado (`RESEND_API_KEY` e `REPORT_EMAIL_FROM`).
-
-    A decisão é por configuração, não por tentativa: sem as duas variáveis
-    preenchidas, a tool `enviar_relatorio` nem é registrada (e o prompt diz que
-    o envio não está disponível), em vez de ser oferecida ao agente e só falhar
-    quando alguém pedir o envio.
-    """
-    return get_settings().envio_de_email_configurado
-
-
 def criar_tools(
     fonte: ScheduleDataSource,
     continuidade: ContinuidadeDataSource,
     data_referencia: date,
-    enviar_relatorio: EnviarRelatorio,
 ) -> list[BaseTool]:
     """Tools do agente RealocAI, já fechadas sobre `fonte` e `continuidade`.
 
     A LLM nunca decide qual fonte de dados ou de continuidade usar — isso é
     fixado aqui, em código, no momento em que as tools são construídas.
     `data_referencia` é a data "hoje" da conversa (ver `criar_agente`), usada
-    como padrão pela tool `enviar_relatorio` quando a LLM não informar uma
-    data. `enviar_relatorio` é a implementação de envio (em produção,
-    `enviar_relatorio_por_email`) — recebida de fora, nunca importada daqui.
+    como padrão pelas tools semanais quando a LLM não informar uma data.
     """
 
     @tool("buscar_paciente", args_schema=ArgsBuscarPaciente)
@@ -858,17 +822,19 @@ def criar_tools(
         `buscar_encaixe`.
         """
         try:
+            foto = fotografar_periodo(fonte, data, data)
             profissional_id = None
             if profissional is not None:
-                profissional_id = _resolver_profissional_id(fonte, data, profissional)
-                if profissional_id is None:
+                # Só o id exato, sem correspondência aproximada.
+                profissional_id = normalizar_id(profissional)
+                if profissional_id not in foto.profissionais:
                     return (
                         f"Profissional não encontrado com o nome ou id '{profissional}' na "
                         f"agenda de {data.strftime('%d/%m/%Y')}."
                     )
 
-            disponiveis = consultar_disponibilidade_do_dia(
-                fonte, data, especialidade=especialidade, profissional_id=profissional_id
+            disponiveis = visoes_fotografia.disponibilidade(
+                foto, data, especialidade=especialidade, profissional_id=profissional_id
             )
         except Exception as erro:
             return f"Erro ao consultar disponibilidade: {erro}"
@@ -887,8 +853,8 @@ def criar_tools(
             f"- {disponivel.slot.hora_inicio.strftime('%H:%M')} às "
             f"{disponivel.slot.hora_fim.strftime('%H:%M')}: "
             f"{_rotulo_especialidade(disponivel.especialidade)} com "
-            f"{_nome_profissional(fonte, data, disponivel.profissional_id)} na "
-            f"{_nome_sala(fonte, data, disponivel.sala_id)}"
+            f"{_nome_na_foto(foto, disponivel.profissional_id)} na "
+            f"{foto.nome_sala(disponivel.sala_id)}"
             f"{_sufixo_posto(disponivel, vagas_por_chave)}."
             for disponivel in disponiveis
         ]
@@ -913,8 +879,9 @@ def criar_tools(
         atende, use `consultar_pacientes_por_profissional`.
         """
         try:
-            relatorio = consultar_ocupacao_do_dia(fonte, data)
-            nomes_salas = {s.id: s.nome for s in fonte.listar_salas(data)}
+            foto = fotografar_periodo(fonte, data, data)
+            relatorio = visoes_fotografia.ocupacao_do_dia(foto, data)
+            nomes_salas = {s.id: s.nome for s in foto.salas.values()}
             bloco = bloco_ocupacao_agregada(relatorio, nomes_salas)
         except Exception as erro:
             return f"Erro ao consultar ocupação: {erro}", None
@@ -961,7 +928,8 @@ def criar_tools(
         """
         data_efetiva = data if data is not None else data_referencia
         try:
-            localizacao = localizar_profissional(fonte, data_efetiva, profissional)
+            foto = _semana_na_foto(fonte, data_efetiva)
+            localizacao = resolver_profissional(foto.profissionais, profissional)
             if isinstance(localizacao, ProfissionalAmbiguo):
                 candidatos = ", ".join(
                     f"{candidato.nome} ({_rotulo_especialidade(candidato.especialidade)})"
@@ -980,8 +948,8 @@ def criar_tools(
                     f"Profissionais disponíveis: {disponiveis}."
                 ), None
 
-            ocupacao = consultar_ocupacao_semanal_profissional(
-                fonte, localizacao.profissional_id, data_efetiva
+            ocupacao = visoes_fotografia.ocupacao_semanal_profissional(
+                foto, localizacao.profissional_id
             )
             texto = _formatar_ocupacao_profissional(ocupacao)
             if not ocupacao.dias:
@@ -1045,10 +1013,16 @@ def criar_tools(
                 ), None
 
         try:
+            # Uma fotografia só: a semana quando ela é pedida ou quando é preciso
+            # achar a profissional entre as da semana; senão, só o dia.
+            if escopo == "semana" or profissional is not None:
+                foto = _semana_na_foto(fonte, data_efetiva)
+            else:
+                foto = fotografar_periodo(fonte, data_efetiva, data_efetiva)
             profissional_id: str | None = None
             nome_encontrado = ""
             if profissional is not None:
-                localizacao = localizar_profissional(fonte, data_efetiva, profissional)
+                localizacao = resolver_profissional(foto.profissionais, profissional)
                 if isinstance(localizacao, ProfissionalAmbiguo):
                     candidatos = ", ".join(
                         f"{candidato.nome} ({_rotulo_especialidade(candidato.especialidade)})"
@@ -1069,7 +1043,7 @@ def criar_tools(
                 profissional_id = localizacao.profissional_id
                 nome_encontrado = localizacao.nome
 
-            resultado = consultar_carga_profissionais(fonte, dias)
+            resultado = visoes_fotografia.carga_profissionais(foto, dias)
         except Exception as erro:
             return f"Erro ao contar pacientes por profissional: {erro}", None
 
@@ -1153,31 +1127,7 @@ def criar_tools(
             )
         return "Nova opção de horário:\n" + _formatar_opcao_encaixe(fonte, data, opcao)
 
-    @tool("enviar_relatorio", args_schema=ArgsEnviarRelatorio)
-    def enviar_relatorio_tool(
-        data: date | None = None, destinatarios: list[str] | None = None
-    ) -> str:
-        """Envia por e-mail o relatório de ocupação do dia (por sala e por especialidade).
-
-        Só use quando o pedido for claro e explícito sobre mandar o relatório
-        por e-mail (ex.: "manda o relatório de hoje"). Nunca aciona o envio
-        por conta própria, nem como parte de outra resposta.
-        """
-        data_efetiva = data if data is not None else data_referencia
-        try:
-            enviar_relatorio(fonte, data_efetiva, destinatarios)
-        except Exception as erro:
-            return f"Erro ao enviar relatório: {erro}"
-
-        destinatarios_efetivos = (
-            destinatarios if destinatarios is not None else get_settings().report_email_to
-        )
-        return (
-            f"Relatório de ocupação de {data_efetiva.strftime('%d/%m/%Y')} enviado para "
-            f"{len(destinatarios_efetivos)} destinatário(s)."
-        )
-
-    tools: list[BaseTool] = [
+    return [
         buscar_paciente_tool,
         buscar_encaixe_tool,
         consultar_disponibilidade_tool,
@@ -1187,7 +1137,3 @@ def criar_tools(
         sugerir_realocacao_tool,
         *criar_tools_relatorios(fonte, data_referencia),
     ]
-    # Por configuração, não por tentativa: sem Resend, a tool não existe para o agente.
-    if envio_de_email_configurado():
-        tools.append(enviar_relatorio_tool)
-    return tools

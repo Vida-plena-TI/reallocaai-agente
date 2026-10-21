@@ -18,7 +18,6 @@ from tests.api.conftest import HEADERS_AUTENTICADOS
 from tests.support.agenda_semanal import SEGUNDA
 from tests.support.fake_chat_model import FakeToolCallingChatModel
 from tests.support.relatorios import fonte_relatorios
-from tests.support.resend import configurar_resend
 
 
 class _ModeloComCaptura(FakeToolCallingChatModel):
@@ -128,26 +127,7 @@ def test_prompt_renderizado_na_chamada_da_api(client: TestClient, flag: bool | N
 
 
 @pytest.mark.parametrize("renderiza", [False, True])
-def test_sem_resend_o_prompt_diz_que_o_email_nao_esta_disponivel(
-    client: TestClient, renderiza: bool
-) -> None:
-    modelo = _ModeloComCaptura(responses=[AIMessage("Olá")])
-    app.dependency_overrides[obter_chat_model] = lambda: modelo
-    pedido = {"mensagem": "Oi", "renderiza_relatorios": renderiza}
-    assert client.post("/agenda/chat", headers=HEADERS_AUTENTICADOS, json=pedido).status_code == 200
-    prompt = str(modelo.entradas[0][0].content)
-    assert "envio do relatório por e-mail não está disponível neste ambiente" in prompt
-    assert "responda em uma frase que o envio por e-mail" in prompt
-    assert "enviar_relatorio" not in prompt
-    assert "corpo do e-mail" not in prompt
-    assert "não gera arquivos, não exporta dados" in prompt
-
-
-@pytest.mark.parametrize("renderiza", [False, True])
-def test_com_resend_o_prompt_mantem_o_texto_atual(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch, renderiza: bool
-) -> None:
-    configurar_resend(monkeypatch, ativo=True)
+def test_o_prompt_diz_que_o_agente_nao_envia_emails(client: TestClient, renderiza: bool) -> None:
     modelo = _ModeloComCaptura(responses=[AIMessage("Olá")])
     app.dependency_overrides[obter_chat_model] = lambda: modelo
     pedido = {"mensagem": "Oi", "renderiza_relatorios": renderiza}
@@ -158,13 +138,15 @@ def test_com_resend_o_prompt_mantem_o_texto_atual(
     assert prompt == variante.format(
         data_referencia=hoje.strftime("%d/%m/%Y"), dia_da_semana=DIAS_DA_SEMANA[hoje.weekday()]
     )
-    assert "não está disponível neste ambiente" not in prompt
-    assert "Só chame `enviar_relatorio`" in prompt
-    if renderiza:
-        assert "Não ofereça enviar o relatório por e-mail por conta própria" in prompt
+    assert "Nunca ofereça envio por e-mail" in prompt
+    assert "responda em uma frase que o agente não envia e-mails" in prompt
+    # Só essa frase fala de e-mail: nenhuma tool nem regra de envio.
+    assert prompt.count("e-mail") == 2
+    assert "enviar_relatorio" not in prompt
+    assert "não gera arquivos, não exporta dados" in prompt
 
 
-def test_variante_com_renderizacao_tem_regras_de_brevidade_tools_e_email() -> None:
+def test_variante_com_renderizacao_tem_regras_de_brevidade_e_tools() -> None:
     com = PROMPT_SISTEMA_COM_RELATORIOS.format(
         data_referencia="05/10/2026", dia_da_semana="segunda-feira"
     )
@@ -172,7 +154,6 @@ def test_variante_com_renderizacao_tem_regras_de_brevidade_tools_e_email() -> No
     assert "no máximo 3 frases" in com
     assert "sem listas e sem tabelas" in com
     assert "Não chame tools extras" in com
-    assert "Não ofereça enviar o relatório por e-mail por conta própria" in com
     assert "Exemplo de resposta boa" in com and "Exemplo de resposta ruim" in com
     assert "no máximo 3 frases" not in sem
     assert "Exemplo de resposta" not in sem

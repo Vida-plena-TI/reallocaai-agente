@@ -1,4 +1,4 @@
-"""Testes de `construir_ocupacao_semanal_profissional` e de `slots_para_meta`."""
+"""Testes da ocupação semanal por profissional (`visoes_fotografia`) e de `slots_para_meta`."""
 
 import logging
 from datetime import time
@@ -10,7 +10,6 @@ from app.engine import ocupacao_profissional
 from app.engine.ocupacao import construir_relatorio_ocupacao_do_dia
 from app.engine.ocupacao_profissional import (
     OcupacaoDiaProfissional,
-    construir_ocupacao_semanal_profissional,
     slots_para_meta,
 )
 from tests.support.agenda_semanal import (
@@ -29,6 +28,7 @@ from tests.support.agenda_semanal import (
     horas_da_tarde,
 )
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
+from tests.support.visoes import ocupacao_semanal
 
 
 def test_percentual_da_semana_e_ponderado_pelos_slots_de_cada_dia() -> None:
@@ -44,7 +44,7 @@ def test_percentual_da_semana_e_ponderado_pelos_slots_de_cada_dia() -> None:
         },
     )
 
-    ocupacao = construir_ocupacao_semanal_profissional(origem, "luciana", QUARTA)
+    ocupacao = ocupacao_semanal(origem, "luciana", QUARTA)
 
     assert [dia.percentual for dia in ocupacao.dias] == [1.0, 0.25]
     assert ocupacao.slots_escalados == 30
@@ -66,7 +66,7 @@ def test_contagens_de_manha_e_tarde_separadas() -> None:
         atendimentos={SEGUNDA: atendimentos(SEGUNDA, manha[:9] + tarde[:8])},
     )
 
-    dia = construir_ocupacao_semanal_profissional(origem, "luciana", SEGUNDA).dias[0]
+    dia = ocupacao_semanal(origem, "luciana", SEGUNDA).dias[0]
 
     assert (dia.manha_escalados, dia.manha_ocupados) == (10, 9)
     assert (dia.tarde_escalados, dia.tarde_ocupados) == (10, 8)
@@ -86,7 +86,7 @@ def test_dia_sem_escala_vai_para_dias_sem_agenda_e_domingo_nunca_aparece() -> No
         },
     )
 
-    ocupacao = construir_ocupacao_semanal_profissional(origem, "luciana", SABADO)
+    ocupacao = ocupacao_semanal(origem, "luciana", SABADO)
 
     assert [dia.data for dia in ocupacao.dias] == [SEGUNDA, QUARTA]
     assert ocupacao.dias_sem_agenda == [TERCA, QUINTA, SEXTA, SABADO]
@@ -107,7 +107,7 @@ def test_sala_com_dois_postos_no_mesmo_dia_e_detalhada_por_posto() -> None:
         },
     )
 
-    dia = construir_ocupacao_semanal_profissional(origem, "luciana", TERCA).dias[0]
+    dia = ocupacao_semanal(origem, "luciana", TERCA).dias[0]
 
     assert [
         (item.sala_nome, item.indice_posto, item.slots_escalados, item.slots_ocupados)
@@ -137,7 +137,7 @@ def test_cada_dia_bate_com_o_relatorio_de_ocupacao_do_dia() -> None:
         },
     )
 
-    ocupacao = construir_ocupacao_semanal_profissional(origem, "luciana", SEGUNDA)
+    ocupacao = ocupacao_semanal(origem, "luciana", SEGUNDA)
 
     assert len(ocupacao.dias) == 3
     for dia in ocupacao.dias:
@@ -158,7 +158,7 @@ def test_sessao_em_grupo_conta_o_slot_uma_vez() -> None:
         atendimentos={SEGUNDA: atendimentos(SEGUNDA, manha[:2], paciente_ids=["ana", "bia"])},
     )
 
-    ocupacao = construir_ocupacao_semanal_profissional(origem, "luciana", SEGUNDA)
+    ocupacao = ocupacao_semanal(origem, "luciana", SEGUNDA)
 
     assert ocupacao.dias[0].slots_ocupados == 2
     assert ocupacao.tem_inconsistencia is False
@@ -174,7 +174,7 @@ def test_atendimento_sem_grade_conta_como_ocupado_e_sinaliza_inconsistencia(
     )
 
     with caplog.at_level(logging.WARNING):
-        ocupacao = construir_ocupacao_semanal_profissional(origem, "luciana", SEGUNDA)
+        ocupacao = ocupacao_semanal(origem, "luciana", SEGUNDA)
 
     dia = ocupacao.dias[0]
     assert (dia.slots_escalados, dia.slots_ocupados, dia.slots_sem_grade) == (10, 2, 1)
@@ -190,7 +190,7 @@ def test_falha_em_um_dia_deixa_a_semana_parcial(caplog: pytest.LogCaptureFixture
     )
 
     with caplog.at_level(logging.WARNING):
-        ocupacao = construir_ocupacao_semanal_profissional(origem, "luciana", SEGUNDA)
+        ocupacao = ocupacao_semanal(origem, "luciana", SEGUNDA)
 
     assert ocupacao.dias_com_falha == [TERCA]
     assert TERCA not in ocupacao.dias_sem_agenda
@@ -204,7 +204,7 @@ def test_falha_em_todos_os_dias_levanta_o_erro() -> None:
     origem = FakeScheduleDataSource(dias_com_falha=set(SEMANA))
 
     with pytest.raises(RuntimeError, match="falha simulada"):
-        construir_ocupacao_semanal_profissional(origem, "luciana", SEGUNDA)
+        ocupacao_semanal(origem, "luciana", SEGUNDA)
 
 
 @pytest.mark.parametrize(

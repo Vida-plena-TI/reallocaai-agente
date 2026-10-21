@@ -9,7 +9,6 @@ from app.engine.carga_profissionais import (
     CargaDoDia,
     CargaProfissionais,
     CargaProfissional,
-    construir_carga_profissionais,
 )
 from app.engine.disponibilidade import SlotDisponivel, listar_disponibilidade
 from app.engine.encaixe import (
@@ -38,7 +37,6 @@ from app.engine.ocupacao_profissional import (
     OcupacaoDiaProfissional,
     OcupacaoSalaPosto,
     OcupacaoSemanalProfissional,
-    construir_ocupacao_semanal_profissional,
 )
 from app.engine.relatorio_generico import (
     ConsultaInvalidaError,
@@ -78,8 +76,6 @@ __all__ = [
     "SlotFotografado",
     "buscar_alternativas",
     "buscar_melhor_encaixe",
-    "construir_carga_profissionais",
-    "construir_ocupacao_semanal_profissional",
     "construir_relatorio_ocupacao_do_dia",
     "fotografar_periodo",
     "gerar_relatorio",

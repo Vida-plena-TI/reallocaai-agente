@@ -76,15 +76,11 @@ def gerar_exemplos() -> dict[str, str]:
     """Nome do arquivo -> conteúdo JSON, validado contra `BlocoRelatorio`."""
     tools = {
         t.name: t
-        for t in criar_tools(
-            fonte_relatorios(), SemHistoricoContinuidadeDataSource(), SEGUNDA, lambda *_: None
-        )
+        for t in criar_tools(fonte_relatorios(), SemHistoricoContinuidadeDataSource(), SEGUNDA)
     }
     gerais = {
         t.name: t
-        for t in criar_tools(
-            fonte_clinica(), SemHistoricoContinuidadeDataSource(), SEGUNDA, lambda *_: None
-        )
+        for t in criar_tools(fonte_clinica(), SemHistoricoContinuidadeDataSource(), SEGUNDA)
     }
     chamadas = [(arquivo, tools, nome, args) for arquivo, (nome, args) in VARIANTES.items()]
     chamadas += [

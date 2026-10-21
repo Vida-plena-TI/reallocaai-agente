@@ -1,0 +1,691 @@
+{
+ "buscar_encaixe": {
+  "argumentos": {
+   "$defs": {
+    "Especialidade": {
+     "description": "Especialidades atendidas pela clínica.\n\nUm profissional atende exatamente uma especialidade (regra do negócio),\npor isso a especialidade é um valor único e não uma coleção.",
+     "enum": [
+      "terapia_ocupacional",
+      "fonoaudiologia",
+      "psicologia",
+      "terapia_alimentar",
+      "psicomotricidade",
+      "psicopedagogia",
+      "musicoterapia"
+     ],
+     "title": "Especialidade",
+     "type": "string"
+    },
+    "ItemDemandaEntrada": {
+     "description": "Um item de demanda de `buscar_encaixe`, na unidade que a LLM conhece (minutos).",
+     "properties": {
+      "duracao_minutos": {
+       "description": "Duração do atendimento em minutos (a agenda trabalha em blocos de 30 minutos; valores que não forem múltiplos exatos são arredondados para cima).",
+       "exclusiveMinimum": 0,
+       "title": "Duracao Minutos",
+       "type": "integer"
+      },
+      "especialidade": {
+       "$ref": "#/$defs/Especialidade",
+       "description": "Especialidade do atendimento pedido."
+      },
+      "profissional_id": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "default": null,
+       "description": "Id de um profissional específico, só quando for uma exigência explícita (ex.: pedido da família). Deixe em branco na maioria dos casos — o sistema já resolve sozinho a continuidade terapêutica do paciente.",
+       "title": "Profissional Id"
+      }
+     },
+     "required": [
+      "especialidade",
+      "duracao_minutos"
+     ],
+     "title": "ItemDemandaEntrada",
+     "type": "object"
+    }
+   },
+   "description": "Busca um horário de encaixe, casando uma ou mais especialidades sem buraco entre elas.\n\nUse para \"tem vaga para [paciente] em [data]?\", para encaixar um\natendimento novo e para perguntas de viabilidade (\"consigo encaixar\nX às Y?\"), com ou sem paciente. É a única fonte de combinações de\nhorário (sessões longas, várias especialidades em sequência,\nalternativas). O paciente é opcional e pode ser qualquer nome, esteja\nou não na agenda: chame direto, sem verificar o paciente antes com\n`buscar_paciente`.",
+   "properties": {
+    "data": {
+     "description": "Data do atendimento, no formato AAAA-MM-DD.",
+     "format": "date",
+     "title": "Data",
+     "type": "string"
+    },
+    "horario_desejado": {
+     "anyOf": [
+      {
+       "format": "time",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Horário exato desejado (HH:MM), quando o paciente ou a família pediu um horário específico. Deixe em branco se não houver preferência de horário.",
+     "title": "Horario Desejado"
+    },
+    "horario_minimo": {
+     "anyOf": [
+      {
+       "format": "time",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Horário mais cedo aceitável para o início do atendimento (HH:MM). Deixe em branco para usar o padrão da clínica.",
+     "title": "Horario Minimo"
+    },
+    "itens": {
+     "description": "Especialidades e durações necessárias, na ordem de preferência.",
+     "items": {
+      "$ref": "#/$defs/ItemDemandaEntrada"
+     },
+     "minItems": 1,
+     "title": "Itens",
+     "type": "array"
+    },
+    "paciente": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Opcional. Nome ou id do paciente, quando o pedido citar um — pode ser qualquer nome, esteja ou não na agenda; não verifique antes com buscar_paciente. Deixe em branco em perguntas de viabilidade sem paciente (ex.: \"consigo encaixar psicologia às 10h?\").",
+     "title": "Paciente"
+    }
+   },
+   "required": [
+    "data",
+    "itens"
+   ],
+   "title": "buscar_encaixe",
+   "type": "object"
+  },
+  "descricao": "Busca um horário de encaixe, casando uma ou mais especialidades sem buraco entre elas.\n\nUse para \"tem vaga para [paciente] em [data]?\", para encaixar um\natendimento novo e para perguntas de viabilidade (\"consigo encaixar\nX às Y?\"), com ou sem paciente. É a única fonte de combinações de\nhorário (sessões longas, várias especialidades em sequência,\nalternativas). O paciente é opcional e pode ser qualquer nome, esteja\nou não na agenda: chame direto, sem verificar o paciente antes com\n`buscar_paciente`.",
+  "formato_resposta": "content"
+ },
+ "buscar_paciente": {
+  "argumentos": {
+   "description": "Localiza um paciente na agenda de um dia e nos outros dias da mesma semana.\n\nUse somente quando o usuário perguntar sobre um paciente (convênio, se\nestá na agenda, em que dias aparece) ou para localizar um atendimento\nexistente. NÃO chame antes de `buscar_encaixe` nem de consultas de\ndisponibilidade: essas tools não dependem de o paciente estar na agenda.",
+   "properties": {
+    "data": {
+     "description": "Data da agenda a consultar, no formato AAAA-MM-DD.",
+     "format": "date",
+     "title": "Data",
+     "type": "string"
+    },
+    "nome_ou_id": {
+     "description": "Nome (ou parte do nome) ou id do paciente.",
+     "title": "Nome Ou Id",
+     "type": "string"
+    }
+   },
+   "required": [
+    "nome_ou_id",
+    "data"
+   ],
+   "title": "buscar_paciente",
+   "type": "object"
+  },
+  "descricao": "Localiza um paciente na agenda de um dia e nos outros dias da mesma semana.\n\nUse somente quando o usuário perguntar sobre um paciente (convênio, se\nestá na agenda, em que dias aparece) ou para localizar um atendimento\nexistente. NÃO chame antes de `buscar_encaixe` nem de consultas de\ndisponibilidade: essas tools não dependem de o paciente estar na agenda.",
+  "formato_resposta": "content"
+ },
+ "consultar_catalogo": {
+  "argumentos": {
+   "description": "Mapa da clínica na semana: profissionais por especialidade (dias e salas), salas e\npostos, convênios por cor, dias com agenda e o que significa cada métrica e relatório.\n\nUse quando precisar saber quem/onde/o quê existe antes de montar um relatório, ou\nquando perguntarem o que significa uma métrica. Não traz pacientes.",
+   "properties": {
+    "data": {
+     "anyOf": [
+      {
+       "format": "date",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Qualquer data da semana a descrever (AAAA-MM-DD). Em branco: semana de hoje.",
+     "title": "Data"
+    }
+   },
+   "title": "consultar_catalogo",
+   "type": "object"
+  },
+  "descricao": "Mapa da clínica na semana: profissionais por especialidade (dias e salas), salas e\npostos, convênios por cor, dias com agenda e o que significa cada métrica e relatório.\n\nUse quando precisar saber quem/onde/o quê existe antes de montar um relatório, ou\nquando perguntarem o que significa uma métrica. Não traz pacientes.",
+  "formato_resposta": "content"
+ },
+ "consultar_disponibilidade": {
+  "argumentos": {
+   "$defs": {
+    "Especialidade": {
+     "description": "Especialidades atendidas pela clínica.\n\nUm profissional atende exatamente uma especialidade (regra do negócio),\npor isso a especialidade é um valor único e não uma coleção.",
+     "enum": [
+      "terapia_ocupacional",
+      "fonoaudiologia",
+      "psicologia",
+      "terapia_alimentar",
+      "psicomotricidade",
+      "psicopedagogia",
+      "musicoterapia"
+     ],
+     "title": "Especialidade",
+     "type": "string"
+    }
+   },
+   "description": "Lista CADA horário livre de UM único dia, com filtro opcional de especialidade e\nprofissional.\n\nUse só para a lista detalhada de um dia (\"quais horários estão livres de\npsicologia hoje?\"). Para mais de um dia (\"de segunda a sexta\", \"na semana\"),\ncontagens, janelas de 1 h ou recortes por sala/período, use `gerar_relatorio`\n(uma chamada só). Para casar várias especialidades de um atendimento, use\n`buscar_encaixe`.",
+   "properties": {
+    "data": {
+     "description": "Data a consultar, no formato AAAA-MM-DD.",
+     "format": "date",
+     "title": "Data",
+     "type": "string"
+    },
+    "especialidade": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Especialidade"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Filtra por essa especialidade, quando informada."
+    },
+    "profissional": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Filtra por esse profissional (nome ou id), quando informado.",
+     "title": "Profissional"
+    }
+   },
+   "required": [
+    "data"
+   ],
+   "title": "consultar_disponibilidade",
+   "type": "object"
+  },
+  "descricao": "Lista CADA horário livre de UM único dia, com filtro opcional de especialidade e\nprofissional.\n\nUse só para a lista detalhada de um dia (\"quais horários estão livres de\npsicologia hoje?\"). Para mais de um dia (\"de segunda a sexta\", \"na semana\"),\ncontagens, janelas de 1 h ou recortes por sala/período, use `gerar_relatorio`\n(uma chamada só). Para casar várias especialidades de um atendimento, use\n`buscar_encaixe`.",
+  "formato_resposta": "content"
+ },
+ "consultar_ocupacao": {
+  "argumentos": {
+   "description": "Ocupação do dia, por especialidade e por sala, sinalizando quem está abaixo da meta.\n\nUse para \"como está a ocupação hoje?\" (um dia). Para vários dias, ranking,\nsalas ociosas ou outros recortes, use `gerar_relatorio`. Para a taxa de\nocupação de UMA profissional específica, use\n`consultar_ocupacao_profissional`. NÃO serve para contar pacientes\n(ocupação mede slots): para quantos pacientes cada profissional\natende, use `consultar_pacientes_por_profissional`.",
+   "properties": {
+    "data": {
+     "description": "Data a consultar, no formato AAAA-MM-DD.",
+     "format": "date",
+     "title": "Data",
+     "type": "string"
+    }
+   },
+   "required": [
+    "data"
+   ],
+   "title": "consultar_ocupacao",
+   "type": "object"
+  },
+  "descricao": "Ocupação do dia, por especialidade e por sala, sinalizando quem está abaixo da meta.\n\nUse para \"como está a ocupação hoje?\" (um dia). Para vários dias, ranking,\nsalas ociosas ou outros recortes, use `gerar_relatorio`. Para a taxa de\nocupação de UMA profissional específica, use\n`consultar_ocupacao_profissional`. NÃO serve para contar pacientes\n(ocupação mede slots): para quantos pacientes cada profissional\natende, use `consultar_pacientes_por_profissional`.",
+  "formato_resposta": "content_and_artifact"
+ },
+ "consultar_ocupacao_profissional": {
+  "argumentos": {
+   "description": "Taxa de ocupação de UMA profissional, dia a dia e no total da semana, frente à meta.\n\nUse quando pedirem a taxa de ocupação de uma profissional específica\n(\"qual a ocupação da Rossana?\"), por dia e por semana. NÃO use para\nocupação por especialidade ou por sala — para isso, use\n`consultar_ocupacao`. NÃO serve para contar pacientes (mede slots):\npara quantos pacientes uma ou todas as profissionais atendem, use\n`consultar_pacientes_por_profissional`.",
+   "properties": {
+    "data": {
+     "anyOf": [
+      {
+       "format": "date",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Qualquer data da semana a consultar, no formato AAAA-MM-DD. Deixe em branco para usar a semana de hoje.",
+     "title": "Data"
+    },
+    "profissional": {
+     "description": "Nome (ou parte do nome) da profissional, como citado na pergunta.",
+     "title": "Profissional",
+     "type": "string"
+    }
+   },
+   "required": [
+    "profissional"
+   ],
+   "title": "consultar_ocupacao_profissional",
+   "type": "object"
+  },
+  "descricao": "Taxa de ocupação de UMA profissional, dia a dia e no total da semana, frente à meta.\n\nUse quando pedirem a taxa de ocupação de uma profissional específica\n(\"qual a ocupação da Rossana?\"), por dia e por semana. NÃO use para\nocupação por especialidade ou por sala — para isso, use\n`consultar_ocupacao`. NÃO serve para contar pacientes (mede slots):\npara quantos pacientes uma ou todas as profissionais atendem, use\n`consultar_pacientes_por_profissional`.",
+  "formato_resposta": "content_and_artifact"
+ },
+ "consultar_pacientes_por_profissional": {
+  "argumentos": {
+   "description": "QUANTOS PACIENTES cada profissional (ou uma) atende, por dia ou na semana.\n\nUse quando perguntarem quantos pacientes as profissionais atendem\n(\"quantos pacientes cada profissional atende por dia?\", \"quantos\npacientes a Rossana atende?\", \"quantos pacientes de fono na\nterça?\"). Padrão: semana de hoje, todas as profissionais, com o\ndetalhe por dia. NÃO use para taxa de ocupação (slots) — para isso,\n`consultar_ocupacao_profissional` ou `consultar_ocupacao`.",
+   "properties": {
+    "data": {
+     "anyOf": [
+      {
+       "format": "date",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Data no formato AAAA-MM-DD: no escopo 'semana', qualquer dia da semana a consultar; no escopo 'dia', o próprio dia. Deixe em branco para usar hoje.",
+     "title": "Data"
+    },
+    "escopo": {
+     "default": "semana",
+     "description": "'semana' (padrão): segunda a sábado da semana da data, com o detalhe por dia. 'dia': só a data informada — use quando a pergunta citar um dia ('hoje', 'na terça', uma data).",
+     "enum": [
+      "semana",
+      "dia"
+     ],
+     "title": "Escopo",
+     "type": "string"
+    },
+    "especialidade": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Especialidade como citada na pergunta (ex.: 'psicologia', 'fono', 'TO'), só quando a pergunta filtrar por uma. Deixe em branco para todas.",
+     "title": "Especialidade"
+    },
+    "profissional": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Nome (ou parte do nome) de uma profissional, só quando a pergunta citar uma. Deixe em branco para todas.",
+     "title": "Profissional"
+    }
+   },
+   "title": "consultar_pacientes_por_profissional",
+   "type": "object"
+  },
+  "descricao": "QUANTOS PACIENTES cada profissional (ou uma) atende, por dia ou na semana.\n\nUse quando perguntarem quantos pacientes as profissionais atendem\n(\"quantos pacientes cada profissional atende por dia?\", \"quantos\npacientes a Rossana atende?\", \"quantos pacientes de fono na\nterça?\"). Padrão: semana de hoje, todas as profissionais, com o\ndetalhe por dia. NÃO use para taxa de ocupação (slots) — para isso,\n`consultar_ocupacao_profissional` ou `consultar_ocupacao`.",
+  "formato_resposta": "content_and_artifact"
+ },
+ "gerar_relatorio": {
+  "argumentos": {
+   "$defs": {
+    "Dimensao": {
+     "description": "Por onde agrupar as linhas do relatório.",
+     "enum": [
+      "dia",
+      "profissional",
+      "especialidade",
+      "sala",
+      "posto",
+      "periodo",
+      "convenio"
+     ],
+     "title": "Dimensao",
+     "type": "string"
+    },
+    "Metrica": {
+     "description": "O que calcular em cada linha (e no total).",
+     "enum": [
+      "ocupacao",
+      "slots_escalados",
+      "slots_ocupados",
+      "vagas_livres",
+      "slots_para_meta",
+      "slots_fechados",
+      "pacientes_distintos",
+      "sessoes",
+      "horas_escaladas",
+      "horas_ocupadas",
+      "horas_livres",
+      "aguardando_autorizacao",
+      "janelas_livres"
+     ],
+     "title": "Metrica",
+     "type": "string"
+    }
+   },
+   "description": "Relatório de QUALQUER período (um dia, a semana, segunda a sexta) numa chamada só.\n\nUse para: vagas/horários livres de mais de um dia ou com recorte (profissional,\nespecialidade, sala, manhã/tarde) -> vagas_livres; onde cabe 1 h ou 1 h 30 ->\njanelas_continuas; ranking_ocupacao; comparativo_dias; convenios e autorizações\npendentes; qualidade_agenda (buracos); salas_ociosas; capacidade_especialidade;\nagenda_paciente (só com o nome pedido pelo usuário); ou qualquer cruzamento ->\npersonalizado com dimensoes e metricas. Os números já vêm calculados: não recalcule.\nUMA chamada cobre o período inteiro: nunca chame uma vez por dia.",
+   "properties": {
+    "convenios": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Filtra por convênio: unimed, klini, sulamerica, particular, nao_informado.",
+     "title": "Convenios"
+    },
+    "dias_semana": {
+     "anyOf": [
+      {
+       "items": {
+        "enum": [
+         "segunda",
+         "terca",
+         "quarta",
+         "quinta",
+         "sexta",
+         "sabado"
+        ],
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Só estes dias da semana dentro do período.",
+     "title": "Dias Semana"
+    },
+    "dimensoes": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/Dimensao"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "personalizado: por onde agrupar (pode ser vazio = só o total). ranking_ocupacao: uma dimensão (padrão profissional).",
+     "title": "Dimensoes"
+    },
+    "duracao_minutos": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "janelas_continuas: duração do atendimento em minutos (60 = 1 h, 90 = 1 h 30).",
+     "title": "Duracao Minutos"
+    },
+    "especialidades": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Filtra por especialidade, como citada ('psico', 'fono', 'TO').",
+     "title": "Especialidades"
+    },
+    "fim": {
+     "anyOf": [
+      {
+       "format": "date",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Último dia, inclusive (AAAA-MM-DD).",
+     "title": "Fim"
+    },
+    "inicio": {
+     "anyOf": [
+      {
+       "format": "date",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Primeiro dia (AAAA-MM-DD). Em branco com fim em branco: a semana de hoje (segunda a sábado). Só inicio: um dia.",
+     "title": "Inicio"
+    },
+    "limite": {
+     "anyOf": [
+      {
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Máximo de linhas (ex.: top 5).",
+     "title": "Limite"
+    },
+    "metricas": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/Metrica"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "personalizado (obrigatório): o que calcular.",
+     "title": "Metricas"
+    },
+    "ordem": {
+     "anyOf": [
+      {
+       "enum": [
+        "desc",
+        "asc"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Ordem de ordenar_por / do ranking. Padrão: desc (maior primeiro).",
+     "title": "Ordem"
+    },
+    "ordenar_por": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "personalizado: uma das metricas ou dimensoes pedidas.",
+     "title": "Ordenar Por"
+    },
+    "paciente": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Só em agenda_paciente: nome do paciente exatamente como citado.",
+     "title": "Paciente"
+    },
+    "periodo_do_dia": {
+     "anyOf": [
+      {
+       "enum": [
+        "manha",
+        "tarde"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Só manhã (antes das 12h) ou só tarde (depois das 13h).",
+     "title": "Periodo Do Dia"
+    },
+    "profissionais": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Filtra por estas profissionais (nome ou parte do nome).",
+     "title": "Profissionais"
+    },
+    "relatorio": {
+     "description": "Relatório pronto, ou 'personalizado' para escolher dimensoes e metricas.",
+     "enum": [
+      "vagas_livres",
+      "janelas_continuas",
+      "ranking_ocupacao",
+      "comparativo_dias",
+      "convenios",
+      "qualidade_agenda",
+      "salas_ociosas",
+      "capacidade_especialidade",
+      "agenda_paciente",
+      "personalizado"
+     ],
+     "title": "Relatorio",
+     "type": "string"
+    },
+    "salas": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Filtra por sala ('Sala 3' ou '3').",
+     "title": "Salas"
+    }
+   },
+   "required": [
+    "relatorio"
+   ],
+   "title": "gerar_relatorio",
+   "type": "object"
+  },
+  "descricao": "Relatório de QUALQUER período (um dia, a semana, segunda a sexta) numa chamada só.\n\nUse para: vagas/horários livres de mais de um dia ou com recorte (profissional,\nespecialidade, sala, manhã/tarde) -> vagas_livres; onde cabe 1 h ou 1 h 30 ->\njanelas_continuas; ranking_ocupacao; comparativo_dias; convenios e autorizações\npendentes; qualidade_agenda (buracos); salas_ociosas; capacidade_especialidade;\nagenda_paciente (só com o nome pedido pelo usuário); ou qualquer cruzamento ->\npersonalizado com dimensoes e metricas. Os números já vêm calculados: não recalcule.\nUMA chamada cobre o período inteiro: nunca chame uma vez por dia.",
+  "formato_resposta": "content_and_artifact"
+ },
+ "sugerir_realocacao": {
+  "argumentos": {
+   "description": "Sugere um novo horário, no mesmo dia e com o mesmo profissional, para um atendimento.\n\nUse quando for preciso remanejar um atendimento específico (atraso,\ncancelamento de outro paciente etc.). Nunca troca o profissional do\natendimento — só propõe outro horário.",
+   "properties": {
+    "atendimento_id": {
+     "description": "Id do atendimento já existente na agenda.",
+     "title": "Atendimento Id",
+     "type": "string"
+    },
+    "data": {
+     "description": "Data em que o atendimento está hoje, no formato AAAA-MM-DD.",
+     "format": "date",
+     "title": "Data",
+     "type": "string"
+    },
+    "nova_duracao_minutos": {
+     "anyOf": [
+      {
+       "exclusiveMinimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Nova duração em minutos, só quando ela mudar. Deixe em branco para manter a duração atual.",
+     "title": "Nova Duracao Minutos"
+    }
+   },
+   "required": [
+    "atendimento_id",
+    "data"
+   ],
+   "title": "sugerir_realocacao",
+   "type": "object"
+  },
+  "descricao": "Sugere um novo horário, no mesmo dia e com o mesmo profissional, para um atendimento.\n\nUse quando for preciso remanejar um atendimento específico (atraso,\ncancelamento de outro paciente etc.). Nunca troca o profissional do\natendimento — só propõe outro horário.",
+  "formato_resposta": "content"
+ }
+}

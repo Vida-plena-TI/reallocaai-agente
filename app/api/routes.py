@@ -3,9 +3,8 @@
 As rotas de consulta direta (Fase 6a) são só leitura: nenhuma altera a
 agenda. `/agenda/chat` (Fase 6b) conversa com o agente de IA, que só lê a
 agenda através das mesmas tools já usadas pelo script manual (Fase 5b) —
-nenhuma escrita acontece por aqui também. `/relatorio/enviar` (Fase 7) é a
-exceção quanto a efeito colateral: envia um e-mail, mas continua sem alterar
-a agenda. Todas as rotas deste router exigem `X-API-Key` válida (ver
+nenhuma escrita acontece por aqui também. Todas as rotas deste router exigem
+`X-API-Key` válida (ver
 `validar_api_key`); a única rota pública da aplicação é `/health`, definida
 em `app.main`.
 """
@@ -29,27 +28,21 @@ from app.api.dependencies import (
 from app.api.schemas import (
     ChatRequest,
     ChatResponse,
-    EnviarRelatorioRequest,
-    EnviarRelatorioResponse,
     MensagemHistoricoResponse,
     OcupacaoItemResponse,
     OcupacaoResponse,
     SlotDisponivelResponse,
 )
 from app.api.sessoes import ArmazenamentoConversas
-from app.config import Settings, get_settings
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import Especialidade, ScheduleDataSource
 from app.engine.ocupacao import OcupacaoAgregada, RelatorioOcupacaoDoDia
-from app.reports.envio import enviar_relatorio_por_email
-from app.reports.exceptions import ReportsEnvioError
 
 router = APIRouter(dependencies=[Depends(validar_api_key)])
 
 _MENSAGEM_CONVERSA_INEXISTENTE = (
     "conversa não encontrada ou expirada, inicie uma nova sem informar conversa_id"
 )
-_MENSAGEM_EMAIL_NAO_CONFIGURADO = "O envio de e-mail não está configurado neste ambiente."
 
 
 def _rotulo_especialidade(especialidade: Especialidade) -> str:
@@ -70,11 +63,12 @@ def _item_ocupacao(rotulo: str, agregada: OcupacaoAgregada) -> OcupacaoItemRespo
 def _construir_ocupacao_response(
     fonte: ScheduleDataSource, data: date, relatorio: RelatorioOcupacaoDoDia
 ) -> OcupacaoResponse:
-    """Resolve sala e especialidade para rótulos legíveis, ordenados de forma estável."""
+    """Resolve sala e especialidade para rótulos legíveis, ordenados de forma estável
+    (salas na ordem natural de `por_sala`, especialidades por nome)."""
     nomes_das_salas = {sala.id: sala.nome for sala in fonte.listar_salas(data)}
     por_sala = [
         _item_ocupacao(nomes_das_salas.get(sala_id, sala_id), agregada)
-        for sala_id, agregada in sorted(relatorio.por_sala().items())
+        for sala_id, agregada in relatorio.por_sala().items()
     ]
     por_especialidade = [
         _item_ocupacao(_rotulo_especialidade(especialidade), agregada)
@@ -173,7 +167,6 @@ def conversar_com_agente(
         continuidade,
         chat_model,
         data_referencia=date.today(),
-        enviar_relatorio=enviar_relatorio_por_email,
         renderiza_relatorios=corpo.renderiza_relatorios,
     )
     try:
@@ -219,43 +212,3 @@ def obter_historico_da_conversa(
         )
         for mensagem, blocos in historico
     ]
-
-
-@router.post(
-    "/relatorio/enviar",
-    response_model=EnviarRelatorioResponse,
-    summary="Envia o relatório de ocupação do dia por e-mail",
-    description=(
-        "Monta o relatório de ocupação do dia (por sala e por especialidade, já "
-        "calculado pela engine) e envia por e-mail via Resend. Omita `data` para "
-        "usar a data de hoje, e `destinatarios` para usar a lista padrão "
-        "configurada em REPORT_EMAIL_TO. Sem o Resend configurado no ambiente, "
-        "devolve 503. Falhas no envio (Resend fora do ar, credencial inválida "
-        "etc.) devolvem 502, sem detalhar o erro interno."
-    ),
-)
-def enviar_relatorio(
-    corpo: EnviarRelatorioRequest,
-    fonte: Annotated[ScheduleDataSource, Depends(obter_fonte)],
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> EnviarRelatorioResponse:
-    if not settings.envio_de_email_configurado:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=_MENSAGEM_EMAIL_NAO_CONFIGURADO,
-        )
-
-    data_efetiva = corpo.data if corpo.data is not None else date.today()
-    destinatarios_efetivos = (
-        corpo.destinatarios if corpo.destinatarios is not None else settings.report_email_to
-    )
-
-    try:
-        enviar_relatorio_por_email(fonte, data_efetiva, corpo.destinatarios)
-    except ReportsEnvioError as erro:
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="erro ao enviar o relatório por e-mail, tente novamente",
-        ) from erro
-
-    return EnviarRelatorioResponse(enviado=True, destinatarios=destinatarios_efetivos)

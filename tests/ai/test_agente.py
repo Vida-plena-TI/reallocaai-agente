@@ -30,11 +30,6 @@ from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 DIA = date(2026, 9, 8)
 
 
-def _enviar_relatorio_nao_usado(fonte: Any, data: date, destinatarios: list[str] | None) -> None:
-    """Nenhum teste deste arquivo exercita a tool `enviar_relatorio`."""
-    raise AssertionError("enviar_relatorio não deveria ter sido chamado neste teste")
-
-
 def _settings(**overrides: Any) -> Settings:
     """`Settings` com os campos de IA em branco, sobrepostos por `overrides`.
 
@@ -84,7 +79,7 @@ def test_perguntar_executa_o_ciclo_de_tool_call_e_retorna_o_texto_final() -> Non
         ]
     )
 
-    agente = criar_agente(origem, continuidade, fake_model, DIA, _enviar_relatorio_nao_usado)
+    agente = criar_agente(origem, continuidade, fake_model, DIA)
     resposta = perguntar(agente, [HumanMessage("Como está a ocupação hoje?")])
 
     assert resposta == "Não há nenhuma escala registrada para hoje."
@@ -168,7 +163,7 @@ def test_perguntar_com_content_estruturado_devolve_so_o_texto() -> None:
         ]
     )
 
-    agente = criar_agente(origem, continuidade, fake_model, DIA, _enviar_relatorio_nao_usado)
+    agente = criar_agente(origem, continuidade, fake_model, DIA)
     resposta = perguntar(agente, [HumanMessage("Como está a ocupação hoje?")])
 
     assert resposta == "Não há nenhuma escala registrada para hoje."
@@ -210,7 +205,7 @@ def test_agente_chama_a_tool_real_com_os_argumentos_da_llm() -> None:
         ]
     )
 
-    agente = criar_agente(origem, continuidade, fake_model, DIA, _enviar_relatorio_nao_usado)
+    agente = criar_agente(origem, continuidade, fake_model, DIA)
     resultado = agente.invoke({"messages": [HumanMessage("Como está a ocupação hoje?")]})
 
     mensagens_de_tool = [
@@ -317,7 +312,7 @@ def test_encaixe_com_paciente_fora_da_agenda_termina_com_resposta_final() -> Non
         ]
     )
 
-    agente = criar_agente(origem, continuidade, fake_model, DIA, _enviar_relatorio_nao_usado)
+    agente = criar_agente(origem, continuidade, fake_model, DIA)
     resultado = agente.invoke(
         {"messages": [HumanMessage("Consigo encaixar a Maria Nova em psicologia às 10h?")]}
     )
@@ -377,7 +372,6 @@ def test_agente_consulta_a_ocupacao_de_uma_profissional_pela_tool_dedicada() -> 
         SemHistoricoContinuidadeDataSource(),
         fake_model,
         SEGUNDA,
-        _enviar_relatorio_nao_usado,
     )
     resultado = agente.invoke({"messages": [HumanMessage("Qual a ocupação da Luciana?")]})
 
@@ -426,7 +420,6 @@ def test_agente_conta_pacientes_por_profissional_pela_tool_dedicada() -> None:
         SemHistoricoContinuidadeDataSource(),
         fake_model,
         SEGUNDA,
-        _enviar_relatorio_nao_usado,
     )
     resultado = agente.invoke(
         {"messages": [HumanMessage("Quantos pacientes cada profissional atende por dia?")]}

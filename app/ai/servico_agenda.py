@@ -25,7 +25,6 @@ from app.domain import (
     dias_da_semana_de,
     normalizar_id,
 )
-from app.engine.carga_profissionais import CargaProfissionais, construir_carga_profissionais
 from app.engine.disponibilidade import SlotDisponivel, listar_disponibilidade
 from app.engine.encaixe import (
     OpcaoComCenario,
@@ -35,10 +34,6 @@ from app.engine.encaixe import (
     sugerir_realocacao,
 )
 from app.engine.ocupacao import RelatorioOcupacaoDoDia, construir_relatorio_ocupacao_do_dia
-from app.engine.ocupacao_profissional import (
-    OcupacaoSemanalProfissional,
-    construir_ocupacao_semanal_profissional,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +177,7 @@ class ProfissionalNaoEncontrado(BaseModel):
     nomes_disponiveis: list[str]
 
 
-#: União discriminada pelo campo `tipo` — os três desfechos de `localizar_profissional`.
+#: União discriminada pelo campo `tipo` — os três desfechos de `resolver_profissional`.
 LocalizacaoProfissional = Annotated[
     ProfissionalEncontrado | ProfissionalAmbiguo | ProfissionalNaoEncontrado,
     Field(discriminator="tipo"),
@@ -195,46 +190,18 @@ def _uma_sequencia_e_prefixo_da_outra(palavras: list[str], outras: list[str]) ->
     return bool(menor) and maior[: len(menor)] == menor
 
 
-def localizar_profissional(
-    fonte: ScheduleDataSource, data: date, texto: str
+def resolver_profissional(
+    profissionais: dict[str, Profissional], texto: str
 ) -> LocalizacaoProfissional:
-    """Resolve o profissional citado em `texto` entre os escalados na semana de `data`.
+    """Resolve o profissional citado em `texto` entre `profissionais` (id -> profissional).
 
+    As tools passam os profissionais da semana (`FotografiaPeriodo.profissionais`).
     Correspondência pelo id normalizado (acento e caixa não importam), já
     trocado pelo canônico quando é uma grafia em `MAPA_ALIAS_PROFISSIONAL`: o id
     exato vence; sem ele, vale quando a sequência de palavras de um lado é
     prefixo da do outro ("Rossana Belfort" encontra `rossana`, e "Ana" encontra
     `ana-paula`). Se mais de um profissional casar, devolve todos como
-    candidatos e nunca escolhe sozinho. Um dia cuja leitura falhe é pulado com
-    warning; se todos falharem, o último erro sobe.
-    """
-    profissionais: dict[str, Profissional] = {}
-    algum_dia_lido = False
-    ultimo_erro: Exception | None = None
-    for dia in dias_da_semana_de(data):
-        try:
-            do_dia = fonte.listar_profissionais(dia)
-        except Exception as erro:
-            ultimo_erro = erro
-            logger.warning(
-                "Falha ao ler os profissionais de %s ao localizar profissional: %s",
-                dia.isoformat(),
-                type(erro).__name__,
-            )
-            continue
-        algum_dia_lido = True
-        for profissional in do_dia:
-            profissionais.setdefault(profissional.id, profissional)
-    if not algum_dia_lido and ultimo_erro is not None:
-        raise ultimo_erro
-    return resolver_profissional(profissionais, texto)
-
-
-def resolver_profissional(
-    profissionais: dict[str, Profissional], texto: str
-) -> LocalizacaoProfissional:
-    """Resolve `texto` entre `profissionais` (id -> profissional), com as regras de
-    `localizar_profissional`: alias, id exato e, sem ele, prefixo de palavras.
+    candidatos e nunca escolhe sozinho.
     """
     # A grafia antiga de quem tem alias ("Larissa") nunca existe na agenda: o
     # parser já a trocou pela canônica, então a busca precisa fazer o mesmo.
@@ -399,20 +366,6 @@ def consultar_disponibilidade_do_dia(
 def consultar_ocupacao_do_dia(fonte: ScheduleDataSource, data: date) -> RelatorioOcupacaoDoDia:
     """Delega para `construir_relatorio_ocupacao_do_dia` (Fase 4a)."""
     return construir_relatorio_ocupacao_do_dia(fonte, data)
-
-
-def consultar_ocupacao_semanal_profissional(
-    fonte: ScheduleDataSource, profissional_id: str, data: date
-) -> OcupacaoSemanalProfissional:
-    """Delega para `construir_ocupacao_semanal_profissional`."""
-    return construir_ocupacao_semanal_profissional(fonte, profissional_id, data)
-
-
-def consultar_carga_profissionais(
-    fonte: ScheduleDataSource, dias: list[date]
-) -> CargaProfissionais:
-    """Delega para `construir_carga_profissionais`."""
-    return construir_carga_profissionais(fonte, dias)
 
 
 def sugerir_realocacao_por_id(

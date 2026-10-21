@@ -165,7 +165,7 @@ def test_atendimento_fora_da_grade_vira_linha_ocupada_fora_da_grade() -> None:
 
 
 def test_atendimento_em_outro_posto_vai_para_o_posto_escalado() -> None:
-    """Mesma regra de `construir_ocupacao_semanal_profissional`."""
+    """Mesma regra da ocupação semanal por profissional."""
     fonte = FakeScheduleDataSource(
         profissionais={SEGUNDA: [LUCIANA]},
         grade={SEGUNDA: grade(SEGUNDA, [time(8, 0)], indice_posto=0)},
