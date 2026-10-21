@@ -165,3 +165,53 @@ Agenda de um paciente (nome fictício):
 | `405` | `GET /relatorios/gerar`. |
 | `422` | Schema inválido (lista `{loc, msg, type}`, sem o valor) ou parâmetro sem sentido (frase). |
 | `502` | Nenhum dia do período pôde ser lido. Sem detalhe do erro interno. |
+
+## `POST /relatorio/enviar` com `relatorios`
+
+O envio por e-mail ganhou campos opcionais. **Sem `relatorios`, nada muda**: o e-mail é o
+relatório de ocupação do dia, como sempre, e o backend do chatbot não precisa mudar nada.
+
+| Campo | Tipo | Descrição |
+| --- | --- | --- |
+| `data` | `AAAA-MM-DD` | Um dia. Padrão: hoje. |
+| `destinatarios` | lista de e-mails | Padrão: `REPORT_EMAIL_TO`. |
+| `relatorios` | lista (opcional) | A lista **exata** dos relatórios do e-mail, na ordem pedida. |
+| `inicio`, `fim` | `AAAA-MM-DD` (opcional) | Com `relatorios`: o período, até **14 dias**. |
+
+Tipos aceitos em `relatorios`:
+
+| Tipo | No e-mail |
+| --- | --- |
+| `ocupacao` | Ocupação do dia por especialidade e por sala (o e-mail de sempre). **Só de um dia** (`data`). |
+| `vagas_livres` | Vagas de 30 min por especialidade, manhã e tarde. |
+| `ranking_ocupacao` | Ocupação por profissional, da maior para a menor, com a situação frente à meta. |
+| `convenios` | Sessões, pacientes (contagem) e aguardando autorização por convênio; pendências por dia e profissional. |
+| `qualidade_agenda` | Buracos entre atendimentos e vagas isoladas por profissional. |
+| `salas_ociosas` | Salas da menos para a mais ocupada, com a situação frente à meta. |
+
+Regras:
+
+- A ocupação só entra se `ocupacao` estiver na lista.
+- `data` junto com `inicio`/`fim`: `422`. `inicio`/`fim` sem `relatorios`: `422`. `ocupacao` com
+  `inicio`/`fim`: `422` (use `data`, ou peça a ocupação num envio separado).
+- Período maior que 14 dias, ou com o fim antes do início: `422`.
+- `agenda_paciente`: `422` com a mensagem "agenda_paciente não pode ser enviado por e-mail: o
+  e-mail nunca contém nome de paciente…". **O e-mail nunca contém nome de paciente.**
+- Tabelas com mais de 15 linhas mostram as 15 primeiras e um rodapé "+N linhas".
+- Os relatórios de ocupação trazem a linha "Meta de ocupação: 80%", o resumo "N de M … abaixo
+  da meta" e a coluna "Situação" ("Abaixo da meta", em destaque no HTML, ou "Na meta"). As
+  salas saem em ordem natural (Sala 2 antes de Sala 10), exceto em `salas_ociosas`, que ordena da
+  menos para a mais ocupada.
+- Sem Resend configurado: `503`. Falha no envio ou na leitura da agenda: `502`, sem detalhe.
+
+Exemplo:
+
+```json
+{
+  "relatorios": ["vagas_livres", "ranking_ocupacao", "convenios"],
+  "inicio": "2026-09-28",
+  "fim": "2026-10-02"
+}
+```
+
+A resposta é a mesma de sempre: `{"enviado": true, "destinatarios": [...]}`.

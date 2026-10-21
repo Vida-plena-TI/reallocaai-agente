@@ -7,10 +7,16 @@ detalhe interno do domínio mudar.
 
 from datetime import date
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.ai.relatorios import BlocoRelatorio
 from app.ai.tools_relatorios import ArgsGerarRelatorio
+from app.reports.relatorios_gerais import (
+    MAX_DIAS_EMAIL,
+    TIPOS_RELATORIO_EMAIL,
+    resolver_periodo,
+    validar_tipos,
+)
 
 #: Teto de `limite` em `POST /relatorios/gerar`.
 MAX_LINHAS_RELATORIO = 200
@@ -119,6 +125,36 @@ class EnviarRelatorioRequest(BaseModel):
             "configurada em REPORT_EMAIL_TO."
         ),
     )
+    relatorios: list[str] | None = Field(
+        default=None,
+        description=(
+            "Opcional. Lista exata dos relatórios do e-mail, na ordem: "
+            f"{', '.join(TIPOS_RELATORIO_EMAIL)}. Omitida: o relatório de ocupação do dia, "
+            "como sempre foi. agenda_paciente nunca vai por e-mail (422)."
+        ),
+    )
+    inicio: date | None = Field(
+        default=None,
+        description=(
+            "Com `relatorios`: primeiro dia do período (até "
+            f"{MAX_DIAS_EMAIL} dias). Não vale para `ocupacao`, que é de um dia (`data`)."
+        ),
+    )
+    fim: date | None = Field(default=None, description="Com `relatorios`: último dia, inclusive.")
+
+    @model_validator(mode="after")
+    def _validar_relatorios_e_periodo(self) -> EnviarRelatorioRequest:
+        if self.relatorios is None:
+            if self.inicio is not None or self.fim is not None:
+                raise ValueError(
+                    "'inicio' e 'fim' só valem com 'relatorios'; o relatório de ocupação é de "
+                    "um dia: use 'data'."
+                )
+            return self
+        tipos = validar_tipos(self.relatorios)
+        # Só valida: o período efetivo é resolvido na rota, com a data de hoje.
+        resolver_periodo(tipos, self.data, self.inicio, self.fim, date.today())
+        return self
 
 
 class EnviarRelatorioResponse(BaseModel):

@@ -41,8 +41,9 @@ from app.config import Settings, get_settings
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import Especialidade, ScheduleDataSource
 from app.engine.ocupacao import OcupacaoAgregada, RelatorioOcupacaoDoDia
-from app.reports.envio import enviar_relatorio_por_email
+from app.reports.envio import enviar_relatorio_por_email, enviar_relatorios_gerais_por_email
 from app.reports.exceptions import ReportsEnvioError
+from app.reports.relatorios_gerais import resolver_periodo, validar_tipos
 
 router = APIRouter(dependencies=[Depends(validar_api_key)])
 
@@ -230,7 +231,10 @@ def obter_historico_da_conversa(
         "Monta o relatório de ocupação do dia (por sala e por especialidade, já "
         "calculado pela engine) e envia por e-mail via Resend. Omita `data` para "
         "usar a data de hoje, e `destinatarios` para usar a lista padrão "
-        "configurada em REPORT_EMAIL_TO. Sem o Resend configurado no ambiente, "
+        "configurada em REPORT_EMAIL_TO. Com `relatorios` (opcional), o e-mail traz "
+        "exatamente esses relatórios, na ordem pedida, de `data` ou de `inicio`/`fim` "
+        "(até 14 dias; `ocupacao` é de um dia só). O e-mail nunca contém nome de "
+        "paciente: `agenda_paciente` devolve 422. Sem o Resend configurado no ambiente, "
         "devolve 503. Falhas no envio (Resend fora do ar, credencial inválida "
         "etc.) devolvem 502, sem detalhar o erro interno."
     ),
@@ -252,7 +256,12 @@ def enviar_relatorio(
     )
 
     try:
-        enviar_relatorio_por_email(fonte, data_efetiva, corpo.destinatarios)
+        if corpo.relatorios is None:
+            enviar_relatorio_por_email(fonte, data_efetiva, corpo.destinatarios)
+        else:
+            tipos = validar_tipos(corpo.relatorios)
+            inicio, fim = resolver_periodo(tipos, corpo.data, corpo.inicio, corpo.fim, date.today())
+            enviar_relatorios_gerais_por_email(fonte, tipos, inicio, fim, corpo.destinatarios)
     except ReportsEnvioError as erro:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

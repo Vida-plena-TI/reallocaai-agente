@@ -268,6 +268,13 @@ salas abaixo da meta") e duas tabelas com as colunas "Especialidade" ou "Sala", 
 "Situação" ("Abaixo da meta", com a linha destacada em vermelho no HTML, ou "Na meta"). As salas
 saem em ordem natural (Sala 2 antes de Sala 10), a mesma de `/agenda/ocupacao`.
 
+**Relatórios gerais por e-mail (opcional).** Com o campo `relatorios` (lista exata, na ordem:
+`ocupacao`, `vagas_livres`, `ranking_ocupacao`, `convenios`, `qualidade_agenda`,
+`salas_ociosas`), o e-mail traz exatamente esses relatórios, de `data` ou de `inicio`/`fim` (até
+14 dias; `ocupacao` é de um dia só). O e-mail nunca contém nome de paciente: `agenda_paciente`
+devolve `422`. Sem o campo, nada muda. Contrato completo em
+[`docs/api-relatorios.md`](docs/api-relatorios.md).
+
 Resposta:
 
 ```json
@@ -487,7 +494,13 @@ caminhos.
 
 ```bash
 uv run python scripts/preview_email.py [AAAA-MM-DD]
+uv run python scripts/preview_email.py --relatorios vagas_livres,ranking_ocupacao \
+  --inicio 2026-10-19 --fim 2026-10-23
 ```
+
+Com `--relatorios`, gera o e-mail dos relatórios gerais (o mesmo de `POST /relatorio/enviar` com
+o campo `relatorios`), do dia informado ou do período `--inicio`/`--fim`, com as mesmas
+validações da rota (por exemplo, `agenda_paciente` é recusado).
 
 Exige só as credenciais do Google Sheets. O relatório traz salas, especialidades e contagens,
 sem nomes de pacientes, mas vem da agenda real: por isso a saída fica em `scripts/output/`, que
