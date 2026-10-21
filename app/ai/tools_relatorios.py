@@ -198,8 +198,8 @@ class ArgsGerarRelatorio(BaseModel):
     )
 
 
-class _ParametroInvalidoError(Exception):
-    """Parâmetro que não pôde ser resolvido; a mensagem vai ao modelo."""
+class ParametroInvalidoError(Exception):
+    """Parâmetro que não pôde ser resolvido; a mensagem vai ao modelo (ou ao 422 da API)."""
 
 
 def _mensagem_validacao(erro: Exception) -> str:
@@ -224,9 +224,9 @@ def _periodo(inicio: date | None, fim: date | None, hoje: date) -> tuple[date, d
     fim = fim or inicio
     assert inicio is not None and fim is not None
     if fim < inicio:
-        raise _ParametroInvalidoError("O fim do período é anterior ao início.")
+        raise ParametroInvalidoError("O fim do período é anterior ao início.")
     if (fim - inicio).days + 1 > MAX_DIAS_POR_PERIODO:
-        raise _ParametroInvalidoError(
+        raise ParametroInvalidoError(
             f"Período longo demais: o máximo é {MAX_DIAS_POR_PERIODO} dias. Divida o pedido."
         )
     return inicio, fim
@@ -240,12 +240,12 @@ def _resolver_profissionais(foto: FotografiaPeriodo, nomes: list[str]) -> frozen
             candidatos = ", ".join(
                 f"{c.nome} ({rotulo_enum(c.especialidade.value)})" for c in localizacao.candidatos
             )
-            raise _ParametroInvalidoError(
+            raise ParametroInvalidoError(
                 f"Mais de uma profissional corresponde a '{nome}': {candidatos}. Pergunte qual "
                 "delas a pessoa quis dizer."
             )
         if isinstance(localizacao, ProfissionalNaoEncontrado):
-            raise _ParametroInvalidoError(
+            raise ParametroInvalidoError(
                 f"Nenhuma profissional '{nome}' na agenda do período. Disponíveis: "
                 f"{', '.join(localizacao.nomes_disponiveis) or 'nenhuma'}."
             )
@@ -259,7 +259,7 @@ def _resolver_especialidades(textos: list[str]) -> frozenset[Especialidade]:
         especialidade = reconhecer_especialidade(texto)
         if especialidade is None:
             validas = ", ".join(rotulo_enum(e.value) for e in Especialidade)
-            raise _ParametroInvalidoError(
+            raise ParametroInvalidoError(
                 f"Especialidade '{texto}' não reconhecida. Válidas: {validas}."
             )
         especialidades.add(especialidade)
@@ -280,7 +280,7 @@ def _resolver_salas(foto: FotografiaPeriodo, textos: list[str]) -> frozenset[str
             disponiveis = ", ".join(
                 sorted((s.nome for s in foto.salas.values()), key=chave_natural)
             )
-            raise _ParametroInvalidoError(
+            raise ParametroInvalidoError(
                 f"Sala '{texto}' não está na agenda do período. Salas: {disponiveis}."
             )
         ids.add(sala.id)
@@ -292,7 +292,7 @@ def _resolver_convenios(textos: list[str]) -> frozenset[str]:
     for texto in textos:
         valor = _CONVENIOS_POR_TEXTO.get(normalizar_id(texto))
         if valor is None:
-            raise _ParametroInvalidoError(
+            raise ParametroInvalidoError(
                 f"Convênio '{texto}' não reconhecido. Válidos: unimed, klini, sulamerica, "
                 "particular, nao_informado."
             )
@@ -345,19 +345,19 @@ def _ajustar_combinacao(args: ArgsGerarRelatorio) -> tuple[ArgsGerarRelatorio, l
     vale uma segunda chamada: é ignorado e a nota vai no texto para o modelo.
     """
     if args.paciente is not None and args.relatorio != "agenda_paciente":
-        raise _ParametroInvalidoError(
+        raise ParametroInvalidoError(
             "paciente só vale com relatorio='agenda_paciente'; os demais relatórios nunca "
             "trazem pacientes, só contagens."
         )
     if args.relatorio == "agenda_paciente" and not (args.paciente or "").strip():
-        raise _ParametroInvalidoError("agenda_paciente exige o nome do paciente em 'paciente'.")
+        raise ParametroInvalidoError("agenda_paciente exige o nome do paciente em 'paciente'.")
     if args.relatorio == "personalizado" and not args.metricas:
-        raise _ParametroInvalidoError(
+        raise ParametroInvalidoError(
             "personalizado exige 'metricas' (ex.: ['vagas_livres']) e, opcionalmente, "
             "'dimensoes' (ex.: ['dia', 'especialidade'])."
         )
     if args.relatorio == "ranking_ocupacao" and args.dimensoes and len(args.dimensoes) != 1:
-        raise _ParametroInvalidoError("ranking_ocupacao aceita exatamente uma dimensão.")
+        raise ParametroInvalidoError("ranking_ocupacao aceita exatamente uma dimensão.")
 
     # "Vagas de 1 h" é pedido de janela contínua.
     if args.relatorio == "vagas_livres" and args.duracao_minutos is not None:
@@ -385,7 +385,7 @@ def _slots_da_janela(duracao_minutos: int | None) -> int:
     minutos = duracao_minutos if duracao_minutos is not None else 60
     slots = -(-minutos // DURACAO_SLOT_MINUTOS)
     if minutos <= 0 or slots > MAX_SLOTS_POR_JANELA:
-        raise _ParametroInvalidoError(
+        raise ParametroInvalidoError(
             f"duracao_minutos deve ficar entre {DURACAO_SLOT_MINUTOS} e "
             f"{MAX_SLOTS_POR_JANELA * DURACAO_SLOT_MINUTOS}."
         )
@@ -400,15 +400,21 @@ def _ordenar_por(valor: str | None) -> Metrica | Dimensao | None:
             return tipo(valor)
         except ValueError:
             continue
-    raise _ParametroInvalidoError(
+    raise ParametroInvalidoError(
         f"ordenar_por='{valor}' não é métrica nem dimensão. Use uma das métricas ou "
         "dimensões pedidas."
     )
 
 
-def _executar(
+def executar_relatorio(
     fonte: ScheduleDataSource, hoje: date, args: ArgsGerarRelatorio
 ) -> tuple[str, dict[str, Any] | None]:
+    """Texto curto e bloco (já em JSON) do relatório pedido em `args`.
+
+    É o núcleo de `gerar_relatorio` e de `POST /relatorios/gerar`: os dois
+    devolvem exatamente o mesmo. Parâmetro sem sentido levanta
+    `ParametroInvalidoError` ou `ConsultaInvalidaError`, com mensagem útil.
+    """
     args, notas = _ajustar_combinacao(args)
     inicio, fim = _periodo(args.inicio, args.fim, hoje)
     janela = _slots_da_janela(args.duracao_minutos) if args.relatorio == "janelas_continuas" else 1
@@ -605,6 +611,14 @@ def _catalogo(foto: FotografiaPeriodo) -> str:
     return "\n".join(linhas)
 
 
+def texto_catalogo(foto: FotografiaPeriodo) -> str:
+    """O texto de `consultar_catalogo` para a fotografia da semana, com o aviso de parcial."""
+    texto = _catalogo(foto)
+    if foto.parcial:
+        texto += "\n" + _avisos(foto)[-1]
+    return texto
+
+
 def criar_tools_relatorios(fonte: ScheduleDataSource, data_referencia: date) -> list[BaseTool]:
     """`consultar_catalogo` e `gerar_relatorio`, fechadas sobre `fonte` e a data de hoje."""
 
@@ -621,10 +635,7 @@ def criar_tools_relatorios(fonte: ScheduleDataSource, data_referencia: date) -> 
             foto = fotografar_periodo(fonte, semana[0], semana[-1])
         except Exception as erro:
             return f"Erro ao ler a agenda para o catálogo ({type(erro).__name__})."
-        texto = _catalogo(foto)
-        if foto.parcial:
-            texto += "\n" + _avisos(foto)[-1]
-        return texto
+        return texto_catalogo(foto)
 
     @tool(
         "gerar_relatorio",
@@ -644,8 +655,8 @@ def criar_tools_relatorios(fonte: ScheduleDataSource, data_referencia: date) -> 
         """
         args = ArgsGerarRelatorio.model_validate(kwargs)
         try:
-            return _executar(fonte, data_referencia, args)
-        except (_ParametroInvalidoError, ConsultaInvalidaError) as erro:
+            return executar_relatorio(fonte, data_referencia, args)
+        except (ParametroInvalidoError, ConsultaInvalidaError) as erro:
             return f"Não foi possível gerar o relatório: {erro}", None
         except Exception as erro:
             # Só o tipo: a mensagem pode repetir dados da planilha.

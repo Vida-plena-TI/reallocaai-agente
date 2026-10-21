@@ -123,6 +123,11 @@ Todos os endpoints abaixo (exceto `/health`) exigem o header `X-API-Key`, com o 
 | `/agenda/chat` | POST | Envia uma mensagem ao agente de IA e devolve a resposta. Ver detalhes abaixo. |
 | `/agenda/chat/{conversa_id}` | GET | Histórico bruto de uma conversa (útil para depuração). |
 | `/relatorio/enviar` | POST | Envia por e-mail o relatório de ocupação de um dia (por sala e por especialidade). Ver detalhes abaixo. |
+| `/relatorios/catalogo` | GET | Mapa da clínica na semana e o significado de cada relatório e métrica (o mesmo da tool `consultar_catalogo`). |
+| `/relatorios/gerar` | POST | Relatório geral de qualquer período: o mesmo `{texto, bloco}` da tool `gerar_relatorio`. Contrato em [`docs/api-relatorios.md`](docs/api-relatorios.md). |
+
+Os erros `422` de validação, em todas as rotas, trazem só `loc`, `msg` e `type` de cada erro: o
+valor recebido nunca volta na resposta (o corpo de `/agenda/chat` pode ter nome de paciente).
 
 ### `POST /agenda/chat`
 

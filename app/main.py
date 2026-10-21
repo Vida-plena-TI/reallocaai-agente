@@ -5,10 +5,14 @@ import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.ai.rastreamento import desligar_rastreamento_externo
+from app.api.rotas_relatorios import router as router_relatorios
 from app.api.routes import router
 from app.api.sessoes import ArmazenamentoConversas
 from app.config import Settings, get_settings, validar_configuracao
@@ -56,6 +60,25 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
+async def responder_erro_de_validacao(
+    _request: Request, erro: RequestValidationError
+) -> JSONResponse:
+    """422 de validação sem o valor recebido.
+
+    O padrão do FastAPI devolve o `input` (e o `ctx`) de cada erro, e o corpo
+    pode trazer texto de conversa ou o nome de um paciente. Aqui só ficam onde
+    (`loc`), o quê (`msg`) e o tipo do erro.
+    """
+    detalhes = [
+        {"loc": list(item["loc"]), "msg": item["msg"], "type": item["type"]}
+        for item in erro.errors()
+    ]
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content=jsonable_encoder({"detail": detalhes}),
+    )
+
+
 def criar_app(settings: Settings) -> FastAPI:
     """Monta a aplicação a partir de `settings` (CORS e docs dependem do ambiente).
 
@@ -89,7 +112,9 @@ def criar_app(settings: Settings) -> FastAPI:
         allow_headers=["*"],
     )
 
+    aplicacao.exception_handler(RequestValidationError)(responder_erro_de_validacao)
     aplicacao.include_router(router)
+    aplicacao.include_router(router_relatorios)
 
     @aplicacao.get("/health")
     def health() -> dict[str, str]:
