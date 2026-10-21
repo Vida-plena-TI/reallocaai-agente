@@ -24,9 +24,7 @@ from app.ai.tools import criar_tools
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
 from app.domain import Profissional, Sala
 from app.domain.formatacao import formatar_razao
-from app.engine.carga_profissionais import construir_carga_profissionais
 from app.engine.ocupacao import construir_relatorio_ocupacao_do_dia
-from app.engine.ocupacao_profissional import construir_ocupacao_semanal_profissional
 from tests.support.agenda_semanal import (
     QUARTA,
     SEGUNDA,
@@ -39,6 +37,7 @@ from tests.support.agenda_semanal import (
 )
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 from tests.support.relatorios import ANA, NOMES_PACIENTES, fonte_relatorios
+from tests.support.visoes import construir_carga, ocupacao_semanal
 
 
 def mensagem_tool(
@@ -107,7 +106,7 @@ def test_ocupacao_profissional_copia_todas_as_metricas_da_engine() -> None:
     bloco = BlocoRelatorio.model_validate(mensagem.artifact)
     dados = bloco.dados
     assert isinstance(dados, DadosOcupacaoProfissional)
-    engine = construir_ocupacao_semanal_profissional(fonte_relatorios(), ANA.id, SEGUNDA)
+    engine = ocupacao_semanal(fonte_relatorios(), ANA.id, SEGUNDA)
     assert dados.profissional.nome == engine.nome
     assert dados.profissional.id != engine.profissional_id
     for campo in ("escalados", "ocupados", "livres", "para_meta"):
@@ -162,7 +161,7 @@ def test_pacientes_copia_engine_e_respeita_filtros(args: dict[str, Any]) -> None
     bloco = BlocoRelatorio.model_validate(mensagem.artifact)
     dados = bloco.dados
     assert isinstance(dados, DadosPacientesProfissional)
-    engine = construir_carga_profissionais(
+    engine = construir_carga(
         fonte_relatorios(), [SEGUNDA] if args.get("escopo") == "dia" else SEMANA
     )
     por_nome = {e.nome: e for e in engine.profissionais}
@@ -343,7 +342,7 @@ def fonte_cento_e_cinco_por_cento() -> FakeScheduleDataSource:
 
 def test_ocupacao_profissional_acima_de_cem_por_cento_devolve_bloco_com_valor_real() -> None:
     fonte = fonte_cento_e_cinco_por_cento()
-    engine = construir_ocupacao_semanal_profissional(fonte, ANA.id, SEGUNDA)
+    engine = ocupacao_semanal(fonte, ANA.id, SEGUNDA)
     assert engine.percentual == 1.05 and not engine.tem_inconsistencia
     mensagem = mensagem_tool("consultar_ocupacao_profissional", {"profissional": "Ana"}, fonte)
     bloco = BlocoRelatorio.model_validate(mensagem.artifact)
@@ -384,7 +383,7 @@ def test_ocupacao_acima_de_cem_por_cento_mantem_o_valor_da_engine(
 ) -> None:
     fonte = fonte_relatorios()
     fonte.grade[SEGUNDA] = fonte.grade[SEGUNDA][:1]
-    engine = construir_ocupacao_semanal_profissional(fonte, ANA.id, SEGUNDA)
+    engine = ocupacao_semanal(fonte, ANA.id, SEGUNDA)
     assert engine.dias[0].percentual == 3.0
     mensagem = mensagem_tool(nome, args, fonte)
     bloco = BlocoRelatorio.model_validate(mensagem.artifact)

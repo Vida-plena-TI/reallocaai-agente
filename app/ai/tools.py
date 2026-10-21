@@ -42,12 +42,8 @@ from app.ai.servico_agenda import (
     ResultadoExato,
     buscar_encaixe,
     buscar_paciente,
-    consultar_carga_profissionais,
-    consultar_disponibilidade_do_dia,
-    consultar_ocupacao_do_dia,
-    consultar_ocupacao_semanal_profissional,
     localizar_paciente,
-    localizar_profissional,
+    resolver_profissional,
     sugerir_realocacao_por_id,
 )
 from app.ai.tools_relatorios import criar_tools_relatorios
@@ -73,9 +69,11 @@ from app.domain.constants import (
     META_OCUPACAO_POR_SALA,
 )
 from app.domain.formatacao import formatar_razao
+from app.engine import visoes_fotografia
 from app.engine.carga_profissionais import CargaProfissionais, CargaProfissional
 from app.engine.disponibilidade import SlotDisponivel
 from app.engine.encaixe import CenarioSugestao, ItemEncaixeResolvido, OpcaoEncaixe
+from app.engine.fotografia import FotografiaPeriodo, fotografar_periodo
 from app.engine.ocupacao import OcupacaoAgregada
 from app.engine.ocupacao_profissional import (
     OcupacaoDiaProfissional,
@@ -155,11 +153,16 @@ def _nome_sala(fonte: ScheduleDataSource, dia: date, sala_id: str) -> str:
     return sala.nome if sala is not None else sala_id
 
 
-def _resolver_profissional_id(fonte: ScheduleDataSource, dia: date, nome_ou_id: str) -> str | None:
-    """Id do profissional cujo id normalizado casa com `nome_ou_id`, sem fuzzy matching."""
-    alvo = normalizar_id(nome_ou_id)
-    profissional = next((item for item in fonte.listar_profissionais(dia) if item.id == alvo), None)
-    return profissional.id if profissional is not None else None
+def _nome_na_foto(foto: FotografiaPeriodo, profissional_id: str) -> str:
+    """Nome do profissional, ou o próprio id quando ele não está na agenda do dia."""
+    profissional = foto.profissionais.get(profissional_id)
+    return profissional.nome if profissional is not None else profissional_id
+
+
+def _semana_na_foto(fonte: ScheduleDataSource, data: date) -> FotografiaPeriodo:
+    """Fotografia de segunda a sábado da semana de `data`: uma leitura de cada dia."""
+    semana = dias_da_semana_de(data)
+    return fotografar_periodo(fonte, semana[0], semana[-1])
 
 
 def _sufixo_posto_do_item(grade: list[EntradaGrade], item: ItemEncaixeResolvido) -> str:
@@ -858,17 +861,19 @@ def criar_tools(
         `buscar_encaixe`.
         """
         try:
+            foto = fotografar_periodo(fonte, data, data)
             profissional_id = None
             if profissional is not None:
-                profissional_id = _resolver_profissional_id(fonte, data, profissional)
-                if profissional_id is None:
+                # Só o id exato, sem correspondência aproximada.
+                profissional_id = normalizar_id(profissional)
+                if profissional_id not in foto.profissionais:
                     return (
                         f"Profissional não encontrado com o nome ou id '{profissional}' na "
                         f"agenda de {data.strftime('%d/%m/%Y')}."
                     )
 
-            disponiveis = consultar_disponibilidade_do_dia(
-                fonte, data, especialidade=especialidade, profissional_id=profissional_id
+            disponiveis = visoes_fotografia.disponibilidade(
+                foto, data, especialidade=especialidade, profissional_id=profissional_id
             )
         except Exception as erro:
             return f"Erro ao consultar disponibilidade: {erro}"
@@ -887,8 +892,8 @@ def criar_tools(
             f"- {disponivel.slot.hora_inicio.strftime('%H:%M')} às "
             f"{disponivel.slot.hora_fim.strftime('%H:%M')}: "
             f"{_rotulo_especialidade(disponivel.especialidade)} com "
-            f"{_nome_profissional(fonte, data, disponivel.profissional_id)} na "
-            f"{_nome_sala(fonte, data, disponivel.sala_id)}"
+            f"{_nome_na_foto(foto, disponivel.profissional_id)} na "
+            f"{foto.nome_sala(disponivel.sala_id)}"
             f"{_sufixo_posto(disponivel, vagas_por_chave)}."
             for disponivel in disponiveis
         ]
@@ -913,8 +918,9 @@ def criar_tools(
         atende, use `consultar_pacientes_por_profissional`.
         """
         try:
-            relatorio = consultar_ocupacao_do_dia(fonte, data)
-            nomes_salas = {s.id: s.nome for s in fonte.listar_salas(data)}
+            foto = fotografar_periodo(fonte, data, data)
+            relatorio = visoes_fotografia.ocupacao_do_dia(foto, data)
+            nomes_salas = {s.id: s.nome for s in foto.salas.values()}
             bloco = bloco_ocupacao_agregada(relatorio, nomes_salas)
         except Exception as erro:
             return f"Erro ao consultar ocupação: {erro}", None
@@ -961,7 +967,8 @@ def criar_tools(
         """
         data_efetiva = data if data is not None else data_referencia
         try:
-            localizacao = localizar_profissional(fonte, data_efetiva, profissional)
+            foto = _semana_na_foto(fonte, data_efetiva)
+            localizacao = resolver_profissional(foto.profissionais, profissional)
             if isinstance(localizacao, ProfissionalAmbiguo):
                 candidatos = ", ".join(
                     f"{candidato.nome} ({_rotulo_especialidade(candidato.especialidade)})"
@@ -980,8 +987,8 @@ def criar_tools(
                     f"Profissionais disponíveis: {disponiveis}."
                 ), None
 
-            ocupacao = consultar_ocupacao_semanal_profissional(
-                fonte, localizacao.profissional_id, data_efetiva
+            ocupacao = visoes_fotografia.ocupacao_semanal_profissional(
+                foto, localizacao.profissional_id
             )
             texto = _formatar_ocupacao_profissional(ocupacao)
             if not ocupacao.dias:
@@ -1045,10 +1052,16 @@ def criar_tools(
                 ), None
 
         try:
+            # Uma fotografia só: a semana quando ela é pedida ou quando é preciso
+            # achar a profissional entre as da semana; senão, só o dia.
+            if escopo == "semana" or profissional is not None:
+                foto = _semana_na_foto(fonte, data_efetiva)
+            else:
+                foto = fotografar_periodo(fonte, data_efetiva, data_efetiva)
             profissional_id: str | None = None
             nome_encontrado = ""
             if profissional is not None:
-                localizacao = localizar_profissional(fonte, data_efetiva, profissional)
+                localizacao = resolver_profissional(foto.profissionais, profissional)
                 if isinstance(localizacao, ProfissionalAmbiguo):
                     candidatos = ", ".join(
                         f"{candidato.nome} ({_rotulo_especialidade(candidato.especialidade)})"
@@ -1069,7 +1082,7 @@ def criar_tools(
                 profissional_id = localizacao.profissional_id
                 nome_encontrado = localizacao.nome
 
-            resultado = consultar_carga_profissionais(fonte, dias)
+            resultado = visoes_fotografia.carga_profissionais(foto, dias)
         except Exception as erro:
             return f"Erro ao contar pacientes por profissional: {erro}", None
 

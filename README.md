@@ -305,8 +305,9 @@ hoje) e o **total da semana**, sempre frente à meta de 80%.
   os blocos manhã/tarde, quantos slots faltam para a meta e, quando ela passou por mais de uma
   sala ou posto no dia, uma linha por sala/posto. O total da semana é **ponderado** pelos slots
   de cada dia (não é a média dos percentuais diários).
-- As regras de contagem são as mesmas de `/agenda/ocupacao` (`app/engine/ocupacao.py`); o
-  cálculo vive em `app/engine/ocupacao_profissional.py`.
+- As regras de contagem são as mesmas de `/agenda/ocupacao` (`app/engine/ocupacao.py`). A tool lê
+  a semana numa fotografia só (`fotografar_periodo`) e monta o resultado em
+  `app/engine/visoes_fotografia.py`; os modelos ficam em `app/engine/ocupacao_profissional.py`.
 - Dias sem escala dela aparecem como "Sem agenda"; um dia cuja leitura falhe é sinalizado e os
   totais da semana ficam marcados como parciais; atendimento fora dos horários escalados gera
   um aviso de possível inconsistência na planilha.
@@ -338,8 +339,9 @@ padrão é a semana de hoje, todas as profissionais, com o detalhe por dia.
 - **Média:** soma dos pacientes dos dias com agenda (grade ou atendimento) dividida pelo número
   desses dias; um dia com agenda e nenhum paciente entra como 0. Profissional sem agenda no
   período não aparece; com agenda e nenhum paciente aparece com 0.
-- O cálculo vive em `app/engine/carga_profissionais.py`, que lê cada dia **uma vez** para todas
-  as profissionais (as leituras à fonte não crescem com o número de profissionais). Um dia cuja
+- O cálculo vive em `app/engine/visoes_fotografia.py` (modelos em
+  `app/engine/carga_profissionais.py`), sobre a fotografia do período: cada dia é lido **uma vez**
+  para todas as profissionais (as leituras à fonte não crescem com o número de profissionais). Um dia cuja
   leitura falhe é sinalizado e os números ficam marcados como parciais. A resposta nunca traz
   nome de paciente, e no escopo `semana` termina com a mesma ressalva da grade semanal.
 
@@ -375,7 +377,22 @@ si leva ~2 s com o cache frio, e o resto é o modelo.
 **Regras de contagem** — as mesmas das engines antigas, e um teste de equivalência
 (`tests/engine/test_equivalencia_relatorios.py`) garante que, no mesmo recorte, os números
 batem exatamente com `consultar_ocupacao`, `consultar_ocupacao_profissional`,
-`consultar_pacientes_por_profissional` e `consultar_disponibilidade`:
+`consultar_pacientes_por_profissional` e `consultar_disponibilidade`.
+
+**As quatro tools antigas rodam sobre o motor novo.** `consultar_disponibilidade`,
+`consultar_ocupacao`, `consultar_ocupacao_profissional` e `consultar_pacientes_por_profissional`
+fazem uma fotografia por chamada (o dia, ou a semana) e montam o resultado em
+`app/engine/visoes_fotografia.py`, com `calcular_metricas` do motor genérico. Nome, descrição,
+argumentos, texto e bloco não mudaram: `tests/ai/test_golden_tools.py` compara cada tool com o
+golden capturado do código antigo (`tests/ai/golden/`, 74 casos, inclusive os de borda) e com o
+contrato que o modelo vê (nome, descrição e schema). O golden nunca é regerado para fazer um teste
+passar. `listar_disponibilidade` e `construir_relatorio_ocupacao_do_dia` continuam existindo
+porque o encaixe, o e-mail atual e as rotas `GET /agenda/*` usam.
+
+Regras antigas preservadas de propósito: a ocupação **por sala** do dia só conta atendimento que
+caiu numa janela da grade; profissional listado sem grade aparece com 0 de 0; a disponibilidade
+casa atendimento e vaga pelo posto exato (como o encaixe); sala e profissional são nomeados só
+com a lista do próprio dia.
 
 - slots de 30 min; cada posto da sala é uma vaga independente; sessão em grupo ocupa o slot
   uma vez e cada paciente conta;

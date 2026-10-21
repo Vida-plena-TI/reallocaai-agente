@@ -12,15 +12,14 @@ import pytest
 
 from app.ai.servico_agenda import (
     ProfissionalEncontrado,
-    localizar_profissional,
 )
 from app.ai.tools import criar_tools
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
 from app.data_sources.google_sheets_parser import parse_worksheet_data
 from app.domain import MAPA_ALIAS_PROFISSIONAL
 from app.engine.ocupacao import construir_relatorio_ocupacao_do_dia
-from app.engine.ocupacao_profissional import construir_ocupacao_semanal_profissional
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
+from tests.support.visoes import localizar, ocupacao_semanal
 
 SEGUNDA = date(2026, 9, 28)
 TERCA = date(2026, 9, 29)
@@ -105,7 +104,7 @@ def test_duas_grafias_em_dias_diferentes_viram_uma_profissional_na_semana(
     monkeypatch.setitem(MAPA_ALIAS_PROFISSIONAL, *ALIAS_FICTICIO)
     fonte = _fonte({SEGUNDA: SEGUNDA_GRAFIA_ANTIGA, TERCA: TERCA_GRAFIA_CANONICA})
 
-    ocupacao = construir_ocupacao_semanal_profissional(fonte, "odette-lima", SEGUNDA)
+    ocupacao = ocupacao_semanal(fonte, "odette-lima", SEGUNDA)
 
     assert _ids_da_semana(fonte) == {"odette-lima"}
     assert ocupacao.nome == "Odette Lima"
@@ -117,8 +116,8 @@ def test_sem_o_alias_as_duas_grafias_dividem_a_ocupacao() -> None:
     """Contraprova do teste acima: é o alias que junta as duas metades."""
     fonte = _fonte({SEGUNDA: SEGUNDA_GRAFIA_ANTIGA, TERCA: TERCA_GRAFIA_CANONICA})
 
-    antiga = construir_ocupacao_semanal_profissional(fonte, "odete-lima", SEGUNDA)
-    canonica = construir_ocupacao_semanal_profissional(fonte, "odette-lima", SEGUNDA)
+    antiga = ocupacao_semanal(fonte, "odete-lima", SEGUNDA)
+    canonica = ocupacao_semanal(fonte, "odette-lima", SEGUNDA)
 
     assert _ids_da_semana(fonte) == {"odete-lima", "odette-lima"}
     assert (antiga.slots_escalados, antiga.slots_ocupados) == (2, 1)
@@ -132,7 +131,7 @@ def test_duas_grafias_no_mesmo_dia_viram_um_registro_no_relatorio_do_dia(
     fonte = _fonte({SEGUNDA: DIA_COM_AS_DUAS_GRAFIAS})
 
     relatorio = construir_relatorio_ocupacao_do_dia(fonte, SEGUNDA)
-    dia = construir_ocupacao_semanal_profissional(fonte, "odette-lima", SEGUNDA).dias[0]
+    dia = ocupacao_semanal(fonte, "odette-lima", SEGUNDA).dias[0]
 
     assert [item.profissional_id for item in relatorio.por_profissional] == ["odette-lima"]
     do_relatorio = relatorio.por_profissional[0]
@@ -146,7 +145,7 @@ def test_busca_pela_grafia_antiga_encontra_a_canonica(monkeypatch: pytest.Monkey
     monkeypatch.setitem(MAPA_ALIAS_PROFISSIONAL, *ALIAS_FICTICIO)
     fonte = _fonte({SEGUNDA: SEGUNDA_GRAFIA_ANTIGA, TERCA: TERCA_GRAFIA_CANONICA})
 
-    resultado = localizar_profissional(fonte, SEGUNDA, "Odete Lima")
+    resultado = localizar(fonte, SEGUNDA, "Odete Lima")
 
     assert resultado == ProfissionalEncontrado(profissional_id="odette-lima", nome="Odette Lima")
 
@@ -154,8 +153,8 @@ def test_busca_pela_grafia_antiga_encontra_a_canonica(monkeypatch: pytest.Monkey
 def test_sem_o_alias_a_busca_ve_duas_profissionais_distintas() -> None:
     fonte = _fonte({SEGUNDA: SEGUNDA_GRAFIA_ANTIGA, TERCA: TERCA_GRAFIA_CANONICA})
 
-    antiga = localizar_profissional(fonte, SEGUNDA, "Odete Lima")
-    canonica = localizar_profissional(fonte, SEGUNDA, "Odette Lima")
+    antiga = localizar(fonte, SEGUNDA, "Odete Lima")
+    canonica = localizar(fonte, SEGUNDA, "Odette Lima")
 
     assert antiga == ProfissionalEncontrado(profissional_id="odete-lima", nome="Odete Lima")
     assert canonica == ProfissionalEncontrado(profissional_id="odette-lima", nome="Odette Lima")

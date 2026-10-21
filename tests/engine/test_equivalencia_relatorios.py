@@ -10,8 +10,6 @@ from app.engine import (
     FiltrosRelatorio,
     FotografiaPeriodo,
     Metrica,
-    construir_carga_profissionais,
-    construir_ocupacao_semanal_profissional,
     construir_relatorio_ocupacao_do_dia,
     fotografar_periodo,
     gerar_relatorio,
@@ -21,6 +19,7 @@ from app.engine.relatorio_generico import ResultadoRelatorio
 from tests.support.agenda_clinica import ANA, BETO, CAU, DIVA, fonte_clinica
 from tests.support.agenda_semanal import QUARTA, SABADO, SEGUNDA, SEMANA
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
+from tests.support.visoes import construir_carga, ocupacao_semanal
 
 PROFISSIONAIS = [ANA.id, BETO.id, CAU.id, DIVA.id]
 ESCALADOS_OCUPADOS = (Metrica.SLOTS_ESCALADOS, Metrica.SLOTS_OCUPADOS)
@@ -87,7 +86,7 @@ def test_ocupacao_do_dia(foto: FotografiaPeriodo, fonte: FakeScheduleDataSource)
 def test_ocupacao_semanal_profissional(
     foto: FotografiaPeriodo, fonte: FakeScheduleDataSource, profissional_id: str
 ) -> None:
-    semana = construir_ocupacao_semanal_profissional(fonte, profissional_id, SEGUNDA)
+    semana = ocupacao_semanal(fonte, profissional_id, SEGUNDA)
     filtro = FiltrosRelatorio(profissional_ids=frozenset({profissional_id}))
     metricas = (
         Metrica.SLOTS_ESCALADOS,
@@ -151,7 +150,7 @@ def test_ocupacao_semanal_profissional(
 
 
 def test_pacientes_por_profissional(foto: FotografiaPeriodo, fonte: FakeScheduleDataSource) -> None:
-    carga = construir_carga_profissionais(fonte, SEMANA)
+    carga = construir_carga(fonte, SEMANA)
 
     por_dia = gerar_relatorio(
         foto,
