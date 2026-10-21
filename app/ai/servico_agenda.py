@@ -227,7 +227,15 @@ def localizar_profissional(
             profissionais.setdefault(profissional.id, profissional)
     if not algum_dia_lido and ultimo_erro is not None:
         raise ultimo_erro
+    return resolver_profissional(profissionais, texto)
 
+
+def resolver_profissional(
+    profissionais: dict[str, Profissional], texto: str
+) -> LocalizacaoProfissional:
+    """Resolve `texto` entre `profissionais` (id -> profissional), com as regras de
+    `localizar_profissional`: alias, id exato e, sem ele, prefixo de palavras.
+    """
     # A grafia antiga de quem tem alias ("Larissa") nunca existe na agenda: o
     # parser já a trocou pela canônica, então a busca precisa fazer o mesmo.
     alvo = normalizar_id(texto)

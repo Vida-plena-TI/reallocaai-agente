@@ -19,17 +19,21 @@ from app.domain import (
     MAPA_ALIAS_PROFISSIONAL,
     MAPA_ESPECIALIDADE_FALLBACK,
     MAPA_SALA_FALLBACK,
+    MAPA_SALA_FIXA_PROFISSIONAL,
     Atendimento,
     Convenio,
     Especialidade,
 )
 from app.engine.disponibilidade import listar_disponibilidade
+from app.engine.ocupacao import construir_relatorio_ocupacao_do_dia
 from tests.data_sources.fixtures import (
     ALIAS_DE_PROFISSIONAL_FICTICIA,
     COLUNAS_SEM_SALA_FICTICIA,
     ESPECIALIDADE_INVISIVEL_FICTICIA,
     ESTAGIARIO_DIVIDE_COLUNA_FICTICIA,
+    NOME_MESCLADO_FICTICIA,
     POSTOS_DO_MESMO_TITULAR_FICTICIA,
+    SALA_FIXA_FICTICIA,
     SEGUNDA_FICTICIA,
     TERCA_FICTICIA,
     AbaFicticia,
@@ -560,6 +564,117 @@ def test_sala_do_mapa_de_fallback_com_nome_fora_do_formato_e_ignorada(
 
     assert "jonas" not in {item.id for item in dados.profissionais}
     assert "não está no formato 'Sala N'" in caplog.text
+
+
+@pytest.fixture
+def sala_fixa(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setitem(MAPA_SALA_FIXA_PROFISSIONAL, ("segunda", "nina"), "Sala 12")
+
+
+def postos_de(
+    dados: DadosAgendaDoDia, profissional_id: str, hora: time
+) -> dict[str, tuple[str, int]]:
+    """Paciente -> (sala, posto) dos atendimentos do profissional naquele horário."""
+    return {
+        paciente_id: (item.sala_id, item.indice_posto)
+        for item in dados.atendimentos
+        if item.profissional_id == profissional_id and item.slots[0].hora_inicio == hora
+        for paciente_id in item.paciente_ids
+    }
+
+
+@pytest.mark.usefixtures("sala_fixa")
+def test_sala_fixa_leva_todas_as_colunas_da_profissional_para_a_sala() -> None:
+    """Coluna sob outra sala (B), sob a sala certa (C) e sem sala (D): as três
+    são postos da Sala 12, na ordem das colunas."""
+    dados = analisar(SALA_FIXA_FICTICIA)
+
+    assert postos_de(dados, "nina", time(9, 0)) == {
+        "paciente-um": ("sala-12", 0),
+        "paciente-dois": ("sala-12", 1),
+        "paciente-tres": ("sala-12", 2),
+    }
+    assert postos_de(dados, "nina", time(13, 0)) == {"paciente-cinco": ("sala-12", 0)}
+    assert {entrada.sala_id for entrada in dados.grade if entrada.profissional_id == "nina"} == {
+        "sala-12"
+    }
+
+
+@pytest.mark.usefixtures("sala_fixa")
+def test_sala_fixa_define_a_capacidade_e_nao_sustenta_a_sala_do_cabecalho() -> None:
+    dados = analisar(SALA_FIXA_FICTICIA)
+
+    assert [(item.id, item.capacidade_simultanea) for item in dados.salas] == [
+        ("sala-2", 1),
+        ("sala-12", 3),
+    ]
+
+
+@pytest.mark.usefixtures("sala_fixa")
+def test_outra_profissional_na_coluna_da_sala_fixa_mantem_o_posto_da_coluna() -> None:
+    """À tarde a coluna C (posto 1 da Nina) é da Mel, sob o cabeçalho `Sala 12`:
+    ela continua na Sala 12 e no posto da coluna, sem colidir com a Nina em B."""
+    dados = analisar(SALA_FIXA_FICTICIA)
+
+    assert postos_de(dados, "mel", time(13, 0)) == {"paciente-seis": ("sala-12", 1)}
+    postos_da_tarde = sorted(
+        (entrada.indice_posto, entrada.profissional_id)
+        for entrada in dados.grade
+        if entrada.sala_id == "sala-12" and entrada.slot.hora_inicio == time(13, 0)
+    )
+    assert postos_da_tarde == [(0, "nina"), (1, "mel"), (2, "nina")]
+
+
+@pytest.mark.usefixtures("sala_fixa")
+def test_sala_fixa_nao_muda_outro_profissional_nem_outra_aba() -> None:
+    segunda = analisar(SALA_FIXA_FICTICIA)
+    terca = analisar(SALA_FIXA_FICTICIA, TERCA)
+
+    assert atendimento_de(segunda, "paciente-quatro")[0].sala_id == "sala-2"
+    # Na terça a Nina não está no mapa: cada coluna segue o cabeçalho e a D,
+    # sem sala, é descartada como sempre foi.
+    assert postos_de(terca, "nina", time(9, 0)) == {
+        "paciente-um": ("sala-1", 0),
+        "paciente-dois": ("sala-12", 0),
+    }
+
+
+@pytest.mark.usefixtures("sala_fixa")
+def test_sala_fixa_nao_passa_de_cem_por_cento_na_ocupacao() -> None:
+    dados = analisar(SALA_FIXA_FICTICIA)
+    origem = FakeScheduleDataSource(
+        profissionais={SEGUNDA: dados.profissionais},
+        grade={SEGUNDA: dados.grade},
+        atendimentos={SEGUNDA: dados.atendimentos},
+    )
+
+    por_sala = construir_relatorio_ocupacao_do_dia(origem, SEGUNDA).por_sala()
+
+    assert "sala-1" not in por_sala
+    assert (por_sala["sala-12"].slots_escalados, por_sala["sala-12"].slots_ocupados) == (6, 5)
+
+
+@pytest.mark.usefixtures("sala_fixa")
+def test_sala_fixa_estende_o_nome_mesclado_so_para_a_profissional_do_mapa() -> None:
+    """A coluna D vem vazia porque o nome está mesclado em C2:D2: com a Nina no
+    mapa ela é o terceiro posto. O merge E2:F2 da Lia, fora do mapa, segue como
+    sempre: a coluna F continua sem profissional."""
+    dados = analisar(NOME_MESCLADO_FICTICIA)
+
+    assert postos_de(dados, "nina", time(9, 0)) == {
+        "paciente-um": ("sala-12", 0),
+        "paciente-dois": ("sala-12", 1),
+        "paciente-tres": ("sala-12", 2),
+    }
+    assert atendimento_de(dados, "paciente-quatro") == []
+    assert {entrada.indice_posto for entrada in dados.grade if entrada.sala_id == "sala-7"} == {0}
+
+
+def test_nome_mesclado_fora_do_mapa_nao_ganha_coluna() -> None:
+    dados = analisar(NOME_MESCLADO_FICTICIA)
+
+    assert atendimento_de(dados, "paciente-tres") == []
+    assert postos_de(dados, "nina", time(9, 0)) == {"paciente-um": ("sala-1", 0)}
 
 
 def test_convenio_desconhecido_e_atualizado_quando_uma_ocorrencia_seguinte_tem_cor() -> None:

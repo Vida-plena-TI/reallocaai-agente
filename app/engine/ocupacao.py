@@ -109,18 +109,30 @@ def construir_relatorio_ocupacao_do_dia(
 
     escalados_por_profissional: dict[str, int] = defaultdict(int)
     escalados_por_sala: dict[str, int] = defaultdict(int)
-    sala_por_profissional_e_slot: dict[tuple[str, Slot], str] = {}
+    #: Postos (sala, posto) escalados de cada profissional em cada slot.
+    postos_por_profissional_e_slot: dict[tuple[str, Slot], set[tuple[str, int]]] = defaultdict(set)
     for entrada in grade:
         escalados_por_profissional[entrada.profissional_id] += 1
         escalados_por_sala[entrada.sala_id] += 1
-        sala_por_profissional_e_slot[(entrada.profissional_id, entrada.slot)] = entrada.sala_id
+        postos_por_profissional_e_slot[(entrada.profissional_id, entrada.slot)].add(
+            (entrada.sala_id, entrada.indice_posto)
+        )
 
     ocupados_por_profissional: dict[str, int] = defaultdict(int)
     ocupados_por_sala: dict[str, int] = defaultdict(int)
     for atendimento in atendimentos:
         for slot in atendimento.slots:
             ocupados_por_profissional[atendimento.profissional_id] += 1
-            sala_id = sala_por_profissional_e_slot.get((atendimento.profissional_id, slot))
+            postos = postos_por_profissional_e_slot.get((atendimento.profissional_id, slot))
+            # O posto do próprio atendimento vence; escalado noutro posto no
+            # horário, vai para o menor posto da grade (a mesma regra de
+            # `app.engine.ocupacao_profissional`). Mesmo quando a planilha
+            # escala a profissional em duas salas no mesmo horário, cada
+            # atendimento fica na sala onde ele está.
+            posto_do_atendimento = (atendimento.sala_id, atendimento.indice_posto)
+            sala_id: str | None = None
+            if postos:
+                sala_id = atendimento.sala_id if posto_do_atendimento in postos else min(postos)[0]
             if sala_id is None:
                 logger.warning(
                     "Atendimento %r cobre %s sem entrada correspondente na grade de %s: "

@@ -1,0 +1,298 @@
+{
+  "versao": 1,
+  "tipo": "tabela_generica",
+  "titulo": "Capacidade por especialidade de 28/09/2026 a 03/10/2026",
+  "periodo": {
+    "inicio": "2026-09-28",
+    "fim": "2026-10-03"
+  },
+  "meta": 0.8,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da semana, sem datas); os números refletem a grade vigente, não uma semana específica do calendário."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Ocupação (total)",
+      "valor": 0.23595505617977527,
+      "formato": "percentual",
+      "exibicao": "23,6%"
+    },
+    {
+      "rotulo": "Slots escalados (total)",
+      "valor": 178,
+      "formato": "inteiro",
+      "exibicao": "178"
+    },
+    {
+      "rotulo": "Slots ocupados (total)",
+      "valor": 42,
+      "formato": "inteiro",
+      "exibicao": "42"
+    },
+    {
+      "rotulo": "Vagas livres (total)",
+      "valor": 136,
+      "formato": "inteiro",
+      "exibicao": "136"
+    },
+    {
+      "rotulo": "Slots para a meta (total)",
+      "valor": 101,
+      "formato": "inteiro",
+      "exibicao": "101"
+    },
+    {
+      "rotulo": "Pacientes distintos (total)",
+      "valor": 10,
+      "formato": "inteiro",
+      "exibicao": "10"
+    }
+  ],
+  "dados": {
+    "tipo": "tabela_generica",
+    "relatorio": "capacidade_especialidade",
+    "dimensoes": [
+      "especialidade"
+    ],
+    "metricas": [
+      "ocupacao",
+      "slots_escalados",
+      "slots_ocupados",
+      "vagas_livres",
+      "slots_para_meta",
+      "pacientes_distintos"
+    ],
+    "colunas": [
+      {
+        "chave": "especialidade",
+        "rotulo": "Especialidade",
+        "formato": "texto"
+      },
+      {
+        "chave": "ocupacao",
+        "rotulo": "Ocupação",
+        "formato": "percentual"
+      },
+      {
+        "chave": "slots_escalados",
+        "rotulo": "Slots escalados",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "slots_ocupados",
+        "rotulo": "Slots ocupados",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "vagas_livres",
+        "rotulo": "Vagas livres",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "slots_para_meta",
+        "rotulo": "Slots para a meta",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "pacientes_distintos",
+        "rotulo": "Pacientes distintos",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "abaixo_da_meta",
+        "rotulo": "Abaixo da meta",
+        "formato": "texto"
+      },
+      {
+        "chave": "situacao",
+        "rotulo": "Situação",
+        "formato": "texto"
+      }
+    ],
+    "linhas": [
+      {
+        "especialidade": "Fonoaudiologia",
+        "ocupacao": 0.2,
+        "slots_escalados": 60,
+        "slots_ocupados": 12,
+        "vagas_livres": 48,
+        "slots_para_meta": 36,
+        "pacientes_distintos": 4,
+        "abaixo_da_meta": true,
+        "situacao": "Sobrando (abaixo da meta)"
+      },
+      {
+        "especialidade": "Psicologia",
+        "ocupacao": 0.27941176470588236,
+        "slots_escalados": 68,
+        "slots_ocupados": 19,
+        "vagas_livres": 49,
+        "slots_para_meta": 36,
+        "pacientes_distintos": 5,
+        "abaixo_da_meta": true,
+        "situacao": "Sobrando (abaixo da meta)"
+      },
+      {
+        "especialidade": "Terapia Ocupacional",
+        "ocupacao": 0.22,
+        "slots_escalados": 50,
+        "slots_ocupados": 11,
+        "vagas_livres": 39,
+        "slots_para_meta": 29,
+        "pacientes_distintos": 6,
+        "abaixo_da_meta": true,
+        "situacao": "Sobrando (abaixo da meta)"
+      }
+    ],
+    "total": {
+      "ocupacao": 0.23595505617977527,
+      "slots_escalados": 178,
+      "slots_ocupados": 42,
+      "vagas_livres": 136,
+      "slots_para_meta": 101,
+      "pacientes_distintos": 10,
+      "abaixo_da_meta": true
+    },
+    "linhas_omitidas": 0
+  },
+  "tabelas": [
+    {
+      "nome": "Resultado",
+      "colunas": [
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "ocupacao",
+          "rotulo": "Ocupação",
+          "formato": "percentual"
+        },
+        {
+          "chave": "slots_escalados",
+          "rotulo": "Slots escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "vagas_livres",
+          "rotulo": "Vagas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_para_meta",
+          "rotulo": "Slots para a meta",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "pacientes_distintos",
+          "rotulo": "Pacientes distintos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "abaixo_da_meta",
+          "rotulo": "Abaixo da meta",
+          "formato": "texto"
+        },
+        {
+          "chave": "situacao",
+          "rotulo": "Situação",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "especialidade": "Fonoaudiologia",
+          "ocupacao": 0.2,
+          "slots_escalados": 60,
+          "slots_ocupados": 12,
+          "vagas_livres": 48,
+          "slots_para_meta": 36,
+          "pacientes_distintos": 4,
+          "abaixo_da_meta": true,
+          "situacao": "Sobrando (abaixo da meta)"
+        },
+        {
+          "especialidade": "Psicologia",
+          "ocupacao": 0.27941176470588236,
+          "slots_escalados": 68,
+          "slots_ocupados": 19,
+          "vagas_livres": 49,
+          "slots_para_meta": 36,
+          "pacientes_distintos": 5,
+          "abaixo_da_meta": true,
+          "situacao": "Sobrando (abaixo da meta)"
+        },
+        {
+          "especialidade": "Terapia Ocupacional",
+          "ocupacao": 0.22,
+          "slots_escalados": 50,
+          "slots_ocupados": 11,
+          "vagas_livres": 39,
+          "slots_para_meta": 29,
+          "pacientes_distintos": 6,
+          "abaixo_da_meta": true,
+          "situacao": "Sobrando (abaixo da meta)"
+        }
+      ]
+    },
+    {
+      "nome": "Total",
+      "colunas": [
+        {
+          "chave": "ocupacao",
+          "rotulo": "Ocupação",
+          "formato": "percentual"
+        },
+        {
+          "chave": "slots_escalados",
+          "rotulo": "Slots escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "vagas_livres",
+          "rotulo": "Vagas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_para_meta",
+          "rotulo": "Slots para a meta",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "pacientes_distintos",
+          "rotulo": "Pacientes distintos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "abaixo_da_meta",
+          "rotulo": "Abaixo da meta",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "ocupacao": 0.23595505617977527,
+          "slots_escalados": 178,
+          "slots_ocupados": 42,
+          "vagas_livres": 136,
+          "slots_para_meta": 101,
+          "pacientes_distintos": 10,
+          "abaixo_da_meta": true
+        }
+      ]
+    }
+  ]
+}

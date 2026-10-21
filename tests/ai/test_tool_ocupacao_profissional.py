@@ -5,7 +5,8 @@ from typing import Any
 
 from langchain_core.tools import BaseTool
 
-from app.ai.tools import NOTA_GRADE_SEMANAL, criar_tools
+from app.ai.relatorios import NOTA_GRADE_SEMANAL
+from app.ai.tools import criar_tools
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
 from app.domain import Especialidade, Profissional, Sala, ScheduleDataSource
 from tests.support.agenda_semanal import (

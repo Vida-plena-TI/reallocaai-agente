@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 
 from app.ai.relatorios import (
     AVISO_ACIMA_DE_CEM,
+    NOTA_GRADE_SEMANAL,
     bloco_ocupacao_agregada,
     bloco_ocupacao_profissional,
     bloco_pacientes_profissional,
@@ -49,6 +50,7 @@ from app.ai.servico_agenda import (
     localizar_profissional,
     sugerir_realocacao_por_id,
 )
+from app.ai.tools_relatorios import criar_tools_relatorios
 from app.config import get_settings
 from app.data_sources.continuidade import (
     ContinuidadeDataSource,
@@ -200,14 +202,6 @@ def _formatar_linha_ocupacao(rotulo: str, agregada: OcupacaoAgregada) -> str:
 #: Nome curto do dia da semana por `date.weekday()`, usado no texto de
 #: `consultar_ocupacao_profissional`.
 _DIAS_DA_SEMANA_CURTOS = ("Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo")
-
-#: Ressalva fixa de `consultar_ocupacao_profissional` enquanto a fonte for a
-#: planilha. Remover quando a agenda passar a vir do Agendador, com datas reais.
-NOTA_GRADE_SEMANAL = (
-    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da "
-    "semana, sem datas); os números refletem a grade vigente, não uma semana específica "
-    "do calendário."
-)
 
 
 def _formatar_percentual(slots_escalados: int, slots_ocupados: int) -> str:
@@ -854,11 +848,14 @@ def criar_tools(
         especialidade: Especialidade | None = None,
         profissional: str | None = None,
     ) -> str:
-        """Lista os horários livres de um dia, com filtro opcional de especialidade e profissional.
+        """Lista CADA horário livre de UM único dia, com filtro opcional de especialidade e
+        profissional.
 
-        Use para perguntas gerais como "quais horários estão livres de
-        psicologia hoje?". Para casar várias especialidades de um mesmo
-        atendimento, use `buscar_encaixe`.
+        Use só para a lista detalhada de um dia ("quais horários estão livres de
+        psicologia hoje?"). Para mais de um dia ("de segunda a sexta", "na semana"),
+        contagens, janelas de 1 h ou recortes por sala/período, use `gerar_relatorio`
+        (uma chamada só). Para casar várias especialidades de um atendimento, use
+        `buscar_encaixe`.
         """
         try:
             profissional_id = None
@@ -908,8 +905,9 @@ def criar_tools(
     def consultar_ocupacao_tool(data: date) -> tuple[str, dict[str, Any] | None]:
         """Ocupação do dia, por especialidade e por sala, sinalizando quem está abaixo da meta.
 
-        Use para perguntas do tipo "como está a ocupação hoje?" ou "tem sala
-        ociosa?". Para a taxa de ocupação de UMA profissional específica, use
+        Use para "como está a ocupação hoje?" (um dia). Para vários dias, ranking,
+        salas ociosas ou outros recortes, use `gerar_relatorio`. Para a taxa de
+        ocupação de UMA profissional específica, use
         `consultar_ocupacao_profissional`. NÃO serve para contar pacientes
         (ocupação mede slots): para quantos pacientes cada profissional
         atende, use `consultar_pacientes_por_profissional`.
@@ -1187,6 +1185,7 @@ def criar_tools(
         consultar_ocupacao_profissional_tool,
         consultar_pacientes_por_profissional_tool,
         sugerir_realocacao_tool,
+        *criar_tools_relatorios(fonte, data_referencia),
     ]
     # Por configuração, não por tentativa: sem Resend, a tool não existe para o agente.
     if envio_de_email_configurado():

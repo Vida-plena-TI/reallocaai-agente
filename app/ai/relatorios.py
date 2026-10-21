@@ -4,7 +4,6 @@ Só projeções explícitas dos resultados da engine: nunca texto analisado,
 entidades de pacientes, arquivos ou desenho. IDs de profissionais são opacos.
 """
 
-import re
 from datetime import date
 from hashlib import sha256
 from typing import Annotated, Literal
@@ -12,18 +11,46 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.domain.constants import META_OCUPACAO_POR_SALA
-from app.domain.formatacao import formatar_razao
+from app.domain.formatacao import chave_natural, formatar_razao
 from app.engine.carga_profissionais import CargaProfissionais, CargaProfissional
 from app.engine.ocupacao import OcupacaoAgregada, RelatorioOcupacaoDoDia
 from app.engine.ocupacao_profissional import OcupacaoSemanalProfissional
 
 Formato = Literal["texto", "inteiro", "decimal", "percentual", "data"]
-TipoRelatorio = Literal["ocupacao_profissional", "pacientes_por_profissional", "ocupacao_agregada"]
+TipoRelatorio = Literal[
+    "ocupacao_profissional",
+    "pacientes_por_profissional",
+    "ocupacao_agregada",
+    "disponibilidade",
+    "convenio",
+    "agenda_paciente",
+    "qualidade_agenda",
+    "tabela_generica",
+]
+#: Tipos cujo bloco sempre traz a meta de 80%.
+TIPOS_COM_META: frozenset[str] = frozenset({"ocupacao_profissional", "ocupacao_agregada"})
+#: Tipos que nunca têm meta; `tabela_generica` tem meta só quando pede ocupação.
+TIPOS_SEM_META: frozenset[str] = frozenset(
+    {
+        "pacientes_por_profissional",
+        "disponibilidade",
+        "convenio",
+        "agenda_paciente",
+        "qualidade_agenda",
+    }
+)
 ValorSimples = str | int | float | bool | None
 #: Aviso de ocupação acima de 100%, repetido no texto das tools.
 AVISO_ACIMA_DE_CEM = (
     "Atenção: há ocupação acima de 100% (mais slots ocupados que escalados); "
     "possível inconsistência na planilha."
+)
+#: Ressalva fixa dos relatórios enquanto a fonte for a planilha. Remover quando
+#: a agenda passar a vir do Agendador, com datas reais.
+NOTA_GRADE_SEMANAL = (
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da "
+    "semana, sem datas); os números refletem a grade vigente, não uma semana específica "
+    "do calendário."
 )
 DIAS_DA_SEMANA = (
     "segunda-feira",
@@ -162,8 +189,140 @@ class DadosOcupacaoAgregada(DataRelatorio):
     por_sala: list[ItemOcupacaoAgregada]
 
 
+class FaixaVaga(DataRelatorio):
+    """Vagas seguidas do mesmo profissional, sala e posto."""
+
+    periodo: Literal["manha", "tarde"]
+    profissional: ProfissionalRelatorio
+    sala_id: str
+    sala_nome: str
+    # Número de exibição, contado a partir de 1.
+    posto: int = Field(ge=1)
+    inicio: str = Field(pattern=r"^\d{2}:\d{2}$")
+    fim: str = Field(pattern=r"^\d{2}:\d{2}$")
+    slots: int = Field(ge=1)
+    # Atendimentos de `minutos_por_janela` que cabem na faixa.
+    cabem: int = Field(ge=0)
+
+
+class VagasDiaPeriodo(DataRelatorio):
+    periodo: Literal["manha", "tarde"]
+    vagas_livres: int
+    horas_livres: float
+    janelas: int | None
+
+
+class DadosDisponibilidade(_ModeloRelatorio):
+    tipo: Literal["disponibilidade"] = "disponibilidade"
+    # 30 = todas as vagas; 60/90 = só onde cabe um atendimento desse tamanho.
+    minutos_por_janela: int = Field(ge=30)
+    faixas: list[FaixaVaga]
+    por_dia: list[VagasDiaPeriodo]
+
+
+class ItemConvenio(_ModeloRelatorio):
+    # `unimed`, `particular`, ..., `nao_informado`; grupos mistos unidos por `+`.
+    convenio: str
+    rotulo: str
+    sessoes: int
+    pacientes_distintos: int
+    slots_ocupados: int
+    aguardando_autorizacao: int
+
+
+class AguardandoProfissionalDia(DataRelatorio):
+    profissional: ProfissionalRelatorio
+    sessoes: int
+
+
+class DadosConvenio(_ModeloRelatorio):
+    tipo: Literal["convenio"] = "convenio"
+    por_convenio: list[ItemConvenio]
+    aguardando: list[AguardandoProfissionalDia]
+
+
+class SessaoAgendaPaciente(_ModeloRelatorio):
+    inicio: str = Field(pattern=r"^\d{2}:\d{2}$")
+    fim: str = Field(pattern=r"^\d{2}:\d{2}$")
+    profissional_nome: str
+    especialidade: str
+    sala_nome: str
+    aguardando_autorizacao: bool
+
+
+class IntervaloAgendaPaciente(_ModeloRelatorio):
+    inicio: str = Field(pattern=r"^\d{2}:\d{2}$")
+    fim: str = Field(pattern=r"^\d{2}:\d{2}$")
+    minutos: int
+    # Parte do intervalo que é a pausa geral do almoço.
+    minutos_de_pausa: int
+
+
+class DiaAgendaPacienteRelatorio(DataRelatorio):
+    sessoes: list[SessaoAgendaPaciente]
+    intervalos: list[IntervaloAgendaPaciente]
+
+
+class PacienteRelatorio(_ModeloRelatorio):
+    # Único bloco com nome de paciente: só quando o usuário pediu esse paciente.
+    nome: str
+    convenio: str | None
+
+
+class DadosAgendaPaciente(_ModeloRelatorio):
+    tipo: Literal["agenda_paciente"] = "agenda_paciente"
+    paciente: PacienteRelatorio
+    dias: list[DiaAgendaPacienteRelatorio]
+    total_sessoes: int
+    # Espera entre terapias no período, sem contar a pausa do almoço.
+    minutos_em_intervalos: int
+
+
+class QualidadeProfissional(_ModeloRelatorio):
+    profissional: ProfissionalRelatorio
+    slots_escalados: int
+    slots_ocupados: int
+    vagas_livres: int
+    buracos: int
+    slots_em_buracos: int
+    slots_isolados: int
+    faixas_livres: int
+    maior_faixa_livre: int
+
+
+class QualidadeProfissionalDiaRelatorio(DataRelatorio, QualidadeProfissional):
+    pass
+
+
+class DadosQualidadeAgenda(_ModeloRelatorio):
+    tipo: Literal["qualidade_agenda"] = "qualidade_agenda"
+    por_profissional: list[QualidadeProfissional]
+    por_dia: list[QualidadeProfissionalDiaRelatorio]
+
+
+class DadosTabelaGenerica(_ModeloRelatorio):
+    tipo: Literal["tabela_generica"] = "tabela_generica"
+    # Relatório nomeado que gerou a tabela, ou `personalizado`.
+    relatorio: str
+    dimensoes: list[str]
+    metricas: list[str]
+    colunas: list[ColunaTabela]
+    linhas: list[dict[str, ValorSimples]]
+    # Recalculado sobre o recorte inteiro (não é a soma das linhas).
+    total: dict[str, ValorSimples]
+    # Linhas fora da tabela por causa do limite pedido.
+    linhas_omitidas: int = Field(ge=0)
+
+
 DadosRelatorio = Annotated[
-    DadosOcupacaoProfissional | DadosPacientesProfissional | DadosOcupacaoAgregada,
+    DadosOcupacaoProfissional
+    | DadosPacientesProfissional
+    | DadosOcupacaoAgregada
+    | DadosDisponibilidade
+    | DadosConvenio
+    | DadosAgendaPaciente
+    | DadosQualidadeAgenda
+    | DadosTabelaGenerica,
     Field(discriminator="tipo"),
 ]
 
@@ -190,8 +349,10 @@ class BlocoRelatorio(_ModeloRelatorio):
             raise ValueError("dias_nao_lidos deve ser vazio exatamente quando parcial é False.")
         if self.dias_nao_lidos != sorted(set(self.dias_nao_lidos)):
             raise ValueError("dias_nao_lidos deve estar ordenado e sem repetição.")
-        if (self.meta is None) != (self.tipo == "pacientes_por_profissional"):
-            raise ValueError("Só pacientes_por_profissional não tem meta.")
+        if self.tipo in TIPOS_COM_META and self.meta is None:
+            raise ValueError(f"{self.tipo} sempre tem meta.")
+        if self.tipo in TIPOS_SEM_META and self.meta is not None:
+            raise ValueError(f"{self.tipo} não tem meta.")
         return self
 
 
@@ -237,14 +398,6 @@ def ocupacao_agregada_acima_de_cem(resultado: RelatorioOcupacaoDoDia) -> bool:
     )
 
 
-def _chave_natural(texto: str) -> tuple[str | int, ...]:
-    """`Sala 10` -> `("sala ", 10, "")`: números comparados como números (Sala 2 < Sala 10)."""
-    return tuple(
-        int(parte) if i % 2 else parte
-        for i, parte in enumerate(re.split(r"(\d+)", texto.casefold()))
-    )
-
-
 def salas_em_ordem_natural(
     por_sala: dict[str, OcupacaoAgregada], nomes_salas: dict[str, str]
 ) -> list[tuple[str, OcupacaoAgregada]]:
@@ -253,7 +406,7 @@ def salas_em_ordem_natural(
         (nomes_salas.get(sala_id, sala_id), agregada)
         for sala_id, agregada in sorted(
             por_sala.items(),
-            key=lambda par: (_chave_natural(nomes_salas.get(par[0], par[0])), par[0]),
+            key=lambda par: (chave_natural(nomes_salas.get(par[0], par[0])), par[0]),
         )
     ]
 
@@ -264,7 +417,7 @@ def _com_aviso(avisos: list[str], acima_de_cem: bool) -> list[str]:
     return list(avisos)
 
 
-def _tabela(
+def tabela(
     nome: str,
     colunas: list[tuple[str, str, Formato]],
     linhas: list[dict[str, ValorSimples]],
@@ -371,7 +524,7 @@ def bloco_ocupacao_profissional(
             inconsistencia=resultado.tem_inconsistencia or acima_de_cem,
         ),
         tabelas=[
-            _tabela(
+            tabela(
                 "Por dia",
                 COLUNAS_DATA
                 + COLUNAS_METRICAS
@@ -383,7 +536,7 @@ def bloco_ocupacao_profissional(
                 ],
                 linhas,
             ),
-            _tabela("Resumo da semana", COLUNAS_METRICAS, [semana.model_dump(mode="json")]),
+            tabela("Resumo da semana", COLUNAS_METRICAS, [semana.model_dump(mode="json")]),
         ],
     )
 
@@ -462,7 +615,7 @@ def bloco_pacientes_profissional(
             escopo=escopo, profissionais=profissionais, clinica_por_dia=clinica
         ),
         tabelas=[
-            _tabela(
+            tabela(
                 "Por profissional e dia",
                 COLUNAS_PROFISSIONAL
                 + COLUNAS_DATA
@@ -480,7 +633,7 @@ def bloco_pacientes_profissional(
                     for d in p.dias
                 ],
             ),
-            _tabela(
+            tabela(
                 "Resumo por profissional",
                 [
                     *COLUNAS_PROFISSIONAL,
@@ -492,7 +645,7 @@ def bloco_pacientes_profissional(
                     for p in profissionais
                 ],
             ),
-            _tabela(
+            tabela(
                 "Clínica por dia",
                 [
                     *COLUNAS_DATA,
@@ -542,7 +695,7 @@ def bloco_ocupacao_agregada(
             **_data(resultado.data).model_dump(), por_especialidade=especialidades, por_sala=salas
         ),
         tabelas=[
-            _tabela(nome, colunas, [i.model_dump(mode="json") for i in itens])
+            tabela(nome, colunas, [i.model_dump(mode="json") for i in itens])
             for nome, itens in [("Por especialidade", especialidades), ("Por sala", salas)]
         ],
     )

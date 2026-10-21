@@ -167,3 +167,33 @@ ALIAS_DE_PROFISSIONAL_FICTICIA = AbaFicticia(
         ["10:00", "Paciente Dois"],
     ],
 )
+
+#: Aba com a mesma profissional em três colunas que são postos simultâneos de
+#: uma sala só, como a terça real: a coluna B está sob o cabeçalho de outra
+#: sala (`Sala 1`), a C sob a sala certa (`Sala 12`) e a D não tem sala em bloco
+#: nenhum. À tarde a coluna C, ainda sob `Sala 12`, é de outra profissional
+#: (`Mel`), e a E é uma sala comum para comparação. Serve para
+#: `MAPA_SALA_FIXA_PROFISSIONAL`, que o teste estende com `Nina`.
+SALA_FIXA_FICTICIA = AbaFicticia(
+    valores=[
+        ["", "Sala 1", "Sala 12", "", "Sala 2"],
+        ["", "Nina TO", "Nina TO", "Nina TO", "Ivo (Fono)"],
+        ["09:00", "Paciente Um", "Paciente Dois", "Paciente Três", "Paciente Quatro"],
+        ["", "Sala 1", "Sala 12", "", "Sala 2"],
+        ["", "Nina TO", "Mel (Fono)", "Nina TO", "Ivo (Fono)"],
+        ["13:00", "Paciente Cinco", "Paciente Seis", "", ""],
+    ],
+)
+
+#: Aba em que o nome da profissional está mesclado em duas colunas (`C2:D2`) e
+#: a segunda tem agenda, como O:P na manhã da terça real. O merge `E2:F2` é de
+#: outra profissional, fora do mapa: a coluna F segue sem profissional, como
+#: hoje.
+NOME_MESCLADO_FICTICIA = AbaFicticia(
+    valores=[
+        ["", "Sala 1", "", "", "Sala 7", ""],
+        ["", "Nina TO", "Nina TO", "", "Lia TO", ""],
+        ["09:00", "Paciente Um", "Paciente Dois", "Paciente Três", "", "Paciente Quatro"],
+    ],
+    merges=["C2:D2", "E1:F1", "E2:F2"],
+)

@@ -1,0 +1,219 @@
+{
+  "versao": 1,
+  "tipo": "convenio",
+  "titulo": "Convênios e autorizações de 28/09/2026 a 03/10/2026",
+  "periodo": {
+    "inicio": "2026-09-28",
+    "fim": "2026-10-03"
+  },
+  "meta": null,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da semana, sem datas); os números refletem a grade vigente, não uma semana específica do calendário."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Sessões",
+      "valor": 22,
+      "formato": "inteiro",
+      "exibicao": "22"
+    },
+    {
+      "rotulo": "Sessões aguardando autorização",
+      "valor": 2,
+      "formato": "inteiro",
+      "exibicao": "2"
+    }
+  ],
+  "dados": {
+    "tipo": "convenio",
+    "por_convenio": [
+      {
+        "convenio": "klini_saude",
+        "rotulo": "Klini Saude",
+        "sessoes": 1,
+        "pacientes_distintos": 1,
+        "slots_ocupados": 4,
+        "aguardando_autorizacao": 0
+      },
+      {
+        "convenio": "klini_saude+unimed",
+        "rotulo": "Klini Saude + Unimed",
+        "sessoes": 1,
+        "pacientes_distintos": 2,
+        "slots_ocupados": 2,
+        "aguardando_autorizacao": 0
+      },
+      {
+        "convenio": "nao_informado",
+        "rotulo": "Não informado",
+        "sessoes": 3,
+        "pacientes_distintos": 2,
+        "slots_ocupados": 7,
+        "aguardando_autorizacao": 0
+      },
+      {
+        "convenio": "particular",
+        "rotulo": "Particular",
+        "sessoes": 4,
+        "pacientes_distintos": 2,
+        "slots_ocupados": 7,
+        "aguardando_autorizacao": 1
+      },
+      {
+        "convenio": "sulamerica",
+        "rotulo": "Sulamerica",
+        "sessoes": 5,
+        "pacientes_distintos": 2,
+        "slots_ocupados": 9,
+        "aguardando_autorizacao": 1
+      },
+      {
+        "convenio": "unimed",
+        "rotulo": "Unimed",
+        "sessoes": 8,
+        "pacientes_distintos": 3,
+        "slots_ocupados": 13,
+        "aguardando_autorizacao": 0
+      }
+    ],
+    "aguardando": [
+      {
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira",
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "sessoes": 1
+      },
+      {
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira",
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "sessoes": 1
+      }
+    ]
+  },
+  "tabelas": [
+    {
+      "nome": "Por convênio",
+      "colunas": [
+        {
+          "chave": "rotulo",
+          "rotulo": "Convênio",
+          "formato": "texto"
+        },
+        {
+          "chave": "sessoes",
+          "rotulo": "Sessões",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "pacientes_distintos",
+          "rotulo": "Pacientes distintos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "aguardando_autorizacao",
+          "rotulo": "Aguardando autorização",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "rotulo": "Klini Saude",
+          "sessoes": 1,
+          "pacientes_distintos": 1,
+          "slots_ocupados": 4,
+          "aguardando_autorizacao": 0
+        },
+        {
+          "rotulo": "Klini Saude + Unimed",
+          "sessoes": 1,
+          "pacientes_distintos": 2,
+          "slots_ocupados": 2,
+          "aguardando_autorizacao": 0
+        },
+        {
+          "rotulo": "Não informado",
+          "sessoes": 3,
+          "pacientes_distintos": 2,
+          "slots_ocupados": 7,
+          "aguardando_autorizacao": 0
+        },
+        {
+          "rotulo": "Particular",
+          "sessoes": 4,
+          "pacientes_distintos": 2,
+          "slots_ocupados": 7,
+          "aguardando_autorizacao": 1
+        },
+        {
+          "rotulo": "Sulamerica",
+          "sessoes": 5,
+          "pacientes_distintos": 2,
+          "slots_ocupados": 9,
+          "aguardando_autorizacao": 1
+        },
+        {
+          "rotulo": "Unimed",
+          "sessoes": 8,
+          "pacientes_distintos": 3,
+          "slots_ocupados": 13,
+          "aguardando_autorizacao": 0
+        }
+      ]
+    },
+    {
+      "nome": "Aguardando autorização",
+      "colunas": [
+        {
+          "chave": "data",
+          "rotulo": "Data",
+          "formato": "data"
+        },
+        {
+          "chave": "dia_semana",
+          "rotulo": "Dia da semana",
+          "formato": "texto"
+        },
+        {
+          "chave": "profissional",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "sessoes",
+          "rotulo": "Sessões aguardando",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "profissional": "Beto Reis",
+          "sessoes": 1
+        },
+        {
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "profissional": "Ana Lima",
+          "sessoes": 1
+        }
+      ]
+    }
+  ]
+}

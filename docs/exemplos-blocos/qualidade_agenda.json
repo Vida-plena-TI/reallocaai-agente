@@ -1,0 +1,741 @@
+{
+  "versao": 1,
+  "tipo": "qualidade_agenda",
+  "titulo": "Buracos e fragmentação da agenda de 28/09/2026 a 03/10/2026",
+  "periodo": {
+    "inicio": "2026-09-28",
+    "fim": "2026-10-03"
+  },
+  "meta": null,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Obs.: a fonte de dados atual é a grade semanal da planilha (uma aba por dia da semana, sem datas); os números refletem a grade vigente, não uma semana específica do calendário."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Buracos",
+      "valor": 6,
+      "formato": "inteiro",
+      "exibicao": "6"
+    },
+    {
+      "rotulo": "Slots presos em buracos",
+      "valor": 8,
+      "formato": "inteiro",
+      "exibicao": "8"
+    },
+    {
+      "rotulo": "Slots isolados (não cabe 1 h)",
+      "valor": 5,
+      "formato": "inteiro",
+      "exibicao": "5"
+    }
+  ],
+  "dados": {
+    "tipo": "qualidade_agenda",
+    "por_profissional": [
+      {
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "slots_escalados": 50,
+        "slots_ocupados": 13,
+        "vagas_livres": 37,
+        "buracos": 3,
+        "slots_em_buracos": 4,
+        "slots_isolados": 3,
+        "faixas_livres": 11,
+        "maior_faixa_livre": 10
+      },
+      {
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "slots_escalados": 50,
+        "slots_ocupados": 11,
+        "vagas_livres": 39,
+        "buracos": 2,
+        "slots_em_buracos": 2,
+        "slots_isolados": 2,
+        "faixas_livres": 9,
+        "maior_faixa_livre": 9
+      },
+      {
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "slots_escalados": 60,
+        "slots_ocupados": 12,
+        "vagas_livres": 48,
+        "buracos": 1,
+        "slots_em_buracos": 2,
+        "slots_isolados": 0,
+        "faixas_livres": 10,
+        "maior_faixa_livre": 10
+      },
+      {
+        "profissional": {
+          "id": "9f767b2539be0bca1e48d23ead1d9646f3698151a4c27eb02371cf03e0cd556f",
+          "nome": "Diva Rocha",
+          "especialidade": "psicologia"
+        },
+        "slots_escalados": 18,
+        "slots_ocupados": 6,
+        "vagas_livres": 12,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 2,
+        "maior_faixa_livre": 6
+      }
+    ],
+    "por_dia": [
+      {
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 5,
+        "vagas_livres": 5,
+        "buracos": 2,
+        "slots_em_buracos": 2,
+        "slots_isolados": 3,
+        "faixas_livres": 4,
+        "maior_faixa_livre": 2,
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira"
+      },
+      {
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 4,
+        "vagas_livres": 6,
+        "buracos": 1,
+        "slots_em_buracos": 2,
+        "slots_isolados": 0,
+        "faixas_livres": 3,
+        "maior_faixa_livre": 2,
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira"
+      },
+      {
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 0,
+        "vagas_livres": 10,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 1,
+        "maior_faixa_livre": 10,
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira"
+      },
+      {
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 2,
+        "vagas_livres": 8,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 1,
+        "maior_faixa_livre": 8,
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira"
+      },
+      {
+        "profissional": {
+          "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
+          "nome": "Ana Lima",
+          "especialidade": "psicologia"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 2,
+        "vagas_livres": 8,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 2,
+        "maior_faixa_livre": 4,
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira"
+      },
+      {
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "slots_escalados": 20,
+        "slots_ocupados": 6,
+        "vagas_livres": 14,
+        "buracos": 1,
+        "slots_em_buracos": 2,
+        "slots_isolados": 0,
+        "faixas_livres": 4,
+        "maior_faixa_livre": 5,
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira"
+      },
+      {
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "slots_escalados": 20,
+        "slots_ocupados": 4,
+        "vagas_livres": 16,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 3,
+        "maior_faixa_livre": 9,
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira"
+      },
+      {
+        "profissional": {
+          "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
+          "nome": "Beto Reis",
+          "especialidade": "fonoaudiologia"
+        },
+        "slots_escalados": 20,
+        "slots_ocupados": 2,
+        "vagas_livres": 18,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 3,
+        "maior_faixa_livre": 10,
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira"
+      },
+      {
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 3,
+        "vagas_livres": 7,
+        "buracos": 1,
+        "slots_em_buracos": 1,
+        "slots_isolados": 1,
+        "faixas_livres": 2,
+        "maior_faixa_livre": 6,
+        "data": "2026-09-28",
+        "dia_semana": "segunda-feira"
+      },
+      {
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 4,
+        "vagas_livres": 6,
+        "buracos": 1,
+        "slots_em_buracos": 1,
+        "slots_isolados": 1,
+        "faixas_livres": 3,
+        "maior_faixa_livre": 3,
+        "data": "2026-09-29",
+        "dia_semana": "terça-feira"
+      },
+      {
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 1,
+        "vagas_livres": 9,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 1,
+        "maior_faixa_livre": 9,
+        "data": "2026-09-30",
+        "dia_semana": "quarta-feira"
+      },
+      {
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 2,
+        "vagas_livres": 8,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 2,
+        "maior_faixa_livre": 6,
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira"
+      },
+      {
+        "profissional": {
+          "id": "3f831f5c6d924b40780632d12722ac3876b21abd49cd1e114eafaa03aec8d0a3",
+          "nome": "Cau Melo",
+          "especialidade": "terapia_ocupacional"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 1,
+        "vagas_livres": 9,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 1,
+        "maior_faixa_livre": 9,
+        "data": "2026-10-02",
+        "dia_semana": "sexta-feira"
+      },
+      {
+        "profissional": {
+          "id": "9f767b2539be0bca1e48d23ead1d9646f3698151a4c27eb02371cf03e0cd556f",
+          "nome": "Diva Rocha",
+          "especialidade": "psicologia"
+        },
+        "slots_escalados": 10,
+        "slots_ocupados": 4,
+        "vagas_livres": 6,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 1,
+        "maior_faixa_livre": 6,
+        "data": "2026-10-01",
+        "dia_semana": "quinta-feira"
+      },
+      {
+        "profissional": {
+          "id": "9f767b2539be0bca1e48d23ead1d9646f3698151a4c27eb02371cf03e0cd556f",
+          "nome": "Diva Rocha",
+          "especialidade": "psicologia"
+        },
+        "slots_escalados": 8,
+        "slots_ocupados": 2,
+        "vagas_livres": 6,
+        "buracos": 0,
+        "slots_em_buracos": 0,
+        "slots_isolados": 0,
+        "faixas_livres": 1,
+        "maior_faixa_livre": 6,
+        "data": "2026-10-03",
+        "dia_semana": "sábado"
+      }
+    ]
+  },
+  "tabelas": [
+    {
+      "nome": "Por profissional",
+      "colunas": [
+        {
+          "chave": "profissional",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "slots_escalados",
+          "rotulo": "Slots escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "vagas_livres",
+          "rotulo": "Vagas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "buracos",
+          "rotulo": "Buracos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_em_buracos",
+          "rotulo": "Slots em buracos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_isolados",
+          "rotulo": "Slots isolados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "faixas_livres",
+          "rotulo": "Faixas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "maior_faixa_livre",
+          "rotulo": "Maior faixa livre (slots)",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "slots_escalados": 50,
+          "slots_ocupados": 13,
+          "vagas_livres": 37,
+          "buracos": 3,
+          "slots_em_buracos": 4,
+          "slots_isolados": 3,
+          "faixas_livres": 11,
+          "maior_faixa_livre": 10,
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia"
+        },
+        {
+          "slots_escalados": 50,
+          "slots_ocupados": 11,
+          "vagas_livres": 39,
+          "buracos": 2,
+          "slots_em_buracos": 2,
+          "slots_isolados": 2,
+          "faixas_livres": 9,
+          "maior_faixa_livre": 9,
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional"
+        },
+        {
+          "slots_escalados": 60,
+          "slots_ocupados": 12,
+          "vagas_livres": 48,
+          "buracos": 1,
+          "slots_em_buracos": 2,
+          "slots_isolados": 0,
+          "faixas_livres": 10,
+          "maior_faixa_livre": 10,
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia"
+        },
+        {
+          "slots_escalados": 18,
+          "slots_ocupados": 6,
+          "vagas_livres": 12,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 2,
+          "maior_faixa_livre": 6,
+          "profissional": "Diva Rocha",
+          "especialidade": "Psicologia"
+        }
+      ]
+    },
+    {
+      "nome": "Por profissional e dia",
+      "colunas": [
+        {
+          "chave": "data",
+          "rotulo": "Data",
+          "formato": "data"
+        },
+        {
+          "chave": "dia_semana",
+          "rotulo": "Dia da semana",
+          "formato": "texto"
+        },
+        {
+          "chave": "profissional",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "slots_escalados",
+          "rotulo": "Slots escalados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_ocupados",
+          "rotulo": "Slots ocupados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "vagas_livres",
+          "rotulo": "Vagas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "buracos",
+          "rotulo": "Buracos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_em_buracos",
+          "rotulo": "Slots em buracos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "slots_isolados",
+          "rotulo": "Slots isolados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "faixas_livres",
+          "rotulo": "Faixas livres",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "maior_faixa_livre",
+          "rotulo": "Maior faixa livre (slots)",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 5,
+          "vagas_livres": 5,
+          "buracos": 2,
+          "slots_em_buracos": 2,
+          "slots_isolados": 3,
+          "faixas_livres": 4,
+          "maior_faixa_livre": 2,
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia"
+        },
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 4,
+          "vagas_livres": 6,
+          "buracos": 1,
+          "slots_em_buracos": 2,
+          "slots_isolados": 0,
+          "faixas_livres": 3,
+          "maior_faixa_livre": 2,
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia"
+        },
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 0,
+          "vagas_livres": 10,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 1,
+          "maior_faixa_livre": 10,
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia"
+        },
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 2,
+          "vagas_livres": 8,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 1,
+          "maior_faixa_livre": 8,
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia"
+        },
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 2,
+          "vagas_livres": 8,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 2,
+          "maior_faixa_livre": 4,
+          "data": "2026-10-02",
+          "dia_semana": "sexta-feira",
+          "profissional": "Ana Lima",
+          "especialidade": "Psicologia"
+        },
+        {
+          "slots_escalados": 20,
+          "slots_ocupados": 6,
+          "vagas_livres": 14,
+          "buracos": 1,
+          "slots_em_buracos": 2,
+          "slots_isolados": 0,
+          "faixas_livres": 4,
+          "maior_faixa_livre": 5,
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia"
+        },
+        {
+          "slots_escalados": 20,
+          "slots_ocupados": 4,
+          "vagas_livres": 16,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 3,
+          "maior_faixa_livre": 9,
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia"
+        },
+        {
+          "slots_escalados": 20,
+          "slots_ocupados": 2,
+          "vagas_livres": 18,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 3,
+          "maior_faixa_livre": 10,
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "profissional": "Beto Reis",
+          "especialidade": "Fonoaudiologia"
+        },
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 3,
+          "vagas_livres": 7,
+          "buracos": 1,
+          "slots_em_buracos": 1,
+          "slots_isolados": 1,
+          "faixas_livres": 2,
+          "maior_faixa_livre": 6,
+          "data": "2026-09-28",
+          "dia_semana": "segunda-feira",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional"
+        },
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 4,
+          "vagas_livres": 6,
+          "buracos": 1,
+          "slots_em_buracos": 1,
+          "slots_isolados": 1,
+          "faixas_livres": 3,
+          "maior_faixa_livre": 3,
+          "data": "2026-09-29",
+          "dia_semana": "terça-feira",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional"
+        },
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 1,
+          "vagas_livres": 9,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 1,
+          "maior_faixa_livre": 9,
+          "data": "2026-09-30",
+          "dia_semana": "quarta-feira",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional"
+        },
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 2,
+          "vagas_livres": 8,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 2,
+          "maior_faixa_livre": 6,
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional"
+        },
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 1,
+          "vagas_livres": 9,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 1,
+          "maior_faixa_livre": 9,
+          "data": "2026-10-02",
+          "dia_semana": "sexta-feira",
+          "profissional": "Cau Melo",
+          "especialidade": "Terapia Ocupacional"
+        },
+        {
+          "slots_escalados": 10,
+          "slots_ocupados": 4,
+          "vagas_livres": 6,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 1,
+          "maior_faixa_livre": 6,
+          "data": "2026-10-01",
+          "dia_semana": "quinta-feira",
+          "profissional": "Diva Rocha",
+          "especialidade": "Psicologia"
+        },
+        {
+          "slots_escalados": 8,
+          "slots_ocupados": 2,
+          "vagas_livres": 6,
+          "buracos": 0,
+          "slots_em_buracos": 0,
+          "slots_isolados": 0,
+          "faixas_livres": 1,
+          "maior_faixa_livre": 6,
+          "data": "2026-10-03",
+          "dia_semana": "sábado",
+          "profissional": "Diva Rocha",
+          "especialidade": "Psicologia"
+        }
+      ]
+    }
+  ]
+}

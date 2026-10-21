@@ -222,3 +222,26 @@ def test_profissional_presente_so_na_grade_usa_id_e_especialidade_da_grade() -> 
     assert ocupacao.profissional_id == "prof-sem-cadastro"
     assert ocupacao.nome == "prof-sem-cadastro"
     assert ocupacao.especialidade is Especialidade.PSICOLOGIA
+
+
+def test_profissional_escalada_em_duas_salas_no_mesmo_horario_fica_na_sala_do_atendimento() -> None:
+    """Inconsistência vista na planilha real: a mesma grade em duas salas.
+
+    Antes, o último par (profissional, slot) da grade decidia a sala e a outra
+    ficava com 0% enquanto esta passava de 100%.
+    """
+    psico = Especialidade.PSICOLOGIA
+    fonte = FakeScheduleDataSource(
+        grade={
+            DIA: [
+                entrada("sala-1", "rossana", psico, time(8, 0)),
+                entrada("sala-12", "rossana", psico, time(8, 0)),
+            ]
+        },
+        atendimentos={DIA: [atendimento("rossana", "sala-1", psico, [time(8, 0)])]},
+    )
+
+    por_sala = construir_relatorio_ocupacao_do_dia(fonte, DIA).por_sala()
+
+    assert por_sala["sala-1"] == OcupacaoAgregada(slots_escalados=1, slots_ocupados=1)
+    assert por_sala["sala-12"] == OcupacaoAgregada(slots_escalados=1, slots_ocupados=0)
