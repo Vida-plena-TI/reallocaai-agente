@@ -1,5 +1,6 @@
 """Blocos no POST/GET, seleção do prompt e histórico textual para o modelo."""
 
+from datetime import date
 from typing import Any
 
 import pytest
@@ -10,6 +11,7 @@ from langchain_core.outputs import ChatResult
 from pydantic import Field
 
 from app.ai.prompts import PROMPT_SISTEMA, PROMPT_SISTEMA_COM_RELATORIOS
+from app.ai.tools import DIAS_DA_SEMANA
 from app.api.dependencies import obter_chat_model, obter_fonte
 from app.main import app
 from tests.api.conftest import HEADERS_AUTENTICADOS
@@ -125,22 +127,26 @@ def test_prompt_renderizado_na_chamada_da_api(client: TestClient, flag: bool | N
 
 
 @pytest.mark.parametrize("renderiza", [False, True])
-def test_sem_resend_o_prompt_diz_que_o_email_nao_esta_disponivel(
-    client: TestClient, renderiza: bool
-) -> None:
+def test_o_prompt_diz_que_o_agente_nao_envia_emails(client: TestClient, renderiza: bool) -> None:
     modelo = _ModeloComCaptura(responses=[AIMessage("Olá")])
     app.dependency_overrides[obter_chat_model] = lambda: modelo
     pedido = {"mensagem": "Oi", "renderiza_relatorios": renderiza}
     assert client.post("/agenda/chat", headers=HEADERS_AUTENTICADOS, json=pedido).status_code == 200
     prompt = str(modelo.entradas[0][0].content)
-    assert "envio do relatório por e-mail não está disponível neste ambiente" in prompt
-    assert "responda em uma frase que o envio por e-mail" in prompt
+    variante = PROMPT_SISTEMA_COM_RELATORIOS if renderiza else PROMPT_SISTEMA
+    hoje = date.today()
+    assert prompt == variante.format(
+        data_referencia=hoje.strftime("%d/%m/%Y"), dia_da_semana=DIAS_DA_SEMANA[hoje.weekday()]
+    )
+    assert "Nunca ofereça envio por e-mail" in prompt
+    assert "responda em uma frase que o agente não envia e-mails" in prompt
+    # Só essa frase fala de e-mail: nenhuma tool nem regra de envio.
+    assert prompt.count("e-mail") == 2
     assert "enviar_relatorio" not in prompt
-    assert "corpo do e-mail" not in prompt
     assert "não gera arquivos, não exporta dados" in prompt
 
 
-def test_variante_com_renderizacao_tem_regras_de_brevidade_tools_e_email() -> None:
+def test_variante_com_renderizacao_tem_regras_de_brevidade_e_tools() -> None:
     com = PROMPT_SISTEMA_COM_RELATORIOS.format(
         data_referencia="05/10/2026", dia_da_semana="segunda-feira"
     )
@@ -148,7 +154,6 @@ def test_variante_com_renderizacao_tem_regras_de_brevidade_tools_e_email() -> No
     assert "no máximo 3 frases" in com
     assert "sem listas e sem tabelas" in com
     assert "Não chame tools extras" in com
-    assert "Não ofereça enviar o relatório por e-mail por conta própria" in com
     assert "Exemplo de resposta boa" in com and "Exemplo de resposta ruim" in com
     assert "no máximo 3 frases" not in sem
     assert "Exemplo de resposta" not in sem

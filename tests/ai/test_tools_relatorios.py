@@ -260,9 +260,8 @@ def test_tools_antigas_apontam_para_gerar_relatorio_em_periodos() -> None:
 
 
 @pytest.mark.parametrize("renderiza", [True, False])
-@pytest.mark.parametrize("email", [True, False])
-def test_prompt_orienta_uma_chamada_por_periodo(renderiza: bool, email: bool) -> None:
-    prompt = prompt_de_sistema(renderiza_relatorios=renderiza, envio_email=email)
+def test_prompt_orienta_uma_chamada_por_periodo(renderiza: bool) -> None:
+    prompt = prompt_de_sistema(renderiza_relatorios=renderiza)
 
     assert "## Mapa da clínica" in prompt
     assert "## Como escolher o relatório" in prompt

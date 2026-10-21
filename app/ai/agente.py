@@ -96,7 +96,7 @@ def criar_agente(
     falso que não faz nenhuma chamada de rede (ver `tests/ai/test_agente.py`).
     """
     tools = criar_tools(fonte, continuidade, data_referencia)
-    variante = prompt_de_sistema(renderiza_relatorios=renderiza_relatorios, envio_email=False)
+    variante = prompt_de_sistema(renderiza_relatorios=renderiza_relatorios)
     prompt = variante.format(
         data_referencia=data_referencia.strftime("%d/%m/%Y"),
         dia_da_semana=DIAS_DA_SEMANA[data_referencia.weekday()],

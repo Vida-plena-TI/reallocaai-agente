@@ -17,13 +17,11 @@ nenhuma chamada ao modelo é feita. Com `--confirmar`, repete cada pergunta de
 
 Para cada execução imprime só métricas: tools e relatório escolhidos, número de
 chamadas ao modelo e às tools, tempo, frases (1 a 3), fidelidade dos números,
-nomes de pacientes na resposta (só a contagem) e oferta de e-mail. Nunca o
-texto da resposta nem o resultado das tools, que contêm nomes de pacientes.
-Nada é gravado em arquivo. A pergunta de agenda de paciente roda sobre a
-semana fictícia de `tests/support/agenda_clinica.py`, com um nome fictício:
-nenhum nome real é escrito aqui. O envio de e-mail é substituído por um
-registro local: se o agente chamar `enviar_relatorio`, isso aparece como tool
-extra e nenhum e-mail sai.
+e nomes de pacientes na resposta (só a contagem). Nunca o texto da resposta
+nem o resultado das tools, que contêm nomes de pacientes. Nada é gravado em
+arquivo. A pergunta de agenda de paciente roda sobre a semana fictícia de
+`tests/support/agenda_clinica.py`, com um nome fictício: nenhum nome real é
+escrito aqui.
 """
 
 import argparse
@@ -124,8 +122,6 @@ PRECO_SAIDA_PADRAO = 10.00
 
 _FIM_DE_FRASE = re.compile(r"(?<=[.!?…])\s+|\n+")
 _DECIMAL_COM_VIRGULA = re.compile(r"\d+,\d+")
-#: Qualquer hífen ou nenhum entre "e" e "mail" (o modelo já usou U+2011).
-_EMAIL = re.compile(r"e\W?mail", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -135,7 +131,6 @@ class Execucao:
     extras: list[str]
     blocos: list[str]
     numeros_infieis: list[str]
-    oferece_email: bool
     #: `relatorio` de cada chamada a `gerar_relatorio`.
     relatorios: tuple[str, ...] = ()
     relatorio_esperado: str | None = None
@@ -161,10 +156,6 @@ class Execucao:
         return not self.numeros_infieis
 
     @property
-    def email_ok(self) -> bool:
-        return not self.oferece_email
-
-    @property
     def nomes_ok(self) -> bool:
         return self.nomes_de_pacientes == 0
 
@@ -178,11 +169,6 @@ def numeros_ausentes_das_tools(resposta: str, textos_das_tools: list[str]) -> li
     """Números com vírgula decimal citados na resposta que não aparecem no texto das tools."""
     fonte = "\n".join(textos_das_tools)
     return [n for n in _DECIMAL_COM_VIRGULA.findall(resposta) if n not in fonte]
-
-
-def menciona_email(resposta: str) -> bool:
-    """Nenhuma pergunta da avaliação pede e-mail: qualquer menção conta como oferta."""
-    return _EMAIL.search(resposta) is not None
 
 
 def _normalizar(texto: str) -> str:
@@ -245,7 +231,6 @@ def avaliar_turno(
         extras=[nome for nome in tools if nome not in esperadas],
         blocos=blocos,
         numeros_infieis=numeros_ausentes_das_tools(resposta, textos),
-        oferece_email=menciona_email(resposta),
         relatorios=tuple(
             str(chamada["args"].get("relatorio"))
             for chamada in chamadas
@@ -270,7 +255,7 @@ class Estimativa:
 def tokens_do_prompt(fonte: ScheduleDataSource, data_referencia: date) -> int:
     """Tokens aproximados do prompt de sistema e dos schemas das tools, sem chamar o modelo."""
     tools = criar_tools(fonte, SemHistoricoContinuidadeDataSource(), data_referencia)
-    prompt = prompt_de_sistema(renderiza_relatorios=True, envio_email=False)
+    prompt = prompt_de_sistema(renderiza_relatorios=True)
     schemas = json.dumps([convert_to_openai_tool(tool) for tool in tools], ensure_ascii=False)
     return (len(prompt) + len(schemas)) // CARACTERES_POR_TOKEN
 
@@ -430,8 +415,7 @@ def main(argv: list[str] | None = None) -> None:
                 f"tempo={execucao.segundos:.1f}s frases={execucao.frases} "
                 f"extras={execucao.extras or '-'} blocos={execucao.blocos or '-'} "
                 f"números fiéis={_sim_nao(execucao.numeros_ok)} "
-                f"nomes de pacientes={execucao.nomes_de_pacientes} "
-                f"oferece e-mail={'SIM' if execucao.oferece_email else 'não'}"
+                f"nomes de pacientes={execucao.nomes_de_pacientes}"
                 + (
                     f" (fora da tool: {execucao.numeros_infieis})"
                     if execucao.numeros_infieis
@@ -451,7 +435,6 @@ def main(argv: list[str] | None = None) -> None:
             f" | relatório certo: {sum(e.relatorio_ok for e in execucoes)}/{total}"
             f" | números fiéis: {sum(e.numeros_ok for e in execucoes)}/{total}"
             f" | sem nome de paciente: {sum(e.nomes_ok for e in execucoes)}/{total}"
-            f" | sem oferta de e-mail: {sum(e.email_ok for e in execucoes)}/{total}"
             f" | tempo médio: {tempo:.1f}s"
         )
 
