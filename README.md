@@ -13,7 +13,7 @@ Fases 1 a 9 concluídas:
 
 | Fase | Entrega |
 | --- | --- |
-| 1 | Estrutura inicial: esqueleto do projeto em camadas (`domain`/`engine`/`data_sources`/`ai`/`api`/`reports`) e configuração via `pydantic-settings`. |
+| 1 | Estrutura inicial: esqueleto do projeto em camadas (`domain`/`engine`/`data_sources`/`ai`/`api`) e configuração via `pydantic-settings`. |
 | 2 | Domínio: entidades e regras estáticas da clínica (`Sala`, `Profissional`, `Slot`, `Atendimento`, `Paciente`, validação do grid de 30 minutos). |
 | 3 | Fonte de dados: parser da planilha do Google Sheets (blocos, salas mescladas, convênio por cor, normalização de nomes) e o contrato de continuidade terapêutica. |
 | 4a | Motor de disponibilidade e ocupação (`listar_disponibilidade`, `construir_relatorio_ocupacao_do_dia`). |
@@ -22,10 +22,11 @@ Fases 1 a 9 concluídas:
 | 5b | Agente LangChain e as tools que ele usa (`app/ai/agente.py`, `app/ai/tools.py`). |
 | 6a | Esqueleto da API HTTP: autenticação por `X-API-Key`, CORS, cache de leitura. |
 | 6b | Endpoint de conversa com o agente (`/agenda/chat`) e sessão em memória. |
-| 7 | Relatório de ocupação por e-mail via Resend. |
+| 7 | Relatório de ocupação por e-mail via Resend (removido na fase 11). |
 | 8 | Cobertura de testes, teste de integração ponta a ponta, verificação automática das fronteiras arquiteturais (`tests/test_arquitetura.py`) e este fechamento da documentação. |
 | 9 | Relatórios gerais: fotografia do período e motor de relatório genérico (`app/engine/fotografia.py`, `relatorio_generico.py`, `relatorios_prontos.py`), tools `gerar_relatorio` e `consultar_catalogo` e cinco tipos de bloco novos. |
-| 10 | Integração dos relatórios gerais: as tools antigas sobre o motor novo (equivalência provada por golden), `GET /relatorios/catalogo` e `POST /relatorios/gerar`, e-mail com os relatórios gerais e avaliação do prompt com os relatórios novos. |
+| 10 | Integração dos relatórios gerais: as tools antigas sobre o motor novo (equivalência provada por golden), `GET /relatorios/catalogo` e `POST /relatorios/gerar`, e-mail com os relatórios gerais (removido na fase 11) e avaliação do prompt com os relatórios novos. |
+| 11 | Remoção do envio de e-mail: Resend, `app/reports`, `POST /relatorio/enviar` e a tool `enviar_relatorio`. O RealocAI não envia e-mails. |
 
 ## Princípio central: IA sugere, o motor decide
 
@@ -55,7 +56,6 @@ app/
 ├── ai/            # Integração com LangChain + langchain-openai: interpretação de pedidos em
 │                  # linguagem natural, ranqueamento e explicação. Nunca decide sozinho.
 ├── api/           # Rotas HTTP (FastAPI): routers, schemas de request/response, dependências.
-├── reports/       # Geração e envio de relatórios (Resend): resumos de ocupação e sugestões.
 ├── config.py      # Variáveis de ambiente centralizadas via pydantic-settings.
 ├── main.py        # Instância FastAPI (`criar_app`) e endpoint GET /health.
 └── __main__.py    # Servidor de produção: `python -m app` (valida a config e sobe o uvicorn).
@@ -66,11 +66,9 @@ tests/             # Espelha a estrutura de app/ (tests/domain, tests/engine, ..
 ### Direção das dependências
 
 ```
-api ─┬─> engine ──> domain
-     ├─> ai ──────> domain
-     └─> reports ─> domain
-              ^
-data_sources ─┘
+api ─┬─> engine ──────> domain
+     ├─> ai ──────────> domain
+     └─> data_sources ─> domain
 ```
 
 O `domain` não importa nada das outras camadas. O `engine` não depende de `ai`, de `api` nem de
@@ -80,7 +78,7 @@ justamente para isso — é a engine que depende dele, não o contrário.
 
 Essa direção de dependência, junto com o isolamento de bibliotecas externas por camada
 (`langchain*` só em `app/ai`, `fastapi`/`starlette` só em `app/api`, `gspread`/`google.auth`
-só em `app/data_sources`, `resend` só em `app/reports`), é verificada automaticamente por
+só em `app/data_sources`), é verificada automaticamente por
 `tests/test_arquitetura.py`, com as poucas exceções aceitas documentadas ali mesmo.
 
 ## Requisitos
@@ -123,7 +121,6 @@ Todos os endpoints abaixo (exceto `/health`) exigem o header `X-API-Key`, com o 
 | `/agenda/ocupacao` | GET | Ocupação de um dia, agregada por sala e por especialidade. |
 | `/agenda/chat` | POST | Envia uma mensagem ao agente de IA e devolve a resposta. Ver detalhes abaixo. |
 | `/agenda/chat/{conversa_id}` | GET | Histórico bruto de uma conversa (útil para depuração). |
-| `/relatorio/enviar` | POST | Envia por e-mail o relatório de ocupação de um dia (por sala e por especialidade). Ver detalhes abaixo. |
 | `/relatorios/catalogo` | GET | Mapa da clínica na semana e o significado de cada relatório e métrica (o mesmo da tool `consultar_catalogo`). |
 | `/relatorios/gerar` | POST | Relatório geral de qualquer período: o mesmo `{texto, bloco}` da tool `gerar_relatorio`. Contrato em [`docs/api-relatorios.md`](docs/api-relatorios.md). |
 
@@ -150,7 +147,7 @@ Corpo da requisição:
   mostra as tabelas e os destaques dos relatórios na tela. Nesse modo, o agente
   responde em no máximo 3 frases curtas, em prosa, com os destaques, sem repetir a lista,
   a tabela nem os avisos; chama só as tools que a pergunta pede (cada tool de relatório
-  vira um cartão na tela) e não oferece envio por e-mail por conta própria.
+  vira um cartão na tela).
   Omitido ou `false` mantém as respostas detalhadas atuais.
 
 Resposta:
@@ -202,8 +199,7 @@ ou os distintos da clínica na consulta diária geral.
 Texto e blocos usam o mesmo resultado da engine. Os dados preservam valores sem
 arredondamento, contagens inteiras, percentuais como frações e dias da semana por extenso.
 As strings de exibição usam `ROUND_HALF_UP`, uma casa decimal e vírgula, também no
-texto das tools e no e-mail de relatório (a ocupação agregada e o e-mail antes usavam
-percentual sem casa decimal). `GET /agenda/ocupacao` também aceita percentual acima de 1.
+texto das tools (a ocupação agregada antes usava percentual sem casa decimal). `GET /agenda/ocupacao` também aceita percentual acima de 1.
 Em caso de inconsistência na grade, a engine pode produzir ocupação acima de 100%.
 O bloco é devolvido com o valor real (percentuais só têm limite inferior, `>= 0`):
 `abaixo_da_meta` fica `false`, um aviso de ocupação acima de 100% entra em `avisos` (e no
@@ -229,8 +225,10 @@ renderiza os dados e implementa a exportação. Se o usuário pedir exportação
 `renderiza_relatorios: true` o agente informa que o relatório na tela tem botões
 "Exportar"; com `false`, informa que a exportação não está disponível neste canal.
 As duas variantes proíbem afirmar que um arquivo foi exportado ou enviado e oferecer
-exportação por conta própria. O envio de relatório no corpo de e-mail já existente
-continua sendo uma funcionalidade separada.
+exportação por conta própria.
+
+**O RealocAI não envia e-mails.** As duas variantes do prompt dizem para nunca oferecer envio
+por e-mail e, se pedirem, responder em uma frase que o agente não envia e-mails.
 
 Em `uv run python scripts/chat_manual.py --verbose`, cada turno também imprime o
 tipo e o título dos blocos, além do rastro de tools. Por padrão o script usa a variante
@@ -244,67 +242,6 @@ tabelas) usam datas em dd/mm/aaaa, por exemplo "Ocupação de 05/10/2026"; datas
 aparecem só nos campos de dados (`periodo`, `data`, `dias_nao_lidos`, colunas de formato
 `data`). As salas seguem ordem natural pelo número (Sala 1, Sala 2, Sala 10) no texto de
 `consultar_ocupacao`, em `dados.por_sala` e na tabela **Por sala**.
-
-### `POST /relatorio/enviar`
-
-Corpo da requisição (ambos os campos opcionais):
-
-```json
-{
-  "data": null,
-  "destinatarios": null
-}
-```
-
-- `data`: omitida (ou `null`) para usar a data de hoje.
-- `destinatarios`: omitida para usar a lista padrão configurada em `REPORT_EMAIL_TO`; uma
-  lista explícita substitui esse padrão.
-
-Sem `RESEND_API_KEY`/`REPORT_EMAIL_FROM` no ambiente, devolve **503**
-`{"detail": "O envio de e-mail não está configurado neste ambiente."}`.
-
-O relatório contém **apenas a ocupação por sala/especialidade** (mesmo dado de
-`/agenda/ocupacao`): a linha "Meta de ocupação: 80%", o resumo ("N de M especialidades e N de M
-salas abaixo da meta") e duas tabelas com as colunas "Especialidade" ou "Sala", "Ocupação" e
-"Situação" ("Abaixo da meta", com a linha destacada em vermelho no HTML, ou "Na meta"). As salas
-saem em ordem natural (Sala 2 antes de Sala 10), a mesma de `/agenda/ocupacao`.
-
-**Relatórios gerais por e-mail (opcional).** Com o campo `relatorios` (lista exata, na ordem:
-`ocupacao`, `vagas_livres`, `ranking_ocupacao`, `convenios`, `qualidade_agenda`,
-`salas_ociosas`), o e-mail traz exatamente esses relatórios, de `data` ou de `inicio`/`fim` (até
-14 dias; `ocupacao` é de um dia só). O e-mail nunca contém nome de paciente: `agenda_paciente`
-devolve `422`. Sem o campo, nada muda. Contrato completo em
-[`docs/api-relatorios.md`](docs/api-relatorios.md).
-
-Resposta:
-
-```json
-{
-  "enviado": true,
-  "destinatarios": ["coordenacao@suaclinica.com.br"]
-}
-```
-
-Falha no envio (Resend fora do ar, credencial inválida etc.) devolve `502`, sem detalhar o
-erro interno do Resend na resposta.
-
-O mesmo envio também pode ser disparado **por conversa com o agente** (`/agenda/chat`),
-através da tool `enviar_relatorio` — o agente só a aciona quando o pedido for claro e
-explícito (ex.: "manda o relatório de hoje").
-
-**A tool só existe quando o Resend está configurado.** `criar_tools` registra
-`enviar_relatorio` apenas se `RESEND_API_KEY` e `REPORT_EMAIL_FROM` estiverem preenchidos
-(`envio_de_email_configurado()` em `app/ai/tools.py`). A decisão é por configuração, não por
-tentativa: sem as duas variáveis, o agente nem vê a tool, e o prompt de sistema (nas duas
-variantes) diz que o envio por e-mail não está disponível neste ambiente, que o agente não deve
-oferecê-lo e que, se pedirem, responde em uma frase que não está disponível. Com o Resend
-configurado, a tool e o prompt voltam ao comportamento descrito acima, incluindo a regra de não
-oferecer o e-mail por conta própria. Os valores de exemplo do `.env.example` não estão vazios:
-para desligar o envio, deixe as duas variáveis em branco. Esta regra vale só para o agente; o
-endpoint `POST /relatorio/enviar` não foi alterado.
-
-Para revisar o e-mail sem o Resend, use `scripts/preview_email.py` (ver
-[Scripts exploratórios](#scripts-exploratórios)).
 
 ### Ocupação de uma profissional (tool `consultar_ocupacao_profissional`)
 
@@ -402,7 +339,7 @@ argumentos, texto e bloco não mudaram: `tests/ai/test_golden_tools.py` compara 
 golden capturado do código antigo (`tests/ai/golden/`, 74 casos, inclusive os de borda) e com o
 contrato que o modelo vê (nome, descrição e schema). O golden nunca é regerado para fazer um teste
 passar. `listar_disponibilidade` e `construir_relatorio_ocupacao_do_dia` continuam existindo
-porque o encaixe, o e-mail atual e as rotas `GET /agenda/*` usam.
+porque o encaixe e as rotas `GET /agenda/*` usam.
 
 Regras antigas preservadas de propósito: a ocupação **por sala** do dia só conta atendimento que
 caiu numa janela da grade; profissional listado sem grade aparece com 0 de 0; a disponibilidade
@@ -486,27 +423,6 @@ planilha compartilhada com o e-mail da service account (basta permissão de leit
 O relatório é impresso no terminal e salvo em `scripts/output/sheet_inspection.txt`. Essa pasta
 é git-ignorada — o output contém dados reais de pacientes e profissionais.
 
-### `scripts/preview_email.py`
-
-Gera localmente o e-mail do relatório de ocupação de uma data (padrão: hoje), com a planilha
-real (`GoogleSheetsDataSource`), **sem usar o Resend e sem enviar nada**. Grava o HTML e o texto
-do corpo em `scripts/output/preview_email.html` e `scripts/output/preview_email.txt` e imprime os
-caminhos.
-
-```bash
-uv run python scripts/preview_email.py [AAAA-MM-DD]
-uv run python scripts/preview_email.py --relatorios vagas_livres,ranking_ocupacao \
-  --inicio 2026-10-19 --fim 2026-10-23
-```
-
-Com `--relatorios`, gera o e-mail dos relatórios gerais (o mesmo de `POST /relatorio/enviar` com
-o campo `relatorios`), do dia informado ou do período `--inicio`/`--fim`, com as mesmas
-validações da rota (por exemplo, `agenda_paciente` é recusado).
-
-Exige só as credenciais do Google Sheets. O relatório traz salas, especialidades e contagens,
-sem nomes de pacientes, mas vem da agenda real: por isso a saída fica em `scripts/output/`, que
-é git-ignorada.
-
 ### `scripts/avaliar_prompt_renderiza.py`
 
 Avalia a variante do prompt com renderização (`renderiza_relatorios=True`) com o **modelo real**
@@ -524,17 +440,16 @@ Para cada execução imprime, só no terminal: as tools e o relatório escolhido
 ao modelo e às tools, o tempo, o número de frases (a resposta curta tem de 1 a 3), se todo número
 com vírgula decimal citado aparece no texto da tool, **quantos** nomes de pacientes aparecem na
 resposta (comparando com os pacientes da fonte, fora o nome pedido e os que também são nome de
-profissional) e se a resposta oferece e-mail (qualquer menção a "e-mail" conta como falha). No fim,
-um resumo por pergunta, com o tempo médio. Nunca imprime o texto da resposta, o das tools nem nomes
-de pacientes, e não grava arquivo. O envio de e-mail é substituído por um registro local.
+profissional). No fim, um resumo por pergunta, com o tempo médio. Nunca imprime o texto da
+resposta, o das tools nem nomes de pacientes, e não grava arquivo.
 
 **Custo antes de rodar.** Sem `--confirmar`, o script só mostra a estimativa de custo e o comando
 para rodar, sem chamar o modelo nem ler a planilha. A estimativa mede o prompt de sistema e os
-schemas das tools de verdade (hoje, cerca de 6,1 mil tokens por chamada), supõe 2 chamadas ao
+schemas das tools de verdade (hoje, cerca de 5,8 mil tokens por chamada), supõe 2 chamadas ao
 modelo por conversa, 1,5 mil tokens de resultado das tools e 400 de saída, e usa US$ 2,50 por
 milhão de tokens de entrada e US$ 10 por milhão de saída (ajustáveis com `--preco-entrada` e
 `--preco-saida`, conforme o modelo de `OPENAI_MODEL`). Com 10 perguntas e 1 repetição, dá cerca de
-137 mil tokens de entrada, 4 mil de saída e **US$ 0,38**; o custo escala linearmente com
+131 mil tokens de entrada, 4 mil de saída e **US$ 0,37**; o custo escala linearmente com
 `--repeticoes`.
 
 ```bash
@@ -589,9 +504,6 @@ depois — nenhum destes pontos é um problema em aberto de "esqueceram de fazer
 - **Realocação é sempre de um atendimento por vez.** `sugerir_realocacao` move um único
   atendimento; reorganizar vários pacientes de uma vez para destravar espaço (realocação em
   massa) não foi implementado.
-- **O relatório por e-mail cobre só ocupação por sala/especialidade.** Lista de atendimentos
-  aguardando autorização e sugestões de desfragmentação no relatório foram adiadas para uma
-  feature futura.
 - **A fonte de dados atual (Google Sheets) é temporária.** A migração para o Agendador via API
   Gateway ainda depende da documentação dessa API estar disponível.
 - **O modelo de IA de produção ainda não foi decidido.** Enquanto isso, o projeto testa via
@@ -614,8 +526,6 @@ Veja `.env.example`. Resumo:
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | uma das duas | JSON da service account (puro ou base64); prioridade sobre o arquivo, só em memória |
 | `GOOGLE_SHEETS_CREDENTIALS_PATH` | uma das duas | Caminho do JSON da service account (uso local) |
 | `CORS_ALLOWED_ORIGINS` | **em production** | Origens liberadas, separadas por vírgula (`*` é recusado) |
-| `RESEND_API_KEY` / `REPORT_EMAIL_FROM` | não (as duas juntas) | Envio do relatório por e-mail; vazias = envio desligado |
-| `REPORT_EMAIL_TO` | não | Destinatários padrão, separados por vírgula |
 | `LOG_LEVEL` | não | `DEBUG`, `INFO` (padrão), `WARNING`, `ERROR`, `CRITICAL` |
 | `DOCS_ENABLED` | não | Força `/docs`, `/redoc`, `/openapi.json`; sem valor, ligados só em `development` |
 | `PORT` | não | Porta do servidor (padrão 8000) |
