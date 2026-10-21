@@ -126,17 +126,18 @@ def test_provedor_desconhecido() -> None:
     assert problemas == ['AI_PROVIDER: valor não reconhecido (aceitos: "openai" ou "google").']
 
 
-def test_resend_exige_as_duas_variaveis_juntas() -> None:
-    problemas = _problemas(_settings(**_VALIDA, resend_api_key="re_ficticia"))
+def test_variaveis_antigas_de_email_no_ambiente_sao_ignoradas(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """O RealocAI não envia mais e-mails: variáveis que sobraram não podem derrubar o app."""
+    monkeypatch.setenv("RESEND_API_KEY", "re_ficticia")
+    monkeypatch.setenv("REPORT_EMAIL_FROM", "relatorios@exemplo.com.br")
+    monkeypatch.setenv("REPORT_EMAIL_TO", "a@exemplo.com.br,b@exemplo.com.br")
 
-    assert problemas[0].startswith("RESEND_API_KEY e REPORT_EMAIL_FROM")
+    settings = _settings(**_VALIDA)
 
-
-def test_resend_e_opcional() -> None:
-    validar_configuracao(_settings(**_VALIDA, resend_api_key=None, report_email_from=None))
-    validar_configuracao(
-        _settings(**_VALIDA, resend_api_key="re_ficticia", report_email_from="a@exemplo.com.br")
-    )
+    validar_configuracao(settings)
+    assert not hasattr(settings, "resend_api_key")
 
 
 def test_cors_obrigatorio_em_producao() -> None:

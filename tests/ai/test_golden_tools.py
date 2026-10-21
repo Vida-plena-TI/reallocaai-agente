@@ -9,7 +9,6 @@ from typing import Any
 
 import pytest
 
-from app.ai import tools as modulo_tools
 from tests.support.agenda_clinica import NOMES_PACIENTES, fonte_clinica
 from tests.support.golden_tools import (
     ARQUIVO_CONTRATO,
@@ -34,10 +33,8 @@ def test_saida_igual_ao_golden(indice: int) -> None:
     assert executar_caso(*CASOS[indice]) == SAIDAS[chave_caso(indice)]
 
 
-def test_contrato_das_tools_igual_ao_golden(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_contrato_das_tools_igual_ao_golden() -> None:
     """Nome, descrição e schema dos argumentos: o que o modelo vê de cada tool."""
-    monkeypatch.setattr(modulo_tools, "envio_de_email_configurado", lambda: True)
-
     contrato = capturar_contrato(list(criar_tools_golden(fonte_clinica()).values()))
 
     assert json.loads(json.dumps(contrato)) == CONTRATO

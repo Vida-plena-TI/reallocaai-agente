@@ -33,7 +33,7 @@ from pydantic import ValidationError
 from app.ai.prompts import prompt_de_sistema
 from app.ai.rastreamento import desligar_rastreamento_externo
 from app.ai.relatorios import BlocoRelatorio
-from app.ai.tools import DIAS_DA_SEMANA, EnviarRelatorio, criar_tools
+from app.ai.tools import DIAS_DA_SEMANA, criar_tools
 from app.config import exigir, get_settings
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import ScheduleDataSource
@@ -87,7 +87,6 @@ def criar_agente(
     continuidade: ContinuidadeDataSource,
     chat_model: BaseChatModel,
     data_referencia: date,
-    enviar_relatorio: EnviarRelatorio,
     renderiza_relatorios: bool = False,
 ) -> Agente:
     """Monta o agente RealocAI: tools da Parte B + prompt de sistema da Parte C.
@@ -95,15 +94,9 @@ def criar_agente(
     `chat_model` é sempre recebido de fora, nunca construído aqui — em
     produção é o resultado de `criar_chat_model()`; em teste, um chat model
     falso que não faz nenhuma chamada de rede (ver `tests/ai/test_agente.py`).
-    `enviar_relatorio` é repassado direto para `criar_tools` (ver lá o porquê
-    de não ser importado direto de `app.reports`).
     """
-    tools = criar_tools(fonte, continuidade, data_referencia, enviar_relatorio)
-    # O prompt só cita o envio por e-mail quando a tool foi registrada.
-    variante = prompt_de_sistema(
-        renderiza_relatorios=renderiza_relatorios,
-        envio_email=any(item.name == "enviar_relatorio" for item in tools),
-    )
+    tools = criar_tools(fonte, continuidade, data_referencia)
+    variante = prompt_de_sistema(renderiza_relatorios=renderiza_relatorios, envio_email=False)
     prompt = variante.format(
         data_referencia=data_referencia.strftime("%d/%m/%Y"),
         dia_da_semana=DIAS_DA_SEMANA[data_referencia.weekday()],

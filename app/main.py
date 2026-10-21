@@ -119,7 +119,7 @@ def criar_app(settings: Settings) -> FastAPI:
     @aplicacao.get("/health")
     def health() -> dict[str, str]:
         """Verificação de disponibilidade. Pública, sem X-API-Key e sem tocar em
-        Sheets, IA ou Resend."""
+        Sheets nem IA."""
         return {"status": "ok"}
 
     return aplicacao

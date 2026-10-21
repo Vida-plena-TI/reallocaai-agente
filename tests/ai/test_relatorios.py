@@ -45,9 +45,7 @@ def mensagem_tool(
     args: dict[str, Any],
     fonte: FakeScheduleDataSource | None = None,
 ) -> ToolMessage:
-    tools = criar_tools(
-        fonte or fonte_relatorios(), SemHistoricoContinuidadeDataSource(), SEGUNDA, lambda *_: None
-    )
+    tools = criar_tools(fonte or fonte_relatorios(), SemHistoricoContinuidadeDataSource(), SEGUNDA)
     ferramenta = next(t for t in tools if t.name == nome)
     assert ferramenta.response_format == "content_and_artifact"
     mensagem = ferramenta.invoke({"name": nome, "args": args, "id": "c1", "type": "tool_call"})

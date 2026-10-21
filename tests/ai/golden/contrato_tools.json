@@ -346,47 +346,6 @@
   "descricao": "QUANTOS PACIENTES cada profissional (ou uma) atende, por dia ou na semana.\n\nUse quando perguntarem quantos pacientes as profissionais atendem\n(\"quantos pacientes cada profissional atende por dia?\", \"quantos\npacientes a Rossana atende?\", \"quantos pacientes de fono na\nterça?\"). Padrão: semana de hoje, todas as profissionais, com o\ndetalhe por dia. NÃO use para taxa de ocupação (slots) — para isso,\n`consultar_ocupacao_profissional` ou `consultar_ocupacao`.",
   "formato_resposta": "content_and_artifact"
  },
- "enviar_relatorio": {
-  "argumentos": {
-   "description": "Envia por e-mail o relatório de ocupação do dia (por sala e por especialidade).\n\nSó use quando o pedido for claro e explícito sobre mandar o relatório\npor e-mail (ex.: \"manda o relatório de hoje\"). Nunca aciona o envio\npor conta própria, nem como parte de outra resposta.",
-   "properties": {
-    "data": {
-     "anyOf": [
-      {
-       "format": "date",
-       "type": "string"
-      },
-      {
-       "type": "null"
-      }
-     ],
-     "default": null,
-     "description": "Data do relatório, no formato AAAA-MM-DD. Deixe em branco para usar a data de referência da conversa (hoje).",
-     "title": "Data"
-    },
-    "destinatarios": {
-     "anyOf": [
-      {
-       "items": {
-        "type": "string"
-       },
-       "type": "array"
-      },
-      {
-       "type": "null"
-      }
-     ],
-     "default": null,
-     "description": "Lista de e-mails destinatários. Deixe em branco para usar a lista padrão já configurada na clínica.",
-     "title": "Destinatarios"
-    }
-   },
-   "title": "enviar_relatorio",
-   "type": "object"
-  },
-  "descricao": "Envia por e-mail o relatório de ocupação do dia (por sala e por especialidade).\n\nSó use quando o pedido for claro e explícito sobre mandar o relatório\npor e-mail (ex.: \"manda o relatório de hoje\"). Nunca aciona o envio\npor conta própria, nem como parte de outra resposta.",
-  "formato_resposta": "content"
- },
  "gerar_relatorio": {
   "argumentos": {
    "$defs": {

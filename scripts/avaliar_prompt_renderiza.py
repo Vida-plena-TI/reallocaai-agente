@@ -54,7 +54,7 @@ from tests.support.agenda_semanal import QUARTA  # noqa: E402
 
 from app.ai.agente import criar_agente, criar_chat_model, perguntar_com_mensagens  # noqa: E402
 from app.ai.prompts import prompt_de_sistema  # noqa: E402
-from app.ai.tools import EnviarRelatorio, criar_tools  # noqa: E402
+from app.ai.tools import criar_tools  # noqa: E402
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource  # noqa: E402
 from app.data_sources.google_sheets import GoogleSheetsDataSource  # noqa: E402
 from app.domain import ScheduleDataSource, dias_da_semana_de  # noqa: E402
@@ -269,13 +269,8 @@ class Estimativa:
 
 def tokens_do_prompt(fonte: ScheduleDataSource, data_referencia: date) -> int:
     """Tokens aproximados do prompt de sistema e dos schemas das tools, sem chamar o modelo."""
-    tools = criar_tools(
-        fonte, SemHistoricoContinuidadeDataSource(), data_referencia, _registrar_sem_enviar([])
-    )
-    prompt = prompt_de_sistema(
-        renderiza_relatorios=True,
-        envio_email=any(tool.name == "enviar_relatorio" for tool in tools),
-    )
+    tools = criar_tools(fonte, SemHistoricoContinuidadeDataSource(), data_referencia)
+    prompt = prompt_de_sistema(renderiza_relatorios=True, envio_email=False)
     schemas = json.dumps([convert_to_openai_tool(tool) for tool in tools], ensure_ascii=False)
     return (len(prompt) + len(schemas)) // CARACTERES_POR_TOKEN
 
@@ -332,13 +327,6 @@ def _argumentos(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _registrar_sem_enviar(registro: list[date]) -> EnviarRelatorio:
-    def enviar(_fonte: ScheduleDataSource, data: date, _destinatarios: list[str] | None) -> None:
-        registro.append(data)
-
-    return enviar
-
-
 def _sim_nao(valor: bool) -> str:
     return "sim" if valor else "NÃO"
 
@@ -389,7 +377,6 @@ def main(argv: list[str] | None = None) -> None:
 
     continuidade = SemHistoricoContinuidadeDataSource()
     chat_model = criar_chat_model()
-    emails_bloqueados: list[date] = []
     semana = dias_da_semana_de(data_referencia)
     foto_real = fotografar_periodo(fonte, semana[0], semana[-1])
     # Os nomes ficam só em memória, para contar ocorrências; nunca são impressos.
@@ -414,7 +401,6 @@ def main(argv: list[str] | None = None) -> None:
                 continuidade,
                 chat_model,
                 QUARTA if pergunta.ficticia else data_referencia,
-                _registrar_sem_enviar(emails_bloqueados),
                 renderiza_relatorios=True,
             )
             historico: list[BaseMessage] = [HumanMessage(pergunta.texto)]
@@ -467,10 +453,6 @@ def main(argv: list[str] | None = None) -> None:
             f" | sem nome de paciente: {sum(e.nomes_ok for e in execucoes)}/{total}"
             f" | sem oferta de e-mail: {sum(e.email_ok for e in execucoes)}/{total}"
             f" | tempo médio: {tempo:.1f}s"
-        )
-    if emails_bloqueados:
-        print(
-            f"\nenviar_relatorio chamado {len(emails_bloqueados)} vez(es); nenhum e-mail enviado."
         )
 
 

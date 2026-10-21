@@ -1,8 +1,8 @@
 """App montado para produção (`criar_app`): /health público, docs desligados, CORS restrito.
 
 Cada teste monta o próprio app com `Settings(_env_file=None, ...)`, sem o
-`lifespan` (o `TestClient` sem `with` não o executa): nada aqui toca Sheets,
-IA nem Resend.
+`lifespan` (o `TestClient` sem `with` não o executa): nada aqui toca Sheets
+nem IA.
 """
 
 import os

@@ -33,10 +33,6 @@ LIA_MENDES = Profissional(
 )
 
 
-def _enviar_relatorio_nao_usado(fonte: Any, data: date, destinatarios: list[str] | None) -> None:
-    raise AssertionError("enviar_relatorio não deveria ter sido chamado neste teste")
-
-
 def _tool(fonte: ScheduleDataSource, data_referencia: date = QUARTA) -> BaseTool:
     return next(
         item
@@ -44,7 +40,6 @@ def _tool(fonte: ScheduleDataSource, data_referencia: date = QUARTA) -> BaseTool
             fonte,
             SemHistoricoContinuidadeDataSource(),
             data_referencia,
-            _enviar_relatorio_nao_usado,
         )
         if item.name == "consultar_pacientes_por_profissional"
     )

@@ -43,7 +43,6 @@ from langchain_core.messages import (  # noqa: E402
 from app.ai.agente import criar_agente, criar_chat_model, perguntar_com_mensagens  # noqa: E402
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource  # noqa: E402
 from app.data_sources.google_sheets import GoogleSheetsDataSource  # noqa: E402
-from app.reports.envio import enviar_relatorio_por_email  # noqa: E402
 
 #: Quantos caracteres do resultado de cada tool aparecem no rastro `--verbose`.
 LIMITE_RESULTADO_TOOL = 300
@@ -116,7 +115,6 @@ def main() -> None:
         continuidade,
         criar_chat_model(),
         data_referencia,
-        enviar_relatorio_por_email,
         renderiza_relatorios=argumentos.renderiza,
     )
 

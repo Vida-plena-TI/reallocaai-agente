@@ -19,8 +19,6 @@ PEDIDOS_INVALIDOS: list[tuple[str, str, dict[str, Any]]] = [
     ("post", "/agenda/chat", {"json": {"mensagem": [f"{NOME} tem vaga amanhã?"]}}),
     ("post", "/agenda/chat", {"json": {"mensagem": NOME, "renderiza_relatorios": NOME}}),
     ("post", "/agenda/chat", {"json": {"mensagem": NOME, "conversa_id": {"nome": NOME}}}),
-    ("post", "/relatorio/enviar", {"json": {"data": NOME}}),
-    ("post", "/relatorio/enviar", {"json": {"destinatarios": NOME}}),
     (
         "post",
         "/relatorios/gerar",

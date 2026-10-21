@@ -235,12 +235,8 @@ CASOS: list[tuple[str, str, dict[str, Any]]] = [
 ]
 
 
-def _nao_envia(*_: Any) -> None:
-    raise AssertionError("o golden nunca envia e-mail")
-
-
 def criar_tools_golden(fonte: FakeScheduleDataSource) -> dict[str, BaseTool]:
-    tools = criar_tools(fonte, SemHistoricoContinuidadeDataSource(), DATA_REFERENCIA, _nao_envia)
+    tools = criar_tools(fonte, SemHistoricoContinuidadeDataSource(), DATA_REFERENCIA)
     return {item.name: item for item in tools}
 
 
@@ -282,15 +278,7 @@ def _gravar(caminho: Path, dados: Any) -> None:
 
 
 def main() -> None:
-    from app.ai import tools as modulo_tools
-
-    # O contrato inclui `enviar_relatorio`, que só existe com o Resend ligado.
-    original = modulo_tools.envio_de_email_configurado
-    modulo_tools.envio_de_email_configurado = lambda: True
-    try:
-        contrato = capturar_contrato(list(criar_tools_golden(fonte_clinica()).values()))
-    finally:
-        modulo_tools.envio_de_email_configurado = original
+    contrato = capturar_contrato(list(criar_tools_golden(fonte_clinica()).values()))
     _gravar(ARQUIVO_CONTRATO, contrato)
     _gravar(ARQUIVO_SAIDAS, capturar_saidas())
     print(f"{len(CASOS)} casos e {len(contrato)} tools gravados em {PASTA}")

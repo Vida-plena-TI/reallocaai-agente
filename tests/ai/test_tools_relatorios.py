@@ -44,7 +44,6 @@ def _tools(fonte: FakeScheduleDataSource | None = None) -> dict[str, BaseTool]:
             fonte or fonte_clinica(),
             SemHistoricoContinuidadeDataSource(),
             SEGUNDA,
-            lambda *_: None,
         )
     }
 

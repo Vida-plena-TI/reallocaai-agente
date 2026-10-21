@@ -1,4 +1,4 @@
-"""Exibição comum ao texto das tools, aos destaques dos relatórios e ao e-mail."""
+"""Exibição comum ao texto das tools e aos destaques dos relatórios."""
 
 import re
 from decimal import ROUND_HALF_UP, Decimal

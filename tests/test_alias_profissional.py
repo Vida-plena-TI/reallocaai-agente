@@ -194,9 +194,7 @@ def test_tool_mostra_o_nome_reconstruido_mesmo_com_minusculo_no_primeiro_dia(
     fonte = _fonte({SEGUNDA: SEGUNDA_CANONICA_MINUSCULA, TERCA: TERCA_GRAFIA_ANTIGA})
     tool = next(
         item
-        for item in criar_tools(
-            fonte, SemHistoricoContinuidadeDataSource(), SEGUNDA, lambda *_: None
-        )
+        for item in criar_tools(fonte, SemHistoricoContinuidadeDataSource(), SEGUNDA)
         if item.name == "consultar_ocupacao_profissional"
     )
 

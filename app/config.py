@@ -117,14 +117,6 @@ class Settings(BaseSettings):
     #: arquivo. Tem prioridade sobre `google_sheets_credentials_path`.
     google_service_account_json: str | None = None
 
-    # Envio de relatórios por e-mail (app/reports)
-    resend_api_key: str | None = None
-    report_email_from: str | None = None
-    # `NoDecode` desliga o parsing JSON que o pydantic-settings aplicaria a campos de lista
-    # antes dos validadores: sem isso, `REPORT_EMAIL_TO=a@b.com,c@d.com` quebraria a leitura
-    # do `.env` e o validador abaixo nunca seria chamado.
-    report_email_to: Annotated[list[str], NoDecode] = Field(default_factory=list)
-
     # API HTTP interna (app/api)
     #: Mesma lógica de `openai_model`: `None` por padrão, validado por `exigir`
     #: dentro de `validar_api_key`, no momento em que uma rota autenticada é
@@ -134,6 +126,8 @@ class Settings(BaseSettings):
     #: da Fase 6b existir). Em desenvolvimento, `app/main.py` libera `localhost`
     #: automaticamente, independente desta variável. Já tem um default seguro:
     #: é um dos únicos campos necessários para `app.main` construir o app.
+    #: `NoDecode` desliga o parsing JSON que o pydantic-settings aplicaria à lista
+    #: antes do validador, para aceitar `a.com,b.com` no `.env`.
     cors_allowed_origins: Annotated[list[str], NoDecode] = Field(default_factory=list)
     #: TTL do cache de leitura da agenda (`CacheadoScheduleDataSource`). Já tem
     #: um default seguro, pelo mesmo motivo de `cors_allowed_origins` acima.
@@ -148,8 +142,6 @@ class Settings(BaseSettings):
         "google_sheets_credentials_path",
         "google_sheets_spreadsheet_id",
         "google_service_account_json",
-        "resend_api_key",
-        "report_email_from",
         "internal_api_key",
         mode="before",
     )
@@ -172,17 +164,12 @@ class Settings(BaseSettings):
             return self.docs_enabled
         return self.app_env == "development"
 
-    @property
-    def envio_de_email_configurado(self) -> bool:
-        """`True` quando `RESEND_API_KEY` e `REPORT_EMAIL_FROM` estão preenchidas."""
-        return bool(self.resend_api_key) and bool(self.report_email_from)
-
-    @field_validator("report_email_to", "cors_allowed_origins", mode="before")
+    @field_validator("cors_allowed_origins", mode="before")
     @classmethod
     def _split_lista_separada_por_virgula(cls, value: object) -> object:
-        """Aceita `REPORT_EMAIL_TO`/`CORS_ALLOWED_ORIGINS` como lista separada por vírgulas.
+        """Aceita `CORS_ALLOWED_ORIGINS` como lista separada por vírgulas.
 
-        Sem isso, o pydantic-settings exigiria JSON (`["a@b.com"]`) no `.env`.
+        Sem isso, o pydantic-settings exigiria JSON (`["https://a.com"]`) no `.env`.
         """
         if isinstance(value, str):
             stripped = value.strip()
@@ -234,12 +221,6 @@ def validar_configuracao(settings: Settings) -> None:
                 problemas.append(
                     f"{nome_do_campo.upper()}: obrigatória quando AI_PROVIDER={provedor}."
                 )
-
-    if faltando("resend_api_key") != faltando("report_email_from"):
-        problemas.append(
-            "RESEND_API_KEY e REPORT_EMAIL_FROM: configure as duas juntas, ou nenhuma "
-            "(sem elas, o envio de e-mail fica desligado)."
-        )
 
     if "*" in settings.cors_allowed_origins:
         problemas.append('CORS_ALLOWED_ORIGINS: "*" não é aceito, liste as origens.')
