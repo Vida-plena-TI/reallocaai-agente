@@ -70,11 +70,12 @@ def _item_ocupacao(rotulo: str, agregada: OcupacaoAgregada) -> OcupacaoItemRespo
 def _construir_ocupacao_response(
     fonte: ScheduleDataSource, data: date, relatorio: RelatorioOcupacaoDoDia
 ) -> OcupacaoResponse:
-    """Resolve sala e especialidade para rótulos legíveis, ordenados de forma estável."""
+    """Resolve sala e especialidade para rótulos legíveis, ordenados de forma estável
+    (salas na ordem natural de `por_sala`, especialidades por nome)."""
     nomes_das_salas = {sala.id: sala.nome for sala in fonte.listar_salas(data)}
     por_sala = [
         _item_ocupacao(nomes_das_salas.get(sala_id, sala_id), agregada)
-        for sala_id, agregada in sorted(relatorio.por_sala().items())
+        for sala_id, agregada in relatorio.por_sala().items()
     ]
     por_especialidade = [
         _item_ocupacao(_rotulo_especialidade(especialidade), agregada)

@@ -263,8 +263,10 @@ Sem `RESEND_API_KEY`/`REPORT_EMAIL_FROM` no ambiente, devolve **503**
 `{"detail": "O envio de e-mail não está configurado neste ambiente."}`.
 
 O relatório contém **apenas a ocupação por sala/especialidade** (mesmo dado de
-`/agenda/ocupacao`) — sem lista de atendimentos aguardando autorização nem sugestões de
-desfragmentação, que ficam fora do escopo desta fase.
+`/agenda/ocupacao`): a linha "Meta de ocupação: 80%", o resumo ("N de M especialidades e N de M
+salas abaixo da meta") e duas tabelas com as colunas "Especialidade" ou "Sala", "Ocupação" e
+"Situação" ("Abaixo da meta", com a linha destacada em vermelho no HTML, ou "Na meta"). As salas
+saem em ordem natural (Sala 2 antes de Sala 10), a mesma de `/agenda/ocupacao`.
 
 Resposta:
 

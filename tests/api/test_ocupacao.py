@@ -109,3 +109,20 @@ def test_ocupacao_acima_de_cem_por_cento_responde_200_com_valor_real(
     }
     assert corpo["por_sala"] == [item_esperado]
     assert corpo["por_especialidade"] == [{**item_esperado, "rotulo": "Psicologia"}]
+
+
+def test_salas_saem_em_ordem_natural(client: TestClient, fonte: FakeScheduleDataSource) -> None:
+    fonte.salas[DIA] = [Sala(id=f"sala-{n}", nome=f"Sala {n}") for n in (10, 2, 1)]
+    fonte.grade[DIA] = [
+        _entrada(f"sala-{n}", "prof-1", Especialidade.PSICOLOGIA, time(8, 0)) for n in (10, 2, 1)
+    ]
+
+    resposta = client.get(
+        "/agenda/ocupacao", params={"data": DIA.isoformat()}, headers=HEADERS_AUTENTICADOS
+    )
+
+    assert [item["rotulo"] for item in resposta.json()["por_sala"]] == [
+        "Sala 1",
+        "Sala 2",
+        "Sala 10",
+    ]

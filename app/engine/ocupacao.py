@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain import EntradaGrade, Especialidade, Profissional, ScheduleDataSource
 from app.domain.constants import META_OCUPACAO_POR_SALA
+from app.domain.formatacao import chave_natural
 from app.domain.slot import Slot
 
 logger = logging.getLogger(__name__)
@@ -74,8 +75,11 @@ class RelatorioOcupacaoDoDia(BaseModel):
     detalhamento_por_sala: dict[str, OcupacaoAgregada] = Field(default_factory=dict)
 
     def por_sala(self) -> dict[str, OcupacaoAgregada]:
-        """Ocupação agregada por sala."""
-        return dict(self.detalhamento_por_sala)
+        """Ocupação agregada por sala, em ordem natural do id: o número da sala é
+        comparado como inteiro (`sala-2` antes de `sala-10`)."""
+        return dict(
+            sorted(self.detalhamento_por_sala.items(), key=lambda par: chave_natural(par[0]))
+        )
 
     def por_especialidade(self) -> dict[Especialidade, OcupacaoAgregada]:
         """Ocupação agregada por especialidade.

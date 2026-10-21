@@ -6,7 +6,11 @@ import pytest
 
 from app.domain import Atendimento, EntradaGrade, Especialidade, Profissional
 from app.domain.slot import Slot
-from app.engine.ocupacao import OcupacaoAgregada, construir_relatorio_ocupacao_do_dia
+from app.engine.ocupacao import (
+    OcupacaoAgregada,
+    RelatorioOcupacaoDoDia,
+    construir_relatorio_ocupacao_do_dia,
+)
 from tests.support.fake_schedule_data_source import FakeScheduleDataSource
 
 DIA = date(2026, 9, 8)
@@ -245,3 +249,17 @@ def test_profissional_escalada_em_duas_salas_no_mesmo_horario_fica_na_sala_do_at
 
     assert por_sala["sala-1"] == OcupacaoAgregada(slots_escalados=1, slots_ocupados=1)
     assert por_sala["sala-12"] == OcupacaoAgregada(slots_escalados=1, slots_ocupados=0)
+
+
+def test_por_sala_em_ordem_natural_do_numero() -> None:
+    """`sala-2` antes de `sala-10`: o número é comparado como inteiro, na origem."""
+    relatorio = RelatorioOcupacaoDoDia(
+        data=date(2026, 9, 8),
+        por_profissional=[],
+        detalhamento_por_sala={
+            sala_id: OcupacaoAgregada(slots_escalados=1, slots_ocupados=1)
+            for sala_id in ("sala-10", "sala-2", "sala-12", "sala-1")
+        },
+    )
+
+    assert list(relatorio.por_sala()) == ["sala-1", "sala-2", "sala-10", "sala-12"]
