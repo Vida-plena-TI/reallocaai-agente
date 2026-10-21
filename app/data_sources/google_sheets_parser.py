@@ -33,6 +33,7 @@ from app.domain import (
     MAPA_ALIAS_PROFISSIONAL,
     MAPA_ESPECIALIDADE_FALLBACK,
     MAPA_SALA_FALLBACK,
+    MAPA_SALA_FIXA_PROFISSIONAL,
     PADROES_ESPECIALIDADE,
     PROFISSIONAIS_IGNORAR,
     Atendimento,
@@ -147,6 +148,11 @@ def parse_worksheet_data(
     analises_por_bloco = [analises for analises, _ in leituras_por_bloco]
     ignoradas_por_bloco = [ignoradas for _, ignoradas in leituras_por_bloco]
 
+    aba_normalizada = _normalizar(titulo_da_aba)
+    for bloco, analises in zip(blocos, analises_por_bloco, strict=True):
+        _estender_merge_de_sala_fixa(raw_values, bloco, intervalos, analises, aba_normalizada)
+    postos_fixos = _postos_de_sala_fixa(aba_normalizada, analises_por_bloco)
+
     # A mesma coluna costuma ser a mesma sala nos dois blocos do dia. Isso é o
     # que salva os cabeçalhos que faltam num deles (a tarde de sexta não repete
     # "Sala 6", mas mantém a profissional embaixo).
@@ -155,11 +161,18 @@ def parse_worksheet_data(
 
     coletor = _Coletor()
     # Uma coluna ignorada não sustenta a sala sozinha: a sala só entra se outra
-    # coluna (mesmo vazia) do cabeçalho a cobrir.
-    for salas_do_bloco, ignoradas in zip(salas_por_bloco, ignoradas_por_bloco, strict=True):
+    # coluna (mesmo vazia) do cabeçalho a cobrir. O mesmo vale para a coluna
+    # que a sala fixa leva para outra sala.
+    for salas_do_bloco, analises, ignoradas in zip(
+        salas_por_bloco, analises_por_bloco, ignoradas_por_bloco, strict=True
+    ):
         for coluna, posto_do_cabecalho in salas_do_bloco.items():
-            if coluna not in ignoradas:
-                coletor.registrar_sala(posto_do_cabecalho.sala)
+            if coluna in ignoradas:
+                continue
+            fixo = _posto_fixo(coluna, analises.get(coluna), posto_do_cabecalho, postos_fixos)
+            if fixo is not None and fixo.sala.id != posto_do_cabecalho.sala.id:
+                continue
+            coletor.registrar_sala(posto_do_cabecalho.sala)
 
     # Horários vistos valem para a aba inteira: é assim que a linha 11:30
     # duplicada da quinta-feira é reduzida à primeira ocorrência.
@@ -172,9 +185,22 @@ def parse_worksheet_data(
     ):
         linhas_de_slot = _linhas_de_slot(raw_values, bloco, dia, linhas_por_horario)
         for coluna, analise in sorted(analises.items()):
-            posto = salas_do_bloco.get(coluna) or salas_do_dia.get(coluna)
+            posto_pelo_cabecalho = salas_do_bloco.get(coluna) or salas_do_dia.get(coluna)
+            posto = _posto_fixo(coluna, analise, posto_pelo_cabecalho, postos_fixos)
+            if posto is not None and posto != posto_pelo_cabecalho:
+                # Só o endereço: o nome do profissional não vai para o log.
+                logger.info(
+                    "Coluna %s está em MAPA_SALA_FIXA_PROFISSIONAL na aba %r: atribuída à %s, "
+                    "posto %d (cabeçalho: %s).",
+                    rotulo_da_coluna(coluna),
+                    titulo_da_aba,
+                    posto.sala.nome,
+                    posto.indice + 1,
+                    "sem sala" if posto_pelo_cabecalho is None else posto_pelo_cabecalho.sala.nome,
+                )
+            posto = posto or posto_pelo_cabecalho
             if posto is None:
-                sala = _sala_de_fallback(_normalizar(titulo_da_aba), analise.id)
+                sala = _sala_de_fallback(aba_normalizada, analise.id)
                 if sala is None:
                     colunas_sem_sala.append(coluna)
                     # Só o endereço: o texto da célula (nome do profissional)
@@ -260,14 +286,95 @@ def _sala_de_fallback(aba_normalizada: str, profissional_id: str) -> Sala | None
     nome = MAPA_SALA_FALLBACK.get((aba_normalizada, profissional_id))
     if nome is None:
         return None
+    return _sala_do_mapa(nome, capacidade=1, mapa="MAPA_SALA_FALLBACK")
+
+
+def _sala_do_mapa(nome: str, *, capacidade: int, mapa: str) -> Sala | None:
+    """Sala escrita à mão num dos mapas de constantes, ou None se fora do formato."""
     encontrado = _PADRAO_SALA.match(_normalizar(nome))
     if encontrado is None:
-        logger.warning(
-            "Sala %r do mapa de fallback não está no formato 'Sala N': fallback ignorado.", nome
-        )
+        logger.warning("Sala %r de %s não está no formato 'Sala N': mapa ignorado.", nome, mapa)
         return None
     numero = int(encontrado.group(1))
-    return Sala(id=f"sala-{numero}", nome=f"Sala {numero}", capacidade_simultanea=1)
+    return Sala(id=f"sala-{numero}", nome=f"Sala {numero}", capacidade_simultanea=capacidade)
+
+
+def _estender_merge_de_sala_fixa(
+    raw_values: Sequence[Sequence[str]],
+    bloco: _Bloco,
+    intervalos: Sequence[tuple[int, int, int, int]],
+    analises: dict[int, _AnaliseProfissional],
+    aba_normalizada: str,
+) -> None:
+    """Dá a quem está em `MAPA_SALA_FIXA_PROFISSIONAL` as colunas do merge do nome.
+
+    Na terça real o nome da profissional está mesclado em O:P: a coluna P tem
+    agenda, mas a célula dela vem vazia e o parser a pularia. Só vale para quem
+    está no mapa — os outros merges na linha de profissionais seguem como estão.
+    """
+    linha = bloco.linha_dos_profissionais
+    for coluna, analise in list(analises.items()):
+        if (aba_normalizada, analise.id) not in MAPA_SALA_FIXA_PROFISSIONAL:
+            continue
+        primeira, limite = _colunas_do_merge(intervalos, linha, coluna)
+        for coberta in range(primeira, limite):
+            if coberta not in analises and not _achatar(_celula(raw_values, linha, coberta)):
+                analises[coberta] = analise
+
+
+def _postos_de_sala_fixa(
+    aba_normalizada: str,
+    analises_por_bloco: Sequence[Mapping[int, _AnaliseProfissional]],
+) -> dict[int, tuple[str, _Posto]]:
+    """Coluna -> (profissional, posto) de quem está em `MAPA_SALA_FIXA_PROFISSIONAL`.
+
+    Junta as colunas em que a profissional aparece em qualquer bloco do dia;
+    cada uma vira um posto da sala, da esquerda para a direita. A capacidade é
+    o número dessas colunas — `_Coletor.registrar_sala` fica com a maior se o
+    cabeçalho da sala disser mais.
+    """
+    colunas_por_profissional: dict[str, set[int]] = {}
+    for analises in analises_por_bloco:
+        for coluna, analise in analises.items():
+            if (aba_normalizada, analise.id) in MAPA_SALA_FIXA_PROFISSIONAL:
+                colunas_por_profissional.setdefault(analise.id, set()).add(coluna)
+
+    postos: dict[int, tuple[str, _Posto]] = {}
+    for profissional_id, colunas in sorted(colunas_por_profissional.items()):
+        sala = _sala_do_mapa(
+            MAPA_SALA_FIXA_PROFISSIONAL[(aba_normalizada, profissional_id)],
+            capacidade=len(colunas),
+            mapa="MAPA_SALA_FIXA_PROFISSIONAL",
+        )
+        if sala is None:
+            continue
+        for indice, coluna in enumerate(sorted(colunas)):
+            postos.setdefault(coluna, (profissional_id, _Posto(sala=sala, indice=indice)))
+    return postos
+
+
+def _posto_fixo(
+    coluna: int,
+    analise: _AnaliseProfissional | None,
+    posto_do_cabecalho: _Posto | None,
+    postos_fixos: Mapping[int, tuple[str, _Posto]],
+) -> _Posto | None:
+    """Posto da sala fixa que vale para a coluna neste bloco, se algum.
+
+    Vale para a própria profissional do mapa, seja qual for o cabeçalho. Outra
+    pessoa na mesma coluna só herda o posto quando o cabeçalho já a põe na
+    mesma sala: assim ninguém é mudado de sala, mas o posto da coluna continua
+    um só (na terça real, a coluna P é o posto 3 da Sala 12 nos dois blocos).
+    """
+    fixo = postos_fixos.get(coluna)
+    if fixo is None or analise is None:
+        return None
+    profissional_id, posto = fixo
+    if analise.id == profissional_id:
+        return posto
+    if posto_do_cabecalho is not None and posto_do_cabecalho.sala.id == posto.sala.id:
+        return posto
+    return None
 
 
 @dataclass(frozen=True, slots=True)

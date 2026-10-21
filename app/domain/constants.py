@@ -70,6 +70,20 @@ PROFISSIONAIS_IGNORAR: Final[frozenset[str]] = frozenset({"raissa", "marley", "v
 MAPA_SALA_FALLBACK: Final[dict[tuple[str, str], str]] = {
     ("segunda", "aline"): "Sala 12",
     ("terca", "sophia"): "Sala 2",
+}
+
+#: Sala de todas as colunas de um profissional numa aba, acima do cabeçalho.
+#:
+#: Diferente de `MAPA_SALA_FALLBACK`, que só age quando o cabeçalho falta: aqui
+#: a clínica confirmou que a profissional atende em postos simultâneos de uma
+#: sala só, e o cabeçalho da planilha está errado ou vazio sobre as colunas
+#: dela. Cada coluna em que ela aparece no dia (inclusive a coberta pelo merge
+#: da célula do nome dela) vira um posto próprio da sala, na ordem das colunas,
+#: e a capacidade da sala passa a ser pelo menos o número dessas colunas. A
+#: chave é (nome da aba normalizado, profissional normalizado).
+MAPA_SALA_FIXA_PROFISSIONAL: Final[dict[tuple[str, str], str]] = {
+    # Terça: B (cabeçalho "Sala 1"), O e P (sem sala; o nome está mesclado em
+    # O:P na manhã) são os três postos simultâneos dela na Sala 12.
     ("terca", "rossana"): "Sala 12",
 }
 
