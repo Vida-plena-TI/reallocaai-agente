@@ -25,6 +25,7 @@ Fases 1 a 9 concluídas:
 | 7 | Relatório de ocupação por e-mail via Resend. |
 | 8 | Cobertura de testes, teste de integração ponta a ponta, verificação automática das fronteiras arquiteturais (`tests/test_arquitetura.py`) e este fechamento da documentação. |
 | 9 | Relatórios gerais: fotografia do período e motor de relatório genérico (`app/engine/fotografia.py`, `relatorio_generico.py`, `relatorios_prontos.py`), tools `gerar_relatorio` e `consultar_catalogo` e cinco tipos de bloco novos. |
+| 10 | Integração dos relatórios gerais: as tools antigas sobre o motor novo (equivalência provada por golden), `GET /relatorios/catalogo` e `POST /relatorios/gerar`, e-mail com os relatórios gerais e avaliação do prompt com os relatórios novos. |
 
 ## Princípio central: IA sugere, o motor decide
 
@@ -509,30 +510,43 @@ sem nomes de pacientes, mas vem da agenda real: por isso a saída fica em `scrip
 ### `scripts/avaliar_prompt_renderiza.py`
 
 Avalia a variante do prompt com renderização (`renderiza_relatorios=True`) com o **modelo real**
-e a **planilha real**. Repete cada pergunta N vezes (padrão 3), sempre em conversa nova:
-"Qual a ocupação da Rossana?", "Quantos pacientes cada profissional atende por dia?",
-"Ocupação por especialidade hoje" e "Exporta isso em Excel". Para cada execução imprime, só no
-terminal, o número de frases da resposta, as tools chamadas, as tools além da esperada (a de
-exportação não espera nenhuma), os blocos gerados e se todo número com vírgula decimal citado
-aparece no texto da tool, e se a resposta oferece e-mail (qualquer menção a "e-mail", com
-qualquer hífen ou nenhum, conta como falha, já que nenhuma pergunta pede e-mail); no fim, um
-resumo por pergunta (até 3 frases, só as tools esperadas, números fiéis, sem oferta de e-mail). Não imprime o texto da resposta nem o das tools, e não grava arquivo. O envio
-de e-mail é substituído por um registro local: se o agente chamar `enviar_relatorio`, aparece
-como tool extra e nenhum e-mail é enviado.
+e a **planilha real**. Cada pergunta é feita N vezes (padrão **1**), sempre em conversa nova:
+
+- as de sempre: "Qual a ocupação da Rossana?", "Quantos pacientes cada profissional atende por
+  dia?", "Ocupação por especialidade hoje" e "Exporta isso em Excel";
+- as dos relatórios gerais (todas esperam `gerar_relatorio` com o relatório certo): vagas de
+  segunda a sexta (`vagas_livres`), janelas de 1 h 30 (`janelas_continuas`), ranking de ocupação,
+  convênios e aguardando autorização, buracos e fragmentação (`qualidade_agenda`) e a agenda de um
+  paciente (`agenda_paciente`). Esta última roda sobre a **semana fictícia** de
+  `tests/support/agenda_clinica.py`, com um nome fictício: nenhum nome real fica no script.
+
+Para cada execução imprime, só no terminal: as tools e o relatório escolhidos, o número de chamadas
+ao modelo e às tools, o tempo, o número de frases (a resposta curta tem de 1 a 3), se todo número
+com vírgula decimal citado aparece no texto da tool, **quantos** nomes de pacientes aparecem na
+resposta (comparando com os pacientes da fonte, fora o nome pedido e os que também são nome de
+profissional) e se a resposta oferece e-mail (qualquer menção a "e-mail" conta como falha). No fim,
+um resumo por pergunta, com o tempo médio. Nunca imprime o texto da resposta, o das tools nem nomes
+de pacientes, e não grava arquivo. O envio de e-mail é substituído por um registro local.
+
+**Custo antes de rodar.** Sem `--confirmar`, o script só mostra a estimativa de custo e o comando
+para rodar, sem chamar o modelo nem ler a planilha. A estimativa mede o prompt de sistema e os
+schemas das tools de verdade (hoje, cerca de 6,1 mil tokens por chamada), supõe 2 chamadas ao
+modelo por conversa, 1,5 mil tokens de resultado das tools e 400 de saída, e usa US$ 2,50 por
+milhão de tokens de entrada e US$ 10 por milhão de saída (ajustáveis com `--preco-entrada` e
+`--preco-saida`, conforme o modelo de `OPENAI_MODEL`). Com 10 perguntas e 1 repetição, dá cerca de
+137 mil tokens de entrada, 4 mil de saída e **US$ 0,38**; o custo escala linearmente com
+`--repeticoes`.
 
 ```bash
-uv run python scripts/avaliar_prompt_renderiza.py [AAAA-MM-DD] [--repeticoes N]
+uv run python scripts/avaliar_prompt_renderiza.py                 # só a estimativa
+uv run python scripts/avaliar_prompt_renderiza.py --confirmar     # roda (pago)
+uv run python scripts/avaliar_prompt_renderiza.py [AAAA-MM-DD] [--repeticoes N] --confirmar
 ```
 
-**Não roda em CI** nem no `uv run pytest` (só as funções puras de contagem têm teste): exige
-`AI_PROVIDER` com a chave e o modelo do provedor, além das credenciais do Google Sheets.
-**Custo aproximado de uma rodada padrão** (4 perguntas × 3 = 12 conversas, em geral 2 chamadas
-ao modelo cada): o prompt de sistema e os schemas das tools somam cerca de 5 mil tokens por
-chamada, mais o resultado das tools, o que dá por volta de 150 mil tokens de entrada e poucos
-milhares de saída. Num modelo de US$ 2,50 por milhão de tokens de entrada e US$ 10 por milhão
-de saída, isso fica em torno de US$ 0,40 por rodada; o custo escala linearmente com
-`--repeticoes`. Com `AI_PROVIDER=google` no tier gratuito, não há custo, mas as ~24 chamadas
-podem esbarrar no limite de requisições por minuto.
+**Não roda em CI** nem no `uv run pytest` (só as funções puras e a estimativa têm teste): exige
+`AI_PROVIDER` com a chave e o modelo do provedor, além das credenciais do Google Sheets. Com
+`AI_PROVIDER=google` no tier gratuito, não há custo, mas as chamadas podem esbarrar no limite de
+requisições por minuto.
 
 ## Qualidade
 
