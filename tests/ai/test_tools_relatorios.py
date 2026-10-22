@@ -297,3 +297,106 @@ def test_vagas_com_duracao_viram_janelas_continuas() -> None:
 
     assert bloco is not None
     assert bloco.titulo.startswith("Janelas livres de 1 h 30")
+
+
+# --- regras do contrato v1 nos blocos novos ----------------------------------
+
+#: Variantes que cobrem todos os blocos novos, inclusive especialidade como dimensão
+#: e ocupação (coluna booleana `abaixo_da_meta`).
+VARIANTES_CONTRATO: list[dict[str, Any]] = [
+    *({"relatorio": r, **a} for r, a in ARGS_POR_RELATORIO.items()),
+    {
+        "relatorio": "personalizado",
+        "dimensoes": ["dia", "especialidade"],
+        "metricas": ["ocupacao", "vagas_livres"],
+    },
+]
+
+
+def _artefatos() -> list[dict[str, Any]]:
+    """O dicionário que vai ao app visual (`ToolMessage.artifact`) de cada variante."""
+    artefatos = []
+    for args in VARIANTES_CONTRATO:
+        mensagem = _tools()["gerar_relatorio"].invoke(
+            {"name": "gerar_relatorio", "args": args, "id": "c1", "type": "tool_call"}
+        )
+        assert isinstance(mensagem, ToolMessage) and mensagem.artifact, args
+        artefatos.append(mensagem.artifact)
+    return artefatos
+
+
+def _percorrer(valor: object, chave: str = "") -> list[tuple[str, object]]:
+    """Todos os pares (chave, valor) do JSON, em qualquer profundidade."""
+    if isinstance(valor, dict):
+        return [par for k, v in valor.items() for par in [(k, v), *_percorrer(v, k)]]
+    if isinstance(valor, list):
+        return [par for v in valor for par in _percorrer(v, chave)]
+    return []
+
+
+def test_especialidade_sai_sempre_como_rotulo_nos_blocos_novos() -> None:
+    from app.domain import Especialidade
+    from app.domain.formatacao import rotulo_enum
+
+    identificadores = {e.value for e in Especialidade}
+    rotulos = {rotulo_enum(e.value) for e in Especialidade}
+    vistos: set[object] = set()
+    for artefato in _artefatos():
+        # Nenhum valor de texto do bloco é um identificador de especialidade.
+        textos = {v for _, v in _percorrer(artefato) if isinstance(v, str)}
+        assert not textos & identificadores, (artefato["tipo"], textos & identificadores)
+        # Campo `especialidade` dos dados e coluna `especialidade` das tabelas.
+        valores = [v for k, v in _percorrer(artefato) if k == "especialidade"]
+        assert set(valores) <= rotulos | {None, "—", "Sem especialidade"}, artefato["tipo"]
+        vistos.update(valores)
+    assert {"Terapia Ocupacional", "Psicologia", "Fonoaudiologia"} <= vistos
+
+
+def test_booleanos_das_tabelas_saem_como_booleano_json() -> None:
+    textos_proibidos = {"Sim", "Não", "sim", "não", "true", "false", "True", "False"}
+    colunas_booleanas: set[str] = set()
+    for artefato in _artefatos():
+        tabelas = list(artefato["tabelas"])
+        if artefato["tipo"] == "tabela_generica":
+            # `dados.total` só tem as métricas: as dimensões ficam ausentes.
+            dados = artefato["dados"]
+            tabelas.append(
+                {"colunas": dados["colunas"], "linhas": [*dados["linhas"], dados["total"]]}
+            )
+        for tabela_ in tabelas:
+            for coluna in tabela_["colunas"]:
+                valores = [linha.get(coluna["chave"]) for linha in tabela_["linhas"]]
+                assert not {v for v in valores if isinstance(v, str)} & textos_proibidos, coluna
+                if any(isinstance(v, bool) for v in valores):
+                    colunas_booleanas.add(coluna["chave"])
+                    assert all(isinstance(v, bool) or v is None for v in valores), coluna
+        # E sobrevive à serialização: `true`/`false`, nunca `"true"`.
+        assert '"true"' not in json.dumps(artefato) and '"false"' not in json.dumps(artefato)
+    assert {"abaixo_da_meta", "aguardando_autorizacao"} <= colunas_booleanas
+
+
+def test_meta_sempre_presente_e_nula_quando_nao_se_aplica() -> None:
+    from pathlib import Path
+
+    from app.api.schemas import ChatResponse
+
+    artefatos = _artefatos()
+    for artefato in artefatos:
+        assert "meta" in artefato, artefato["tipo"]
+    nulas = [a for a in artefatos if a["meta"] is None]
+    assert nulas
+    # No JSON da API o campo também aparece, como `null`.
+    resposta = ChatResponse(
+        conversa_id="c",
+        resposta="r",
+        blocos=[BlocoRelatorio.model_validate(a) for a in nulas],
+    )
+    assert all(b["meta"] is None for b in json.loads(resposta.model_dump_json())["blocos"])
+
+    caminho = Path(__file__).parents[2] / "docs/exemplos-blocos/bloco_relatorio.schema.json"
+    for schema in (
+        BlocoRelatorio.model_json_schema(),
+        json.loads(caminho.read_text(encoding="utf-8")),
+    ):
+        assert "meta" in schema["required"]
+        assert {"type": "null"} in schema["properties"]["meta"]["anyOf"]

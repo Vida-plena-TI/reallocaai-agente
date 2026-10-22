@@ -161,7 +161,10 @@ def _profissional(foto: FotografiaPeriodo, profissional_id: str) -> Profissional
     return ProfissionalRelatorio(
         id=sha256(profissional_id.encode()).hexdigest(),
         nome=foto.nome_profissional(profissional_id),
-        especialidade=profissional.especialidade.value if profissional is not None else None,
+        # Rótulo legível (`Terapia Ocupacional`), nunca o identificador.
+        especialidade=rotulo_enum(profissional.especialidade.value)
+        if profissional is not None
+        else None,
     )
 
 
@@ -299,11 +302,7 @@ def disponibilidade(
                         "dia_semana": f.dia_semana,
                         "periodo": "Manhã" if f.periodo == "manha" else "Tarde",
                         "profissional": f.profissional.nome,
-                        "especialidade": _rotulo_especialidade(
-                            Especialidade(f.profissional.especialidade)
-                            if f.profissional.especialidade
-                            else None
-                        ),
+                        "especialidade": f.profissional.especialidade or "—",
                         "sala": f.sala_nome,
                         "posto": f.posto,
                         "inicio": f.inicio,
@@ -667,9 +666,7 @@ def _linha_qualidade(item: QualidadeProfissional) -> dict[str, ValorSimples]:
     return {
         **item.model_dump(mode="json", exclude={"profissional"}),
         "profissional": item.profissional.nome,
-        "especialidade": rotulo_enum(item.profissional.especialidade)
-        if item.profissional.especialidade
-        else "—",
+        "especialidade": item.profissional.especialidade or "—",
     }
 
 

@@ -85,7 +85,7 @@
         "profissional": {
           "id": "9b08de1dd2ae38487aaa3f42500664f05eae8ef2b1f3068cd5de4aceac951511",
           "nome": "Beto Reis",
-          "especialidade": "fonoaudiologia"
+          "especialidade": "Fonoaudiologia"
         },
         "sessoes": 1
       },
@@ -95,7 +95,7 @@
         "profissional": {
           "id": "76528714a71668d11a5ac5a2e4a035172a6c9394943011a2e1a79014a47a6a26",
           "nome": "Ana Lima",
-          "especialidade": "psicologia"
+          "especialidade": "Psicologia"
         },
         "sessoes": 1
       }
