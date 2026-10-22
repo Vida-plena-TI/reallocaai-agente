@@ -400,3 +400,27 @@ def test_meta_sempre_presente_e_nula_quando_nao_se_aplica() -> None:
     ):
         assert "meta" in schema["required"]
         assert {"type": "null"} in schema["properties"]["meta"]["anyOf"]
+
+
+def test_tabela_de_vagas_ordenada_por_data_especialidade_inicio_profissional_sala_posto() -> None:
+    from app.ai.blocos_gerais import ordem_vaga
+    from app.ai.relatorios import DadosDisponibilidade
+
+    _, bloco = _gerar(relatorio="vagas_livres", inicio=SEGUNDA.isoformat(), fim=SEXTA.isoformat())
+
+    assert bloco is not None and isinstance(bloco.dados, DadosDisponibilidade)
+    esperado = sorted(bloco.dados.faixas, key=ordem_vaga)
+    linhas = bloco.tabelas[0].linhas
+    assert len({f.profissional.especialidade for f in esperado}) > 1
+    chaves = ["data", "especialidade", "inicio", "profissional", "sala", "posto"]
+    assert [tuple(linha[c] for c in chaves) for linha in linhas] == [
+        (
+            f.data.isoformat(),
+            f.profissional.especialidade,
+            f.inicio,
+            f.profissional.nome,
+            f.sala_nome,
+            f.posto,
+        )
+        for f in esperado
+    ]

@@ -44,7 +44,7 @@ from app.ai.relatorios import (
 )
 from app.domain import Especialidade
 from app.domain.constants import DURACAO_SLOT_MINUTOS
-from app.domain.formatacao import formatar_razao, rotulo_enum
+from app.domain.formatacao import chave_natural, chave_texto, formatar_razao, rotulo_enum
 from app.engine.fotografia import FotografiaPeriodo
 from app.engine.relatorio_generico import (
     Dimensao,
@@ -213,6 +213,25 @@ def _mais(quantidade: int) -> list[str]:
 # --- disponibilidade -------------------------------------------------------
 
 
+def ordem_vaga(
+    faixa: FaixaVaga,
+) -> tuple[date, tuple[bool, str], str, tuple[bool, str], tuple[bool, tuple[str | int, ...]], int]:
+    """Data -> especialidade -> início -> profissional -> sala (natural) -> posto.
+
+    Textos sem diferenciar acento nem maiúsculas; valores ausentes vão para o fim.
+    """
+    especialidade = faixa.profissional.especialidade
+    nome = faixa.profissional.nome
+    return (
+        faixa.data,
+        (not especialidade, chave_texto(especialidade or "")),
+        faixa.inicio,
+        (not nome, chave_texto(nome)),
+        (not faixa.sala_nome, chave_natural(faixa.sala_nome)),
+        faixa.posto,
+    )
+
+
 def disponibilidade(
     foto: FotografiaPeriodo, relatorio: RelatorioVagas, avisos: list[str], recorte: str = ""
 ) -> tuple[str, BlocoRelatorio]:
@@ -310,7 +329,7 @@ def disponibilidade(
                         "slots": f.slots,
                         "cabem": f.cabem,
                     }
-                    for f in faixas
+                    for f in sorted(faixas, key=ordem_vaga)
                 ],
             ),
             tabela(

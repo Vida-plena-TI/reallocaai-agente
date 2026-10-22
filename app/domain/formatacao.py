@@ -1,6 +1,7 @@
 """Exibição comum ao texto das tools e aos destaques dos relatórios."""
 
 import re
+import unicodedata
 from decimal import ROUND_HALF_UP, Decimal
 
 
@@ -19,6 +20,12 @@ def chave_natural(texto: str) -> tuple[str | int, ...]:
         int(parte) if i % 2 else parte
         for i, parte in enumerate(re.split(r"(\d+)", texto.casefold()))
     )
+
+
+def chave_texto(texto: str) -> str:
+    """`Ética` -> `etica`: ordem alfabética pt-BR sem diferenciar acento nem maiúsculas."""
+    decomposto = unicodedata.normalize("NFKD", texto)
+    return "".join(c for c in decomposto if not unicodedata.combining(c)).casefold()
 
 
 def rotulo_enum(valor: str) -> str:
