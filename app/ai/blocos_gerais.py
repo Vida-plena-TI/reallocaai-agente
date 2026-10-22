@@ -44,7 +44,7 @@ from app.ai.relatorios import (
 )
 from app.domain import Especialidade
 from app.domain.constants import DURACAO_SLOT_MINUTOS
-from app.domain.formatacao import formatar_razao, rotulo_enum
+from app.domain.formatacao import chave_natural, chave_texto, formatar_razao, rotulo_enum
 from app.engine.fotografia import FotografiaPeriodo
 from app.engine.relatorio_generico import (
     Dimensao,
@@ -161,7 +161,10 @@ def _profissional(foto: FotografiaPeriodo, profissional_id: str) -> Profissional
     return ProfissionalRelatorio(
         id=sha256(profissional_id.encode()).hexdigest(),
         nome=foto.nome_profissional(profissional_id),
-        especialidade=profissional.especialidade.value if profissional is not None else None,
+        # Rótulo legível (`Terapia Ocupacional`), nunca o identificador.
+        especialidade=rotulo_enum(profissional.especialidade.value)
+        if profissional is not None
+        else None,
     )
 
 
@@ -208,6 +211,25 @@ def _mais(quantidade: int) -> list[str]:
 
 
 # --- disponibilidade -------------------------------------------------------
+
+
+def ordem_vaga(
+    faixa: FaixaVaga,
+) -> tuple[date, tuple[bool, str], str, tuple[bool, str], tuple[bool, tuple[str | int, ...]], int]:
+    """Data -> especialidade -> início -> profissional -> sala (natural) -> posto.
+
+    Textos sem diferenciar acento nem maiúsculas; valores ausentes vão para o fim.
+    """
+    especialidade = faixa.profissional.especialidade
+    nome = faixa.profissional.nome
+    return (
+        faixa.data,
+        (not especialidade, chave_texto(especialidade or "")),
+        faixa.inicio,
+        (not nome, chave_texto(nome)),
+        (not faixa.sala_nome, chave_natural(faixa.sala_nome)),
+        faixa.posto,
+    )
 
 
 def disponibilidade(
@@ -299,11 +321,7 @@ def disponibilidade(
                         "dia_semana": f.dia_semana,
                         "periodo": "Manhã" if f.periodo == "manha" else "Tarde",
                         "profissional": f.profissional.nome,
-                        "especialidade": _rotulo_especialidade(
-                            Especialidade(f.profissional.especialidade)
-                            if f.profissional.especialidade
-                            else None
-                        ),
+                        "especialidade": f.profissional.especialidade or "—",
                         "sala": f.sala_nome,
                         "posto": f.posto,
                         "inicio": f.inicio,
@@ -311,7 +329,7 @@ def disponibilidade(
                         "slots": f.slots,
                         "cabem": f.cabem,
                     }
-                    for f in faixas
+                    for f in sorted(faixas, key=ordem_vaga)
                 ],
             ),
             tabela(
@@ -667,9 +685,7 @@ def _linha_qualidade(item: QualidadeProfissional) -> dict[str, ValorSimples]:
     return {
         **item.model_dump(mode="json", exclude={"profissional"}),
         "profissional": item.profissional.nome,
-        "especialidade": rotulo_enum(item.profissional.especialidade)
-        if item.profissional.especialidade
-        else "—",
+        "especialidade": item.profissional.especialidade or "—",
     }
 
 
