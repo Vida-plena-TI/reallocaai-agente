@@ -5,6 +5,8 @@ Estes endpoints expõem, por HTTP, o mesmo motor de relatórios que o agente usa
 texto e o mesmo `BlocoRelatorio`** que a tool devolve ao agente. O formato de cada bloco está em
 [`exemplos-blocos/bloco_relatorio.schema.json`](exemplos-blocos/bloco_relatorio.schema.json), e há
 um exemplo por tipo de bloco em [`exemplos-blocos/`](exemplos-blocos/).
+As regras do contrato dos blocos novos (campos, tipos e convenções) estão em
+[`contrato-blocos-novos.md`](contrato-blocos-novos.md).
 
 A exportação em Excel continua no backend do chatbot: o RealocAI devolve só o bloco estruturado
 (`bloco.tabela` traz as colunas e linhas prontas para exportar).
