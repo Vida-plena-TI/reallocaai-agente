@@ -458,6 +458,9 @@ uv run python scripts/avaliar_prompt_renderiza.py --confirmar     # roda (pago)
 uv run python scripts/avaliar_prompt_renderiza.py [AAAA-MM-DD] [--repeticoes N] --confirmar
 ```
 
+Para medir se a resposta está **certa** (e não só curta), use os casos reais de
+[`docs/avaliacao.md`](docs/avaliacao.md) (`scripts/avaliar_casos_reais.py`).
+
 **Não roda em CI** nem no `uv run pytest` (só as funções puras e a estimativa têm teste): exige
 `AI_PROVIDER` com a chave e o modelo do provedor, além das credenciais do Google Sheets. Com
 `AI_PROVIDER=google` no tier gratuito, não há custo, mas as chamadas podem esbarrar no limite de
