@@ -6,7 +6,10 @@ import pytest
 
 from app.ai.prompts import PROMPT_SISTEMA, PROMPT_SISTEMA_COM_RELATORIOS
 
-VARIANTES = [PROMPT_SISTEMA, PROMPT_SISTEMA_COM_RELATORIOS]
+VARIANTES = [
+    pytest.param(PROMPT_SISTEMA, id="texto"),
+    pytest.param(PROMPT_SISTEMA_COM_RELATORIOS, id="tela"),
+]
 
 
 def _sem_a_lista_de_proibidos(prompt: str) -> str:
@@ -48,3 +51,13 @@ def test_erro_de_parametro_e_corrigido_e_nao_repassado(prompt: str) -> None:
 def test_com_tela_lista_de_varias_linhas_vai_no_relatorio() -> None:
     assert "o texto NUNCA repete a\nlista" in PROMPT_SISTEMA_COM_RELATORIOS
     assert "consultar_disponibilidade (um dia)" in PROMPT_SISTEMA_COM_RELATORIOS
+
+
+@pytest.mark.parametrize("prompt", VARIANTES)
+def test_perguntas_agrupadas_e_padroes_declarados(prompt: str) -> None:
+    assert "faça UMA pergunta curta que liste, de" in prompt
+    assert "nunca pergunte em sequência" in prompt
+    assert "Nunca pergunte nem peça confirmação do que já foi dito" in prompt
+    assert "duração de 30 minutos; qualquer profissional" in prompt
+    assert "não pergunte por quantas semanas" in prompt
+    assert "feriados e exceções não aparecem na grade" in prompt
