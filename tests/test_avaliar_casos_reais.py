@@ -69,9 +69,9 @@ def test_deterministico_ponta_a_ponta_sem_nomes_de_pacientes(
     assert codigo == 0
     assert {caso["id"]: caso["status"] for caso in detalhe["casos"]} == {
         "c01": "passou",
-        "c02": "xfail",
-        "c03": "xfail",
-        "c04": "xfail",
+        "c02": "passou",
+        "c03": "passou",
+        "c04": "passou",
         "c05": "passou",
         "c06": "xfail",
         "c07": "passou",

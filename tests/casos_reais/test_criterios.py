@@ -38,7 +38,7 @@ def _rodar(tipo: str, turno: TurnoObservado, **params: object) -> ResultadoCrite
 def test_casos_do_yaml_carregam() -> None:
     casos = carregar_casos()
     assert [caso.id for caso in casos] == [f"c0{n}" for n in range(1, 9)]
-    assert {caso.id for caso in casos if caso.xfail} == {"c02", "c03", "c04", "c06"}
+    assert {caso.id for caso in casos if caso.xfail} == {"c06"}
 
 
 def test_criterio_desconhecido_e_recusado(tmp_path: Path) -> None:
@@ -123,6 +123,48 @@ def test_nao_coube_frase_proibida_e_planos() -> None:
     assert _rodar("max_planos", TurnoObservado(resposta="Nada."), maximo=3).ok is False
     proibida = TurnoObservado(resposta="Não existe bloco contínuo de 120 minutos.")
     assert _rodar("frase_proibida", proibida, frases=["bloco contínuo de 120 minutos"]).ok is False
+
+
+def _bloco_do_plano(*linhas: tuple[str, str, str, str, str]) -> dict[str, object]:
+    return {
+        "tipo": "tabela_generica",
+        "dados": {
+            "relatorio": "plano_semanal",
+            "linhas": [
+                {"dia": d, "situacao": s, "especialidade": e, "horario": h, "sala": sala}
+                for d, s, e, h, sala in linhas
+            ],
+        },
+    }
+
+
+def test_criterios_do_plano_olham_so_as_linhas_plano() -> None:
+    """Quarta fictícia: Sala 5 (Elo) livre às 10:00; Sala 2 (TO) livre às 09:30."""
+    bloco = _bloco_do_plano(
+        ("quarta-feira", "Plano", "Fonoaudiologia", "10:00 às 10:30", "Sala 5"),
+        ("quarta-feira", "Plano", "Psicomotricidade", "10:30 às 11:00", "Sala 4"),
+        ("quarta-feira", "Não coube", "Terapia Ocupacional", "—", "—"),
+        ("quarta-feira", "Alternativa", "Terapia Ocupacional", "09:30 às 10:00", "Sala 2"),
+    )
+    turno = TurnoObservado(textos_das_tools=["Plano; não coube TO."], blocos=[bloco])
+
+    assert _rodar("vagas_dentro_da_janela", turno, inicio="10:00", fim="12:00").ok
+    assert _rodar("sem_sobreposicao_no_dia", turno).ok
+    assert _rodar("plano_em_vagas_reais", turno).ok
+    assert _rodar("nao_coube_com_alternativas", turno, especialidade="Terapia Ocupacional").ok
+    assert _rodar("nao_coube_com_alternativas", turno, especialidade="Psicologia").ok is False
+
+
+def test_criterios_do_plano_acusam_cruzamento_e_vaga_inexistente() -> None:
+    bloco = _bloco_do_plano(
+        ("quarta-feira", "Plano", "Fonoaudiologia", "10:00 às 10:30", "Sala 5"),
+        ("quarta-feira", "Plano", "Terapia Ocupacional", "10:00 às 10:30", "Sala 2"),
+    )
+    turno = TurnoObservado(textos_das_tools=["Plano."], blocos=[bloco])
+
+    assert _rodar("sem_sobreposicao_no_dia", turno).ok is False
+    resultado = _rodar("plano_em_vagas_reais", turno)
+    assert resultado.ok is False and "quarta Sala 2 10:00" in resultado.detalhe
 
 
 def test_estado_profissional_contra_o_oraculo() -> None:
