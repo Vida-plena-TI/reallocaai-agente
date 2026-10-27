@@ -97,3 +97,36 @@ def test_planilha_contada_busca_uma_vez_e_conta_todas() -> None:
     planilha.fetch_sheet_metadata()
     assert planilha.chamadas == 2
     assert buscas == [{"a": "1"}]
+
+
+def test_rotulo_da_especialidade_vem_do_cabecalho() -> None:
+    assert oraculo.rotulo_do_profissional("Bia (Fono)") == "Fono"
+    assert oraculo.rotulo_do_profissional("Bia") == ""
+    vagas = oraculo.vagas(payload_da_semana(), TERCA)
+    assert {vaga.especialidade for vaga in vagas if vaga.sala == 2} == {"TO"}
+
+
+def test_maior_sequencia_conferida_a_mao() -> None:
+    """10h às 12h (posições 6 a 9 da manhã). Quarta: Elo (Fono) 10:00, Duda
+    (Psicomotricidade) 10:30 e 11:00, Carol (Psicologia) 11:00; TO lotada -> 3.
+    Quinta: Bia (Fono) 10:00 e 10:30, Duda 10:30, 11:00 e 11:30; Carol e TO
+    lotadas -> 2 (fono e psicomotricidade)."""
+    quatro = ["Fono", "Psicomotricidade", "Psicologia", "TO"]
+    payload = payload_da_semana()
+
+    assert oraculo.maior_sequencia(payload, QUARTA, quatro, time(10), time(12)) == 3
+    assert oraculo.maior_sequencia(payload, QUINTA, quatro, time(10), time(12)) == 2
+    assert oraculo.maior_sequencia(payload, QUARTA, ["TO"], time(10), time(12)) == 0
+    assert oraculo.maior_sequencia(payload, DOMINGO, quatro, time(10), time(12)) == 0
+
+
+def test_cenario_poucas_vagas_conferido_a_mao() -> None:
+    """c09: TO com 1 vaga na quarta (14:00) e 4 na quinta, todas fora das 10h às 12h."""
+    payload = payload_da_semana("poucas_vagas")
+
+    assert _horas(oraculo.vagas(payload, QUARTA), 2) == ["14:00"]
+    assert _horas(oraculo.vagas(payload, QUINTA), 2) == ["07:00", "07:30", "08:30", "09:00"]
+    assert _horas(oraculo.vagas(payload, QUARTA), 3) == []
+    assert "10:00" in _horas(oraculo.vagas(payload, TERCA), 2)
+    # A semana padrão não mudou.
+    assert payload_da_semana() == payload_da_semana(None)

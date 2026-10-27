@@ -10,7 +10,9 @@ do jeito mais simples possível:
 - linha de horário: `HH:MM` na coluna A, dentro do expediente (07:00 a 11:30
   e 13:00 a 17:30);
 - célula vazia sob um profissional = vaga; `FECHADO` = não existe; qualquer
-  outro texto = ocupada.
+  outro texto = ocupada;
+- especialidade de uma vaga: o rótulo entre parênteses do profissional
+  (`Bia (Fono)` -> `Fono`).
 
 Só entende o layout simples (uma sala por coluna, sem merge). As
 inconsistências da planilha real são assunto dos testes do parser, não daqui.
@@ -20,7 +22,7 @@ import re
 import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, time
+from datetime import date, datetime, time, timedelta
 from typing import Any, Literal
 
 #: Aba de cada `date.weekday()`; domingo não tem aba.
@@ -38,6 +40,8 @@ class Vaga:
     sala: int
     hora: time
     profissional: str
+    #: Rótulo entre parênteses do profissional (`Fono`, `TO`...); vazio sem ele.
+    especialidade: str = ""
 
 
 def _normalizar(texto: str) -> str:
@@ -75,12 +79,19 @@ def nome_do_profissional(texto: str) -> str:
     return re.split(r"[(\n]", texto, maxsplit=1)[0].strip()
 
 
+def rotulo_do_profissional(texto: str) -> str:
+    """`Bia (Fono)` -> `Fono`: o que está entre parênteses; vazio sem eles."""
+    achado = re.search(r"\(([^)]*)\)", texto)
+    return achado.group(1).strip() if achado else ""
+
+
 @dataclass(frozen=True)
 class _Celula:
     sala: int
     profissional: str
     hora: time
     texto: str
+    especialidade: str = ""
 
 
 def _celulas(payload: Mapping[str, Any], dia: date) -> list[_Celula]:
@@ -88,6 +99,7 @@ def _celulas(payload: Mapping[str, Any], dia: date) -> list[_Celula]:
     celulas: list[_Celula] = []
     salas: dict[int, int] = {}
     profissionais: dict[int, str] = {}
+    rotulos: dict[int, str] = {}
     for indice, linha in enumerate(linhas):
         cabecalho = {
             coluna: int(achado.group(1))
@@ -98,6 +110,10 @@ def _celulas(payload: Mapping[str, Any], dia: date) -> list[_Celula]:
             salas = cabecalho
             profissionais = {
                 coluna: nome_do_profissional(_celula(linhas, indice + 1, coluna))
+                for coluna in salas
+            }
+            rotulos = {
+                coluna: rotulo_do_profissional(_celula(linhas, indice + 1, coluna))
                 for coluna in salas
             }
             continue
@@ -113,14 +129,14 @@ def _celulas(payload: Mapping[str, Any], dia: date) -> list[_Celula]:
             texto = _celula(linhas, indice, coluna)
             if _normalizar(texto) == "fechado":
                 continue
-            celulas.append(_Celula(sala, profissionais[coluna], hora, texto))
+            celulas.append(_Celula(sala, profissionais[coluna], hora, texto, rotulos[coluna]))
     return celulas
 
 
 def vagas(payload: Mapping[str, Any], dia: date) -> list[Vaga]:
     """Toda célula vazia sob um profissional, no expediente de `dia`."""
     return sorted(
-        Vaga(dia, celula.sala, celula.hora, celula.profissional)
+        Vaga(dia, celula.sala, celula.hora, celula.profissional, celula.especialidade)
         for celula in _celulas(payload, dia)
         if not celula.texto
     )
@@ -155,3 +171,35 @@ def estado_profissional(
         if _normalizar(vaga.profissional) == alvo and inicio <= vaga.hora < fim
     ]
     return "com_vaga" if na_janela else "sem_vaga_na_janela"
+
+
+def maior_sequencia(
+    payload: Mapping[str, Any],
+    dia: date,
+    especialidades: Sequence[str],
+    inicio: time,
+    fim: time,
+) -> int:
+    """Quantas sessões de 30 min, uma logo após a outra e cada uma de uma
+    especialidade diferente (rótulos como na planilha: `Fono`, `TO`...), cabem
+    em vagas de `dia` dentro de [inicio, fim). Busca exaustiva, sem atalhos."""
+    alvos = {_normalizar(e) for e in especialidades}
+    por_hora: dict[time, set[str]] = {}
+    for vaga in vagas(payload, dia):
+        rotulo = _normalizar(vaga.especialidade)
+        if rotulo in alvos and inicio <= vaga.hora < fim:
+            por_hora.setdefault(vaga.hora, set()).add(rotulo)
+
+    def seguinte(hora: time) -> time:
+        return (datetime.combine(dia, hora) + timedelta(minutes=30)).time()
+
+    def a_partir_de(hora: time, usadas: frozenset[str]) -> int:
+        return max(
+            (
+                1 + a_partir_de(seguinte(hora), usadas | {rotulo})
+                for rotulo in por_hora.get(hora, set()) - usadas
+            ),
+            default=0,
+        )
+
+    return max((a_partir_de(hora, frozenset()) for hora in por_hora), default=0)
