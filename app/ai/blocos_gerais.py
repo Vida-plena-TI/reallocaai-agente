@@ -10,7 +10,7 @@ Nenhum bloco daqui traz id ou nome de paciente, exceto `agenda_paciente`, que s�
 é gerado para o paciente pedido explicitamente.
 """
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import date, time
 from hashlib import sha256
 from typing import Final
@@ -46,7 +46,7 @@ from app.domain import Especialidade
 from app.domain.constants import DURACAO_SLOT_MINUTOS
 from app.domain.formatacao import chave_natural, chave_texto, formatar_razao, rotulo_enum
 from app.engine.fotografia import FotografiaPeriodo
-from app.engine.planejamento import PlanoSemanal, SessaoPlano
+from app.engine.planejamento import PlanoDia, PlanoSemanal, SessaoPlano, maior_sequencia
 from app.engine.relatorio_generico import (
     Dimensao,
     LinhaRelatorio,
@@ -985,21 +985,58 @@ def _sessao_no_texto(foto: FotografiaPeriodo, sessao: SessaoPlano) -> str:
     )
 
 
+def _no_dia(dia: date) -> str:
+    """`na quarta`, `no sábado`."""
+    nome = DIAS_DA_SEMANA[dia.weekday()].split("-")[0]
+    return f"{'no' if nome == 'sábado' else 'na'} {nome}"
+
+
+def _seguidas_no_texto(dia: PlanoDia) -> str | None:
+    """`3 seguidas das 10:00 às 11:30`; `None` sem duas sessões seguidas."""
+    sequencia = maior_sequencia(dia.sessoes)
+    if len(sequencia) < 2:
+        return None
+    return f"{len(sequencia)} seguidas das {sequencia[0].inicio:%H:%M} às {sequencia[-1].fim:%H:%M}"
+
+
+def _alternativas_no_texto(dia: date, alternativas: list[SessaoPlano]) -> str:
+    if not alternativas:
+        return "sem alternativa nos dias pedidos"
+    por_dia = Counter(a.data for a in alternativas)
+    total = f"{len(alternativas)} alternativa(s) fora da janela na tabela"
+    if set(por_dia) == {dia}:
+        return total
+    return total + ": " + enumerar([f"{n} {_no_dia(d)}" for d, n in sorted(por_dia.items())])
+
+
 def plano_semanal(
     foto: FotografiaPeriodo, plano: PlanoSemanal, titulo: str, avisos: list[str]
 ) -> tuple[str, BlocoRelatorio]:
     """O plano em `tabela_generica`: por dia, as sessões do plano e, para cada
-    especialidade que não coube, a linha "Não coube" seguida das alternativas.
+    especialidade que não coube, a linha "Não coube" seguida das alternativas que
+    acontecem nesse dia (as do próprio dia e as que completam outro dia pedido).
+    Com `seguidas`, quem ficou fora da sequência só tem a linha "Não coube".
     """
     pedidas = len(plano.pedido.itens)
+    seguidas = plano.pedido.seguidas
     linhas: list[dict[str, ValorSimples]] = []
     texto = _cabecalho_texto(titulo, foto)
+    em_outros_dias: list[str] = []
     for dia in plano.dias:
         nome_do_dia = DIAS_DA_SEMANA[dia.data.weekday()]
         linhas.extend(_linha_sessao(foto, s, SITUACAO_PLANO) for s in dia.sessoes)
-        partes = [f"{len(dia.sessoes)} de {pedidas} especialidades"]
+        sequencia = _seguidas_no_texto(dia)
+        contagem = f"{len(dia.sessoes)} de {pedidas} especialidades"
+        if not seguidas:
+            partes = [contagem]
+        elif sequencia is not None:
+            partes = [f"{sequencia} ({contagem})"]
+        else:
+            partes = [f"nenhuma sequência de 2 ou mais seguidas ({contagem})"]
         if dia.sessoes:
             partes.append("; ".join(_sessao_no_texto(foto, s) for s in dia.sessoes))
+        if not seguidas and sequencia is not None:
+            partes.append(sequencia)
         for nao_coube in dia.nao_couberam:
             especialidade = rotulo_enum(nao_coube.especialidade.value)
             linhas.append(
@@ -1013,16 +1050,36 @@ def plano_semanal(
                     "posto": None,
                 }
             )
+            # As alternativas que acontecem neste dia, de qualquer dia pedido: as
+            # do próprio dia primeiro. Cada uma aparece uma vez na tabela.
             linhas.extend(
-                _linha_sessao(foto, a, SITUACAO_ALTERNATIVA) for a in nao_coube.alternativas
+                _linha_sessao(foto, a, SITUACAO_ALTERNATIVA)
+                for outro in sorted(plano.dias, key=lambda d: d.data != dia.data)
+                for n in outro.nao_couberam
+                if n.especialidade is nao_coube.especialidade
+                for a in n.alternativas
+                if a.data == dia.data
             )
-            alternativas = (
-                f"{len(nao_coube.alternativas)} alternativa(s) fora da janela na tabela"
-                if nao_coube.alternativas
-                else "sem alternativa na semana"
+            if seguidas:
+                partes.append(f"fora da sequência: {especialidade}")
+                continue
+            partes.append(
+                f"não coube {especialidade} "
+                f"({_alternativas_no_texto(dia.data, nao_coube.alternativas)})"
             )
-            partes.append(f"não coube {especialidade} ({alternativas})")
+            if nao_coube.ha_em_outros_dias and especialidade not in em_outros_dias:
+                em_outros_dias.append(especialidade)
         texto.append(f"- {nome_do_dia.capitalize()}: {'. '.join(partes)}.")
+    if em_outros_dias:
+        texto.append(
+            f"Faltaram alternativas nos dias pedidos para {enumerar(em_outros_dias)}, mas há "
+            "horários em outros dias da semana (fora da tabela): pergunte se a coordenadora "
+            "quer vê-los."
+        )
+    if seguidas and any(dia.nao_couberam for dia in plano.dias):
+        texto.append(
+            "Para caber mais especialidades em sequência, ofereça ampliar a janela de horário."
+        )
     texto.extend(avisos)
 
     nao_couberam = sum(len(dia.nao_couberam) for dia in plano.dias)

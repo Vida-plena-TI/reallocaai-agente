@@ -13,6 +13,16 @@ Escolha do plano de um dia, nesta ordem:
 4. menos trocas de sala entre sessões consecutivas;
 5. horários mais cedo.
 
+Com `seguidas`, só vale um conjunto em que cada sessão começa quando a
+anterior termina: o plano do dia é a maior sequência consecutiva que cabe na
+janela, e quem fica de fora não ganha alternativas (fora da sequência, elas
+não respondem ao pedido).
+
+Alternativas de quem não coube (só sem `seguidas`): apenas nos dias pedidos,
+primeiro no mesmo dia e, se faltar, no outro dia pedido em que a mesma
+especialidade também não coube. Cada horário aparece uma vez no plano
+inteiro. Horários em dias não pedidos não entram; só se avisa que existem.
+
 Só entra vaga real: slot livre (profissional escalado, posto sem atendimento),
 fora das salas a evitar. Sessão de mais de 30 min usa slots seguidos do mesmo
 profissional, sala e posto, sem atravessar a pausa.
@@ -60,6 +70,8 @@ class PedidoPlano(BaseModel):
     fim: time
     itens: tuple[ItemPlano, ...] = Field(min_length=1, max_length=MAX_ITENS_POR_PLANO)
     salas_evitadas: frozenset[str] = frozenset()
+    #: Só sessões uma logo após a outra (a maior sequência de cada dia).
+    seguidas: bool = False
 
 
 class SessaoPlano(BaseModel):
@@ -83,8 +95,11 @@ class NaoCoube(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     especialidade: Especialidade
-    #: Mesmo dia primeiro (mais perto da janela), depois outros dias.
+    #: Nos dias pedidos: mesmo dia primeiro (mais perto da janela), depois o outro
+    #: dia pedido. Nenhum horário se repete entre os `NaoCoube` do plano.
     alternativas: list[SessaoPlano]
+    #: Faltaram alternativas nos dias pedidos e há horários em dias não pedidos.
+    ha_em_outros_dias: bool = False
 
 
 class PlanoDia(BaseModel):
@@ -110,6 +125,18 @@ class PlanoSemanal(BaseModel):
 
 def _minutos(hora: time) -> int:
     return hora.hour * 60 + hora.minute
+
+
+def maior_sequencia(sessoes: Sequence[SessaoPlano]) -> list[SessaoPlano]:
+    """A maior sequência de sessões seguidas (cada uma começa quando a anterior
+    termina), entre sessões em ordem de horário; a mais cedo em caso de empate."""
+    melhor: list[SessaoPlano] = []
+    atual: list[SessaoPlano] = []
+    for sessao in sessoes:
+        atual = [*atual, sessao] if atual and atual[-1].fim == sessao.inicio else [sessao]
+        if len(atual) > len(melhor):
+            melhor = atual
+    return melhor
 
 
 def _candidatas(
@@ -197,7 +224,7 @@ def _salas_com_menos_trocas(opcoes_por_sessao: Sequence[Sequence[SessaoPlano]]) 
 
 
 def _plano_do_dia(
-    candidatas_por_item: Sequence[list[SessaoPlano]],
+    candidatas_por_item: Sequence[list[SessaoPlano]], *, seguidas: bool = False
 ) -> list[tuple[int, SessaoPlano]]:
     """O melhor conjunto (índice do item, sessão) do dia, pelas regras do módulo."""
     # Horários possíveis de cada item; `None` = o item fica de fora.
@@ -214,6 +241,8 @@ def _plano_do_dia(
             continue
         ordenados = sorted(escolhidos, key=lambda par: (par[1], par[0]))
         if any(_se_cruzam(a[1], b[1]) for a, b in pairwise(ordenados)):
+            continue
+        if seguidas and any(a[1][1] != b[1][0] for a, b in pairwise(ordenados)):
             continue
         opcoes = [
             [s for s in candidatas_por_item[i] if (s.inicio, s.fim) == horario]
@@ -244,41 +273,92 @@ def _distancia_da_janela(sessao: SessaoPlano, inicio: time, fim: time) -> int:
     return 0
 
 
-def _alternativas(
+def _ordem_da_alternativa(
+    sessao: SessaoPlano, pedido: PedidoPlano
+) -> tuple[int, date, time, tuple[bool, str, int]]:
+    return (
+        _distancia_da_janela(sessao, pedido.inicio, pedido.fim),
+        sessao.data,
+        sessao.inicio,
+        _desempate(sessao),
+    )
+
+
+def _horarios_fora_do_plano(
     item: ItemPlano,
-    dia: date,
+    pedido: PedidoPlano,
+    slots: list[SlotFotografado],
+    ocupado: list[tuple[time, time]],
+) -> list[SessaoPlano]:
+    """Horários do item num dia, sem cruzar o plano dele: mais perto da janela
+    primeiro, um por início."""
+    sessoes = _melhor_representante(_candidatas(slots, item, pedido.salas_evitadas)).values()
+    livres = sorted(
+        (s for s in sessoes if not any(_se_cruzam((s.inicio, s.fim), p) for p in ocupado)),
+        key=lambda s: _ordem_da_alternativa(s, pedido),
+    )
+    escolhidas: list[SessaoPlano] = []
+    inicios: set[time] = set()
+    for sessao in livres:
+        if sessao.inicio not in inicios:
+            inicios.add(sessao.inicio)
+            escolhidas.append(sessao)
+    return escolhidas
+
+
+def _nao_couberam(
     pedido: PedidoPlano,
     slots_por_dia: dict[date, list[SlotFotografado]],
-    ocupado_no_plano: dict[date, list[tuple[time, time]]],
-) -> list[SessaoPlano]:
-    """Até `MAX_ALTERNATIVAS` horários fora da janela: mesmo dia primeiro, depois os outros.
+    escolhidas_por_dia: dict[date, list[tuple[int, SessaoPlano]]],
+) -> dict[date, list[NaoCoube]]:
+    """O que não coube em cada dia pedido, na ordem do pedido, com as alternativas.
 
-    Nunca cruzam uma sessão já planejada naquele dia; um horário por dia e início.
+    Por especialidade: primeiro até `MAX_ALTERNATIVAS` no mesmo dia; depois, para
+    o dia que ficou com menos, sobras dos outros dias pedidos em que ela também
+    não coube. Nenhum horário se repete.
     """
-    candidatas: list[tuple[tuple[object, ...], SessaoPlano]] = []
-    for outro_dia, slots in slots_por_dia.items():
-        sessoes = _melhor_representante(_candidatas(slots, item, pedido.salas_evitadas)).values()
-        for sessao in sessoes:
-            if any(_se_cruzam((sessao.inicio, sessao.fim), p) for p in ocupado_no_plano[outro_dia]):
-                continue
-            chave = (
-                outro_dia != dia,
-                _distancia_da_janela(sessao, pedido.inicio, pedido.fim),
-                sessao.data,
-                sessao.inicio,
-                _desempate(sessao),
-            )
-            candidatas.append((chave, sessao))
-    escolhidas: list[SessaoPlano] = []
-    vistos: set[tuple[date, time]] = set()
-    for _, sessao in sorted(candidatas, key=lambda c: c[0]):
-        if (sessao.data, sessao.inicio) in vistos:
+    resultado: dict[date, list[NaoCoube]] = {dia: [] for dia in pedido.dias}
+    for indice, item in enumerate(pedido.itens):
+        falhos = [
+            dia for dia in pedido.dias if indice not in {i for i, _ in escolhidas_por_dia[dia]}
+        ]
+        if not falhos:
             continue
-        vistos.add((sessao.data, sessao.inicio))
-        escolhidas.append(sessao)
-        if len(escolhidas) == MAX_ALTERNATIVAS:
-            break
-    return escolhidas
+        if pedido.seguidas:
+            for dia in falhos:
+                resultado[dia].append(NaoCoube(especialidade=item.especialidade, alternativas=[]))
+            continue
+        livres = {
+            dia: _horarios_fora_do_plano(
+                item,
+                pedido,
+                slots_por_dia.get(dia, []),
+                [(s.inicio, s.fim) for _, s in escolhidas_por_dia[dia]],
+            )
+            for dia in falhos
+        }
+        alternativas = {dia: livres[dia][:MAX_ALTERNATIVAS] for dia in falhos}
+        sobras = sorted(
+            (s for dia in falhos for s in livres[dia][MAX_ALTERNATIVAS:]),
+            key=lambda s: _ordem_da_alternativa(s, pedido),
+        )
+        for dia in falhos:
+            while len(alternativas[dia]) < MAX_ALTERNATIVAS and sobras:
+                alternativas[dia].append(sobras.pop(0))
+        outros_dias = any(
+            _horarios_fora_do_plano(item, pedido, slots, [])
+            for dia, slots in slots_por_dia.items()
+            if dia not in pedido.dias
+        )
+        for dia in falhos:
+            resultado[dia].append(
+                NaoCoube(
+                    especialidade=item.especialidade,
+                    alternativas=alternativas[dia],
+                    ha_em_outros_dias=outros_dias and len(alternativas[dia]) < MAX_ALTERNATIVAS,
+                )
+            )
+    return resultado
 
 
 def planejar_semana(foto: FotografiaPeriodo, pedido: PedidoPlano) -> PlanoSemanal:
@@ -300,30 +380,15 @@ def planejar_semana(foto: FotografiaPeriodo, pedido: PedidoPlano) -> PlanoSemana
             )
             for item in pedido.itens
         ]
-        escolhidas_por_dia[dia] = _plano_do_dia(candidatas_por_item)
+        escolhidas_por_dia[dia] = _plano_do_dia(candidatas_por_item, seguidas=pedido.seguidas)
 
-    ocupado_no_plano: dict[date, list[tuple[time, time]]] = {dia: [] for dia in slots_por_dia}
-    for dia, escolhidas in escolhidas_por_dia.items():
-        ocupado_no_plano.setdefault(dia, []).extend((s.inicio, s.fim) for _, s in escolhidas)
-
-    dias: list[PlanoDia] = []
-    for dia in pedido.dias:
-        escolhidas = escolhidas_por_dia[dia]
-        atendidos = {i for i, _ in escolhidas}
-        dias.append(
-            PlanoDia(
-                data=dia,
-                sessoes=sorted((s for _, s in escolhidas), key=lambda s: s.inicio),
-                nao_couberam=[
-                    NaoCoube(
-                        especialidade=item.especialidade,
-                        alternativas=_alternativas(
-                            item, dia, pedido, slots_por_dia, ocupado_no_plano
-                        ),
-                    )
-                    for i, item in enumerate(pedido.itens)
-                    if i not in atendidos
-                ],
-            )
+    nao_couberam = _nao_couberam(pedido, slots_por_dia, escolhidas_por_dia)
+    dias = [
+        PlanoDia(
+            data=dia,
+            sessoes=sorted((s for _, s in escolhidas_por_dia[dia]), key=lambda s: s.inicio),
+            nao_couberam=nao_couberam[dia],
         )
+        for dia in pedido.dias
+    ]
     return PlanoSemanal(pedido=pedido, dias=dias)

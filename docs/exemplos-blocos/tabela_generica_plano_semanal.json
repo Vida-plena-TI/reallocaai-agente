@@ -145,33 +145,6 @@
         "posto": null
       },
       {
-        "dia": "segunda-feira",
-        "situacao": "Alternativa",
-        "especialidade": "Fonoaudiologia",
-        "horario": "09:30 às 10:00",
-        "profissional": "Beto Reis",
-        "sala": "Sala 2",
-        "posto": 1
-      },
-      {
-        "dia": "segunda-feira",
-        "situacao": "Alternativa",
-        "especialidade": "Fonoaudiologia",
-        "horario": "10:00 às 10:30",
-        "profissional": "Beto Reis",
-        "sala": "Sala 2",
-        "posto": 1
-      },
-      {
-        "dia": "segunda-feira",
-        "situacao": "Alternativa",
-        "especialidade": "Fonoaudiologia",
-        "horario": "10:30 às 11:00",
-        "profissional": "Beto Reis",
-        "sala": "Sala 2",
-        "posto": 1
-      },
-      {
         "dia": "quinta-feira",
         "situacao": "Não coube",
         "especialidade": "Terapia Ocupacional",
@@ -323,33 +296,6 @@
           "profissional": "—",
           "sala": "—",
           "posto": null
-        },
-        {
-          "dia": "segunda-feira",
-          "situacao": "Alternativa",
-          "especialidade": "Fonoaudiologia",
-          "horario": "09:30 às 10:00",
-          "profissional": "Beto Reis",
-          "sala": "Sala 2",
-          "posto": 1
-        },
-        {
-          "dia": "segunda-feira",
-          "situacao": "Alternativa",
-          "especialidade": "Fonoaudiologia",
-          "horario": "10:00 às 10:30",
-          "profissional": "Beto Reis",
-          "sala": "Sala 2",
-          "posto": 1
-        },
-        {
-          "dia": "segunda-feira",
-          "situacao": "Alternativa",
-          "especialidade": "Fonoaudiologia",
-          "horario": "10:30 às 11:00",
-          "profissional": "Beto Reis",
-          "sala": "Sala 2",
-          "posto": 1
         },
         {
           "dia": "quinta-feira",

@@ -26,6 +26,8 @@ from app.engine.planejamento import (
     ItemPlano,
     PedidoPlano,
     PlanoSemanal,
+    SessaoPlano,
+    maior_sequencia,
     planejar_semana,
 )
 from tests.casos_reais.planilha import PlanilhaContada
@@ -58,6 +60,7 @@ def _pedido(
     slots: int = 1,
     preferidos: dict[Especialidade, str] | None = None,
     salas_evitadas: frozenset[str] = frozenset(),
+    seguidas: bool = False,
 ) -> PedidoPlano:
     return PedidoPlano(
         dias=dias,
@@ -72,6 +75,7 @@ def _pedido(
             for e in especialidades
         ),
         salas_evitadas=salas_evitadas,
+        seguidas=seguidas,
     )
 
 
@@ -169,10 +173,14 @@ def test_salas_evitadas_ficam_de_fora(semana: FotografiaPeriodo) -> None:
 
 
 def _livre(
-    hora: time, sala: str, profissional: str, especialidade: Especialidade
+    hora: time,
+    sala: str,
+    profissional: str,
+    especialidade: Especialidade,
+    dia: date = QUARTA,
 ) -> SlotFotografado:
     return SlotFotografado(
-        data=QUARTA,
+        data=dia,
         hora_inicio=hora,
         periodo=periodo_do_horario(hora),
         estado=EstadoSlot.LIVRE,
@@ -186,11 +194,12 @@ def _livre(
 
 
 def _foto(*slots: SlotFotografado) -> FotografiaPeriodo:
+    dias = sorted({slot.data for slot in slots} | {QUARTA})
     return FotografiaPeriodo(
-        inicio=QUARTA,
-        fim=QUARTA,
-        dias_consultados=[QUARTA],
-        dias_lidos=[QUARTA],
+        inicio=dias[0],
+        fim=dias[-1],
+        dias_consultados=dias,
+        dias_lidos=dias,
         dias_nao_lidos=[],
         slots=list(slots),
         profissionais={},
@@ -291,3 +300,132 @@ def test_alternativas_ficam_fora_do_plano_e_sao_no_maximo_tres() -> None:
     assert len(nao_coube.alternativas) == MAX_ALTERNATIVAS
     # A TO das 10:00 cruzaria a fono do plano; as alternativas são as mais perto da janela.
     assert [a.inicio for a in nao_coube.alternativas] == [time(8, 30), time(8), time(7, 30)]
+
+
+# --- alternativas: só dias pedidos, sem repetição ------------------------------
+
+
+def _chave(sessao: SessaoPlano) -> tuple[date, time, str]:
+    return (sessao.data, sessao.inicio, sessao.sala_id)
+
+
+def test_alternativas_so_nos_dias_pedidos_e_sem_repeticao() -> None:
+    """TO lotada das 10h às 11h na quarta e na quinta; a segunda (não pedida) tem
+    vaga às 10:00, mais perto da janela que qualquer outra, e não entra."""
+    foto = _foto(
+        _livre(time(10), "sala-1", "ana", FONO, QUARTA),
+        _livre(time(10), "sala-1", "ana", FONO, QUINTA),
+        _livre(time(8), "sala-2", "bia", TO, QUARTA),
+        *(_livre(time(h), "sala-2", "bia", TO, QUINTA) for h in (7, 8, 9, 13)),
+        *(_livre(time(h), "sala-2", "bia", TO, SEGUNDA) for h in (10, 11)),
+    )
+    pedido = _pedido((QUARTA, QUINTA), time(10), time(11), (FONO, TO))
+    plano = planejar_semana(foto, pedido)
+
+    quarta, quinta = (dia.nao_couberam[0] for dia in plano.dias)
+    todas = [*quarta.alternativas, *quinta.alternativas]
+    assert {a.data for a in todas} <= {QUARTA, QUINTA}
+    assert len({_chave(a) for a in todas}) == len(todas)
+    # Quinta: as 3 do próprio dia, mais perto da janela primeiro.
+    assert [(a.data, a.inicio) for a in quinta.alternativas] == [
+        (QUINTA, time(9)),
+        (QUINTA, time(8)),
+        (QUINTA, time(13)),
+    ]
+    # Quarta: a do próprio dia primeiro; depois a sobra da quinta (7:00).
+    assert [(a.data, a.inicio) for a in quarta.alternativas] == [
+        (QUARTA, time(8)),
+        (QUINTA, time(7)),
+    ]
+    # Faltou uma na quarta e a segunda tem TO: avisa, sem pôr na tabela.
+    assert quarta.ha_em_outros_dias
+    assert not quinta.ha_em_outros_dias
+
+
+def test_sem_outros_dias_nao_avisa() -> None:
+    foto = _foto(_livre(time(10), "sala-1", "ana", FONO), _livre(time(8), "sala-2", "bia", TO))
+    pedido = _pedido((QUARTA,), time(10), time(11), (FONO, TO))
+    ((nao_coube,),) = (dia.nao_couberam for dia in planejar_semana(foto, pedido).dias)
+
+    assert [a.inicio for a in nao_coube.alternativas] == [time(8)]
+    assert not nao_coube.ha_em_outros_dias
+
+
+def test_dia_em_que_a_especialidade_coube_nao_da_alternativa() -> None:
+    """TO coube na quarta: uma segunda TO na quarta não serve de alternativa à da quinta."""
+    foto = _foto(
+        _livre(time(10), "sala-2", "bia", TO, QUARTA),
+        _livre(time(8), "sala-2", "bia", TO, QUARTA),
+    )
+    pedido = _pedido((QUARTA, QUINTA), time(10), time(11), (TO,))
+    quarta, quinta = planejar_semana(foto, pedido).dias
+
+    assert [s.inicio for s in quarta.sessoes] == [time(10)]
+    (nao_coube,) = quinta.nao_couberam
+    assert nao_coube.alternativas == []
+    assert not nao_coube.ha_em_outros_dias
+
+
+def test_semana_ficticia_alternativas_nunca_repetem(semana: FotografiaPeriodo) -> None:
+    plano = planejar_semana(semana, _pedido((QUARTA, QUINTA), time(10), time(12)))
+
+    todas = [a for dia in plano.dias for n in dia.nao_couberam for a in n.alternativas]
+    assert todas
+    assert {a.data for a in todas} <= {QUARTA, QUINTA}
+    assert len({_chave(a) for a in todas}) == len(todas)
+
+
+# --- seguidas -------------------------------------------------------------------
+
+
+def test_seguidas_escolhe_a_maior_sequencia_consecutiva() -> None:
+    """Sem `seguidas` cabem as três (com buraco); seguidas, só fono e psicologia."""
+    foto = _foto(
+        _livre(time(10), "sala-1", "ana", FONO),
+        _livre(time(10, 30), "sala-2", "bia", PSICOLOGIA),
+        _livre(time(11, 30), "sala-3", "caio", TO),
+    )
+    comum = _pedido((QUARTA,), time(10), time(12), (FONO, PSICOLOGIA, TO))
+    seguidas = _pedido((QUARTA,), time(10), time(12), (FONO, PSICOLOGIA, TO), seguidas=True)
+
+    (dia_comum,) = planejar_semana(foto, comum).dias
+    (dia,) = planejar_semana(foto, seguidas).dias
+
+    assert len(dia_comum.sessoes) == 3
+    assert [(s.especialidade, s.inicio) for s in dia.sessoes] == [
+        (FONO, time(10)),
+        (PSICOLOGIA, time(10, 30)),
+    ]
+    assert maior_sequencia(dia.sessoes) == dia.sessoes
+    # Fora da sequência: sem alternativas (não respondem ao pedido).
+    (nao_coube,) = dia.nao_couberam
+    assert nao_coube.especialidade is TO and nao_coube.alternativas == []
+
+
+def test_seguidas_na_semana_ficticia(semana: FotografiaPeriodo) -> None:
+    plano = planejar_semana(semana, _pedido((QUARTA, QUINTA), time(10), time(12), seguidas=True))
+
+    for dia in plano.dias:
+        assert maior_sequencia(dia.sessoes) == dia.sessoes
+        assert all(n.alternativas == [] for n in dia.nao_couberam)
+    assert [len(dia.sessoes) for dia in plano.dias] == [3, 2]
+
+
+def test_maior_sequencia() -> None:
+    def sessao(inicio: time, fim: time) -> SessaoPlano:
+        return SessaoPlano(
+            data=QUARTA,
+            especialidade=FONO,
+            inicio=inicio,
+            fim=fim,
+            profissional_id="ana",
+            sala_id="sala-1",
+            indice_posto=0,
+        )
+
+    a, b = sessao(time(8), time(8, 30)), sessao(time(9), time(9, 30))
+    c, d = sessao(time(9, 30), time(10)), sessao(time(10), time(10, 30))
+
+    assert maior_sequencia([]) == []
+    assert maior_sequencia([a]) == [a]
+    assert maior_sequencia([a, b, c, d]) == [b, c, d]

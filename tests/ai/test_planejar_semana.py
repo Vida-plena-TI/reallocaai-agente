@@ -187,3 +187,86 @@ def test_dia_fora_do_catalogo_e_recusado_pelo_schema() -> None:
 
     assert bloco is None
     assert "Parâmetros inválidos (dias_semana.0)" in texto
+
+
+def test_alternativa_fica_no_grupo_do_dia_em_que_acontece() -> None:
+    """Toda "Alternativa" vem logo depois do "Não coube" da mesma especialidade e do
+    mesmo dia: a coluna `dia` bate com o grupo. Nenhuma se repete."""
+    _, bloco = _planejar(
+        dias_semana=["quarta", "quinta"],
+        especialidades=QUATRO,
+        hora_inicio="10:00",
+        hora_fim="12:00",
+    )
+
+    assert bloco is not None
+    linhas = _linhas(bloco)
+    grupo: dict[str, Any] | None = None
+    vistas: set[tuple[str, str, str]] = set()
+    for linha in linhas:
+        if linha["situacao"] == SITUACAO_NAO_COUBE:
+            grupo = linha
+        elif linha["situacao"] == SITUACAO_ALTERNATIVA:
+            assert grupo is not None
+            assert (linha["dia"], linha["especialidade"]) == (grupo["dia"], grupo["especialidade"])
+            chave = (linha["dia"], linha["horario"], linha["sala"])
+            assert chave not in vistas
+            vistas.add(chave)
+        else:
+            grupo = None
+    assert vistas
+    assert {dia for dia, _, _ in vistas} <= {"quarta-feira", "quinta-feira"}
+
+
+def test_texto_do_plano_comum_diz_quantas_ficaram_seguidas() -> None:
+    texto, _ = _planejar(
+        dias_semana=["quarta", "quinta"],
+        especialidades=QUATRO,
+        hora_inicio="10:00",
+        hora_fim="12:00",
+    )
+
+    assert "3 seguidas das 10:00 às 11:30" in texto
+    assert "2 seguidas das 10:00 às 11:00" in texto
+    assert not re.search(r"\d{2}/\d{2}", texto)
+
+
+def test_seguidas_maior_sequencia_por_dia_com_o_mesmo_formato_de_bloco() -> None:
+    texto, bloco = _planejar(
+        dias_semana=["quarta", "quinta"],
+        especialidades=QUATRO,
+        hora_inicio="10:00",
+        hora_fim="12:00",
+        seguidas=True,
+    )
+
+    assert bloco is not None
+    dados = bloco.model_dump(mode="json")["dados"]
+    assert bloco.titulo == (
+        "Plano semanal com sessões seguidas: quarta e quinta, das 10:00 às 12:00 "
+        "(sessões de 30 min)"
+    )
+    assert dados["relatorio"] == RELATORIO_PLANO_SEMANAL
+    assert [c["chave"] for c in dados["colunas"]] == [
+        "dia",
+        "situacao",
+        "especialidade",
+        "horario",
+        "profissional",
+        "sala",
+        "posto",
+    ]
+    linhas = _linhas(bloco)
+    assert {linha["situacao"] for linha in linhas} == {SITUACAO_PLANO, SITUACAO_NAO_COUBE}
+    assert [
+        (n["dia"], n["especialidade"]) for n in linhas if n["situacao"] == SITUACAO_NAO_COUBE
+    ] == [
+        ("quarta-feira", "Terapia Ocupacional"),
+        ("quinta-feira", "Psicologia"),
+        ("quinta-feira", "Terapia Ocupacional"),
+    ]
+    assert "Quarta-feira: 3 seguidas das 10:00 às 11:30 (3 de 4 especialidades)" in texto
+    assert "Quinta-feira: 2 seguidas das 10:00 às 11:00 (2 de 4 especialidades)" in texto
+    assert "fora da sequência: Terapia Ocupacional" in texto
+    assert "ampliar a janela" in texto
+    assert not re.search(r"\d{2}/\d{2}", texto)
