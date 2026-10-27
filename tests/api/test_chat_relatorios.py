@@ -157,11 +157,12 @@ def test_variante_com_renderizacao_tem_regras_de_brevidade_e_tools() -> None:
     sem = PROMPT_SISTEMA.format(data_referencia="05/10/2026", dia_da_semana="segunda-feira")
     assert "no máximo 3 frases" in com
     assert "sem listas e sem tabelas" in com
-    assert "Não chame tools extras" in com
+    assert "Não chame\nferramentas extras" in com
+    assert "o texto NUNCA repete a\nlista" in com
     assert "Exemplo de resposta boa" in com and "Exemplo de resposta ruim" in com
     assert "no máximo 3 frases" not in sem
     assert "Exemplo de resposta" not in sem
-    assert "tools extras" not in sem
+    assert "ferramentas extras" not in sem
 
 
 def test_variantes_renderizadas_e_openapi(client: TestClient) -> None:
