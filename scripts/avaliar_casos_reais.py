@@ -122,7 +122,12 @@ def _fonte(planilha: PlanilhaContada) -> GoogleSheetsDataSource:
 
 
 def executar_deterministico(caso: Caso, planilha: PlanilhaContada) -> list[TurnoObservado]:
-    """Executa a `chamada` de cada turno direto na tool, como a LLM faria."""
+    """Executa a `chamada` de cada turno direto na tool, como a LLM faria.
+
+    Criar as tools lê o catálogo da semana: essa leitura (e o tempo dela) conta
+    no primeiro turno executado, como contaria numa conversa de verdade.
+    """
+    criacao: tuple[int, float] | None = (planilha.chamadas, time.perf_counter())
     tools = {
         tool.name: tool
         for tool in criar_tools(_fonte(planilha), SemHistoricoContinuidadeDataSource(), caso.hoje)
@@ -137,7 +142,8 @@ def executar_deterministico(caso: Caso, planilha: PlanilhaContada) -> list[Turno
         if tool is None:
             observado.erro = f"tool inexistente: {turno.chamada.tool}"
             continue
-        antes, inicio = planilha.chamadas, time.perf_counter()
+        antes, inicio = criacao or (planilha.chamadas, time.perf_counter())
+        criacao = None
         try:
             mensagem = tool.invoke(
                 {
@@ -163,7 +169,11 @@ def executar_deterministico(caso: Caso, planilha: PlanilhaContada) -> list[Turno
 def executar_llm(
     caso: Caso, planilha: PlanilhaContada, chat_model: BaseChatModel
 ) -> list[TurnoObservado]:
-    """Uma conversa nova com o agente real, turno a turno, com o histórico acumulado."""
+    """Uma conversa nova com o agente real, turno a turno, com o histórico acumulado.
+
+    Criar o agente lê o catálogo da semana: conta no primeiro turno.
+    """
+    criacao: tuple[int, float] | None = (planilha.chamadas, time.perf_counter())
     agente = criar_agente(
         _fonte(planilha),
         SemHistoricoContinuidadeDataSource(),
@@ -180,7 +190,8 @@ def executar_llm(
             observado.erro = "conversa interrompida no turno anterior"
             continue
         historico.append(HumanMessage(turno.pergunta))
-        antes, inicio = planilha.chamadas, time.perf_counter()
+        antes, inicio = criacao or (planilha.chamadas, time.perf_counter())
+        criacao = None
         try:
             resposta, mensagens, blocos = perguntar_com_mensagens(agente, historico)
         except Exception as erro:

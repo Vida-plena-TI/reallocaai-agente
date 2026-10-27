@@ -72,7 +72,7 @@ def test_deterministico_ponta_a_ponta_sem_nomes_de_pacientes(
         "c02": "xfail",
         "c03": "xfail",
         "c04": "xfail",
-        "c05": "xfail",
+        "c05": "passou",
         "c06": "xfail",
         "c07": "passou",
         "c08": "n/a",
@@ -92,3 +92,10 @@ def test_xpass_e_falha_inesperada_contam_como_falha() -> None:
     assert not avaliacao.houve_falha([c01])
     c01.execucoes[0].status = "xpass"
     assert avaliacao.houve_falha([c01])
+
+
+def test_leitura_do_catalogo_conta_no_primeiro_turno() -> None:
+    """Criar as tools lê o catálogo: a régua do c07 (1 chamada à planilha) precisa vê-la."""
+    (c07,) = avaliar_deterministico([c for c in carregar_casos() if c.id == "c07"])
+    (turno,) = c07.execucoes[0].turnos
+    assert turno.chamadas_planilha == 1

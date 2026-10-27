@@ -147,7 +147,7 @@ conferida na planilha**. Com isso:
 | c02 | Encaixe na terça, 10h às 12h, 30 min, qualquer especialidade | xfail: `buscar_encaixe` sem limite de término nem "qualquer especialidade" |
 | c03 | Vagas quarta e quinta, fono e psicomotricidade, 10h às 12h | xfail: `gerar_relatorio` sem janela de horário |
 | c04 | Plano semanal quarta e quinta, 4 especialidades | xfail: falta a tool de plano semanal |
-| c05 | Nomes (apelido, grafia, três estados) | xfail: falta a busca por profissional com apelido e janela |
+| c05 | Nomes (apelido, grafia, três estados) | passou |
 | c06 | Realocação com autorização do usuário | xfail: falta a tool de realocação por pedido |
 | c07 | Vagas de segunda a sexta (1 leitura da planilha, < 20 s) | passou |
 | c08 | Vocabulário proibido | n/a (só no `--llm`) |

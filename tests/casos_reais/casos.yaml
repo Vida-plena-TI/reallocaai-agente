@@ -105,33 +105,29 @@
     existe, não atende no dia, sem vaga na janela)
   hoje: 2026-09-28
   so_ficticia: true
-  xfail: >-
-    Ainda não existe a busca de vagas por profissional com apelido, grafia
-    aproximada e janela de horário; consultar_disponibilidade só aceita o id
-    exato e não diferencia os três estados.
   turnos:
     - pergunta: a beatriz tem vaga na quinta entre 10h e 12h?
       chamada:
         tool: consultar_disponibilidade
-        args: {data: "{quinta}", profissional: beatriz}
+        args: {data: "{quinta}", profissional: beatriz, horario_inicio: "10:00", horario_fim: "12:00"}
     - pergunta: e a ASSIZELLY, na quarta, no mesmo horário?
       chamada:
         tool: consultar_disponibilidade
-        args: {data: "{quarta}", profissional: ASSIZELLY}
+        args: {data: "{quarta}", profissional: ASSIZELLY, horario_inicio: "10:00", horario_fim: "12:00"}
     - pergunta: e a Zuleide na quinta?
       chamada:
         tool: consultar_disponibilidade
-        args: {data: "{quinta}", profissional: Zuleide}
+        args: {data: "{quinta}", profissional: Zuleide, horario_inicio: "10:00", horario_fim: "12:00"}
     - pergunta: e a Elo na quinta?
       chamada:
         tool: consultar_disponibilidade
-        args: {data: "{quinta}", profissional: Elo}
+        args: {data: "{quinta}", profissional: Elo, horario_inicio: "10:00", horario_fim: "12:00"}
     - pergunta: e a Carol na quinta, entre 10h e 12h?
       chamada:
         tool: consultar_disponibilidade
-        args: {data: "{quinta}", profissional: Carol}
+        args: {data: "{quinta}", profissional: Carol, horario_inicio: "10:00", horario_fim: "12:00"}
   criterios:
-    # "beatriz" = Bia é apelido ainda a confirmar com a clínica.
+    # "beatriz" = Bia: apelido confirmado pela coordenadora (PROFISSIONAIS_APELIDOS).
     - {tipo: estado_profissional, turno: 1, na_planilha: Bia, dia: quinta, inicio: "10:00", fim: "12:00"}
     - {tipo: estado_profissional, turno: 2, na_planilha: Assizely, dia: quarta, inicio: "10:00", fim: "12:00"}
     - {tipo: estado_profissional, turno: 3, na_planilha: null, dia: quinta, inicio: "10:00", fim: "12:00"}
