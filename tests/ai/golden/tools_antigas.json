@@ -37,7 +37,7 @@
  },
  "009 clinica consultar_disponibilidade {\"data\": \"2026-09-28\", \"profissional\": \"beto\"}": {
   "bloco": null,
-  "texto": "Profissional não encontrado com o nome ou id 'beto' na agenda de 28/09/2026."
+  "texto": "Horários livres em 28/09/2026:\n- 07:00 às 07:30: Fonoaudiologia com Beto Reis na Sala 2.\n- 07:30 às 08:00: Fonoaudiologia com Beto Reis na Sala 2.\n- 09:30 às 10:00: Fonoaudiologia com Beto Reis na Sala 2.\n- 10:00 às 10:30: Fonoaudiologia com Beto Reis na Sala 2.\n- 10:30 às 11:00: Fonoaudiologia com Beto Reis na Sala 2.\n- 11:00 às 11:30: Fonoaudiologia com Beto Reis na Sala 2.\n- 11:30 às 12:00: Fonoaudiologia com Beto Reis na Sala 2.\n- 14:00 às 14:30: Fonoaudiologia com Beto Reis na Sala 2.\n- 14:30 às 15:00: Fonoaudiologia com Beto Reis na Sala 2.\n- 15:30 às 16:00: Fonoaudiologia com Beto Reis na Sala 2.\n- 16:00 às 16:30: Fonoaudiologia com Beto Reis na Sala 2.\n- 16:30 às 17:00: Fonoaudiologia com Beto Reis na Sala 2.\n- 17:00 às 17:30: Fonoaudiologia com Beto Reis na Sala 2.\n- 17:30 às 18:00: Fonoaudiologia com Beto Reis na Sala 2."
  },
  "010 clinica consultar_disponibilidade {\"data\": \"2026-09-28\", \"especialidade\": \"musicoterapia\"}": {
   "bloco": null,
@@ -69,7 +69,7 @@
  },
  "017 borda consultar_disponibilidade {\"data\": \"2026-10-02\", \"profissional\": \"cau-melo\"}": {
   "bloco": null,
-  "texto": "Profissional não encontrado com o nome ou id 'cau-melo' na agenda de 02/10/2026."
+  "texto": "Horários livres em 02/10/2026:\n- 13:30 às 14:00: Terapia Ocupacional com cau-melo na Sala 2.\n- 14:00 às 14:30: Terapia Ocupacional com cau-melo na Sala 2.\n- 14:30 às 15:00: Terapia Ocupacional com cau-melo na Sala 2.\n- 15:00 às 15:30: Terapia Ocupacional com cau-melo na Sala 2.\n- 15:30 às 16:00: Terapia Ocupacional com cau-melo na Sala 2.\n- 16:00 às 16:30: Terapia Ocupacional com cau-melo na Sala 2.\n- 16:30 às 17:00: Terapia Ocupacional com cau-melo na Sala 2.\n- 17:00 às 17:30: Terapia Ocupacional com cau-melo na Sala 2.\n- 17:30 às 18:00: Terapia Ocupacional com cau-melo na Sala 2."
  },
  "018 clinica consultar_ocupacao {\"data\": \"2026-09-28\"}": {
   "bloco": {

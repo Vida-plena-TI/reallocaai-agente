@@ -15,6 +15,7 @@ from app.domain.constants import (
     MAPA_SALA_FALLBACK,
     MAPA_SALA_FIXA_PROFISSIONAL,
     META_OCUPACAO_POR_SALA,
+    PROFISSIONAIS_APELIDOS,
     PROFISSIONAIS_IGNORAR,
 )
 from app.domain.entities import (
@@ -58,6 +59,7 @@ __all__ = [
     "MAPA_SALA_FIXA_PROFISSIONAL",
     "META_OCUPACAO_POR_SALA",
     "PADROES_ESPECIALIDADE",
+    "PROFISSIONAIS_APELIDOS",
     "PROFISSIONAIS_IGNORAR",
     "Atendimento",
     "AtendimentoComBuracoError",

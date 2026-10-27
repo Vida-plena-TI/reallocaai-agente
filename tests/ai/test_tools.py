@@ -551,7 +551,7 @@ def test_consultar_disponibilidade_tool_profissional_inexistente() -> None:
 
     resultado = tool.invoke({"data": "2026-09-08", "profissional": "fantasma"})
 
-    assert "não encontrado" in resultado.lower()
+    assert "'fantasma' não existe na grade da semana" in resultado
 
 
 # ---- consultar_ocupacao ----

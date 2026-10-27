@@ -22,6 +22,7 @@ from typing import Any, Literal
 from langchain_core.tools import BaseTool, tool
 from pydantic import BaseModel, Field
 
+from app.ai.catalogo import catalogo_da_semana, profissionais_do_catalogo
 from app.ai.relatorios import (
     AVISO_ACIMA_DE_CEM,
     NOTA_GRADE_SEMANAL,
@@ -45,6 +46,12 @@ from app.ai.servico_agenda import (
     resolver_profissional,
     sugerir_realocacao_por_id,
 )
+from app.ai.textos_profissional import (
+    texto_ambiguo,
+    texto_inexistente,
+    texto_nao_atende,
+    texto_sem_vaga,
+)
 from app.ai.tools_relatorios import criar_tools_relatorios
 from app.data_sources.continuidade import (
     ContinuidadeDataSource,
@@ -61,7 +68,9 @@ from app.domain import (
     normalizar_id,
     reconhecer_especialidade,
 )
+from app.domain.catalogo_agenda import CatalogoAgenda, ProfissionalCatalogo
 from app.domain.constants import (
+    HORARIO_ABERTURA,
     HORARIO_FECHAMENTO,
     HORARIO_PREFERENCIAL_PADRAO,
     META_OCUPACAO_POR_SALA,
@@ -137,6 +146,17 @@ def _sufixo_posto(
     if vagas_por_chave[_chave_sem_posto(disponivel)] <= 1:
         return ""
     return f" (posto {disponivel.indice_posto + 1})"
+
+
+def _na_janela(slot: Slot, inicio: time | None, fim: time | None) -> bool:
+    """O slot começa em `inicio` ou depois e termina em `fim` ou antes."""
+    return (inicio is None or slot.hora_inicio >= inicio) and (fim is None or slot.hora_fim <= fim)
+
+
+def _rotulo_janela(inicio: time | None, fim: time | None) -> str:
+    if inicio is None and fim is None:
+        return ""
+    return f" ({(inicio or HORARIO_ABERTURA):%H:%M} às {(fim or HORARIO_FECHAMENTO):%H:%M})"
 
 
 def _nome_sala(fonte: ScheduleDataSource, dia: date, sala_id: str) -> str:
@@ -557,7 +577,8 @@ class ItemDemandaEntrada(BaseModel):
     profissional_id: str | None = Field(
         default=None,
         description=(
-            "Id de um profissional específico, só quando for uma exigência explícita "
+            "Profissional específico (nome como foi dito; apelido vale), só quando for uma "
+            "exigência explícita "
             "(ex.: pedido da família). Deixe em branco na maioria dos casos — o sistema "
             "já resolve sozinho a continuidade terapêutica do paciente."
         ),
@@ -601,7 +622,18 @@ class ArgsConsultarDisponibilidade(BaseModel):
         default=None, description="Filtra por essa especialidade, quando informada."
     )
     profissional: str | None = Field(
-        default=None, description="Filtra por esse profissional (nome ou id), quando informado."
+        default=None,
+        description="Filtra por esse profissional, com o nome como foi dito (apelido vale).",
+    )
+    # Preservar na reescrita sobre o motor (prompt P2): ver consultar_disponibilidade.
+    horario_inicio: time | None = Field(
+        default=None,
+        description=(
+            "Início da janela pedida (HH:MM), quando a pergunta citar uma ('entre 10h e 12h')."
+        ),
+    )
+    horario_fim: time | None = Field(
+        default=None, description="Fim da janela pedida (HH:MM); a vaga precisa terminar até ele."
     )
 
 
@@ -773,13 +805,34 @@ def criar_tools(
                         "a busca foi feita sem considerar histórico de profissional habitual."
                     )
 
+            # Profissional pedido no item: nome como dito, resolvido no catálogo da
+            # semana (apelido, grafia, primeiro nome), com os três estados.
+            catalogo: CatalogoAgenda | None = None
+            fixados: list[ProfissionalCatalogo | None] = []
+            for item in itens:
+                if item.profissional_id is None:
+                    fixados.append(None)
+                    continue
+                catalogo = catalogo or catalogo_da_semana(fonte, data)
+                localizacao = resolver_profissional(
+                    profissionais_do_catalogo(catalogo), item.profissional_id
+                )
+                if isinstance(localizacao, ProfissionalAmbiguo):
+                    return texto_ambiguo(item.profissional_id, localizacao)
+                if isinstance(localizacao, ProfissionalNaoEncontrado):
+                    return texto_inexistente(item.profissional_id, catalogo)
+                atendente = catalogo.profissionais[localizacao.profissional_id]
+                if not atendente.atende_no_dia(data):
+                    return texto_nao_atende(atendente, data)
+                fixados.append(atendente)
+
             itens_brutos = [
                 ItemDemandaBruta(
                     especialidade=item.especialidade,
                     duracao_em_slots=math.ceil(item.duracao_minutos / DURACAO_SLOT_MINUTOS),
-                    profissional_id=item.profissional_id,
+                    profissional_id=fixado.id if fixado is not None else None,
                 )
-                for item in itens
+                for item, fixado in zip(itens, fixados, strict=True)
             ]
             horario_minimo_efetivo = (
                 horario_minimo if horario_minimo is not None else HORARIO_PREFERENCIAL_PADRAO
@@ -796,6 +849,12 @@ def criar_tools(
         except Exception as erro:
             return f"Erro ao buscar encaixe: {erro}"
 
+        if (
+            len(fixados) == 1
+            and fixados[0] is not None
+            and not isinstance(resultado, ResultadoExato | ResultadoAlternativas)
+        ):
+            return texto_sem_vaga(fixados[0], data, horario_minimo_efetivo, None) + nota
         duracao_total_minutos = sum(
             item.duracao_em_slots * DURACAO_SLOT_MINUTOS for item in itens_brutos
         )
@@ -811,35 +870,62 @@ def criar_tools(
         data: date,
         especialidade: Especialidade | None = None,
         profissional: str | None = None,
+        horario_inicio: time | None = None,
+        horario_fim: time | None = None,
     ) -> str:
-        """Lista CADA horário livre de UM único dia, com filtro opcional de especialidade e
-        profissional.
+        """Lista CADA horário livre de UM único dia, com filtro opcional de especialidade,
+        profissional e janela de horário.
 
         Use só para a lista detalhada de um dia ("quais horários estão livres de
-        psicologia hoje?"). Para mais de um dia ("de segunda a sexta", "na semana"),
-        contagens, janelas de 1 h ou recortes por sala/período, use `gerar_relatorio`
-        (uma chamada só). Para casar várias especialidades de um atendimento, use
-        `buscar_encaixe`.
+        psicologia hoje?", "a Bia tem vaga na quinta entre 10h e 12h?"). Com
+        profissional, diz se ela não existe na grade, não atende no dia ou está
+        sem vaga na janela. Para mais de um dia ("de segunda a sexta", "na
+        semana"), contagens, janelas de 1 h ou recortes por sala/período, use
+        `gerar_relatorio` (uma chamada só). Para casar várias especialidades de
+        um atendimento, use `buscar_encaixe`.
         """
+        # A futura reescrita desta tool sobre o motor (prompt P2) deve preservar
+        # `horario_inicio` e `horario_fim`: é com eles que a busca por profissional
+        # distingue "atende, mas está sem vaga na janela".
+        if horario_inicio is not None and horario_fim is not None and horario_fim <= horario_inicio:
+            return "O horário final da janela precisa ser depois do inicial."
+        atendente: ProfissionalCatalogo | None = None
         try:
             foto = fotografar_periodo(fonte, data, data)
-            profissional_id = None
             if profissional is not None:
-                # Só o id exato, sem correspondência aproximada.
-                profissional_id = normalizar_id(profissional)
-                if profissional_id not in foto.profissionais:
+                catalogo = catalogo_da_semana(fonte, data)
+                localizacao = resolver_profissional(
+                    profissionais_do_catalogo(catalogo), profissional
+                )
+                if isinstance(localizacao, ProfissionalAmbiguo):
+                    return texto_ambiguo(profissional, localizacao)
+                if isinstance(localizacao, ProfissionalNaoEncontrado):
+                    return texto_inexistente(profissional, catalogo)
+                atendente = catalogo.profissionais[localizacao.profissional_id]
+                if not atendente.atende_no_dia(data):
+                    return texto_nao_atende(atendente, data)
+                if especialidade is not None and atendente.especialidade != especialidade:
                     return (
-                        f"Profissional não encontrado com o nome ou id '{profissional}' na "
-                        f"agenda de {data.strftime('%d/%m/%Y')}."
+                        f"{atendente.nome} é de {_rotulo_especialidade(atendente.especialidade)}, "
+                        f"não de {_rotulo_especialidade(especialidade)}."
                     )
 
-            disponiveis = visoes_fotografia.disponibilidade(
-                foto, data, especialidade=especialidade, profissional_id=profissional_id
-            )
+            disponiveis = [
+                disponivel
+                for disponivel in visoes_fotografia.disponibilidade(
+                    foto,
+                    data,
+                    especialidade=especialidade,
+                    profissional_id=atendente.id if atendente is not None else None,
+                )
+                if _na_janela(disponivel.slot, horario_inicio, horario_fim)
+            ]
         except Exception as erro:
             return f"Erro ao consultar disponibilidade: {erro}"
 
         if not disponiveis:
+            if atendente is not None:
+                return texto_sem_vaga(atendente, data, horario_inicio, horario_fim)
             return (
                 f"Nenhum horário livre encontrado em {data.strftime('%d/%m/%Y')} para os "
                 "filtros informados."
@@ -858,7 +944,8 @@ def criar_tools(
             f"{_sufixo_posto(disponivel, vagas_por_chave)}."
             for disponivel in disponiveis
         ]
-        return f"Horários livres em {data.strftime('%d/%m/%Y')}:\n" + "\n".join(linhas)
+        janela = _rotulo_janela(horario_inicio, horario_fim)
+        return f"Horários livres em {data.strftime('%d/%m/%Y')}{janela}:\n" + "\n".join(linhas)
 
     # langchain_core instalado: convert.tool aceita content_and_artifact;
     # base.BaseTool desempacota (content, artifact). ToolMessage.artifact não

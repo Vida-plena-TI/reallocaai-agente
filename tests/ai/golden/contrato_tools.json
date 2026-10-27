@@ -39,7 +39,7 @@
         }
        ],
        "default": null,
-       "description": "Id de um profissional específico, só quando for uma exigência explícita (ex.: pedido da família). Deixe em branco na maioria dos casos — o sistema já resolve sozinho a continuidade terapêutica do paciente.",
+       "description": "Profissional específico (nome como foi dito; apelido vale), só quando for uma exigência explícita (ex.: pedido da família). Deixe em branco na maioria dos casos — o sistema já resolve sozinho a continuidade terapêutica do paciente.",
        "title": "Profissional Id"
       }
      },
@@ -189,7 +189,7 @@
      "type": "string"
     }
    },
-   "description": "Lista CADA horário livre de UM único dia, com filtro opcional de especialidade e\nprofissional.\n\nUse só para a lista detalhada de um dia (\"quais horários estão livres de\npsicologia hoje?\"). Para mais de um dia (\"de segunda a sexta\", \"na semana\"),\ncontagens, janelas de 1 h ou recortes por sala/período, use `gerar_relatorio`\n(uma chamada só). Para casar várias especialidades de um atendimento, use\n`buscar_encaixe`.",
+   "description": "Lista CADA horário livre de UM único dia, com filtro opcional de especialidade,\nprofissional e janela de horário.\n\nUse só para a lista detalhada de um dia (\"quais horários estão livres de\npsicologia hoje?\", \"a Bia tem vaga na quinta entre 10h e 12h?\"). Com\nprofissional, diz se ela não existe na grade, não atende no dia ou está\nsem vaga na janela. Para mais de um dia (\"de segunda a sexta\", \"na\nsemana\"), contagens, janelas de 1 h ou recortes por sala/período, use\n`gerar_relatorio` (uma chamada só). Para casar várias especialidades de\num atendimento, use `buscar_encaixe`.",
    "properties": {
     "data": {
      "description": "Data a consultar, no formato AAAA-MM-DD.",
@@ -209,6 +209,34 @@
      "default": null,
      "description": "Filtra por essa especialidade, quando informada."
     },
+    "horario_fim": {
+     "anyOf": [
+      {
+       "format": "time",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Fim da janela pedida (HH:MM); a vaga precisa terminar até ele.",
+     "title": "Horario Fim"
+    },
+    "horario_inicio": {
+     "anyOf": [
+      {
+       "format": "time",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Início da janela pedida (HH:MM), quando a pergunta citar uma ('entre 10h e 12h').",
+     "title": "Horario Inicio"
+    },
     "profissional": {
      "anyOf": [
       {
@@ -219,7 +247,7 @@
       }
      ],
      "default": null,
-     "description": "Filtra por esse profissional (nome ou id), quando informado.",
+     "description": "Filtra por esse profissional, com o nome como foi dito (apelido vale).",
      "title": "Profissional"
     }
    },
@@ -229,7 +257,7 @@
    "title": "consultar_disponibilidade",
    "type": "object"
   },
-  "descricao": "Lista CADA horário livre de UM único dia, com filtro opcional de especialidade e\nprofissional.\n\nUse só para a lista detalhada de um dia (\"quais horários estão livres de\npsicologia hoje?\"). Para mais de um dia (\"de segunda a sexta\", \"na semana\"),\ncontagens, janelas de 1 h ou recortes por sala/período, use `gerar_relatorio`\n(uma chamada só). Para casar várias especialidades de um atendimento, use\n`buscar_encaixe`.",
+  "descricao": "Lista CADA horário livre de UM único dia, com filtro opcional de especialidade,\nprofissional e janela de horário.\n\nUse só para a lista detalhada de um dia (\"quais horários estão livres de\npsicologia hoje?\", \"a Bia tem vaga na quinta entre 10h e 12h?\"). Com\nprofissional, diz se ela não existe na grade, não atende no dia ou está\nsem vaga na janela. Para mais de um dia (\"de segunda a sexta\", \"na\nsemana\"), contagens, janelas de 1 h ou recortes por sala/período, use\n`gerar_relatorio` (uma chamada só). Para casar várias especialidades de\num atendimento, use `buscar_encaixe`.",
   "formato_resposta": "content"
  },
  "consultar_ocupacao": {

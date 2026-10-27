@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 
 from app.config import get_settings
-from app.domain import ScheduleDataSource, dias_da_semana_de
+from app.domain import PROFISSIONAIS_APELIDOS, Profissional, ScheduleDataSource, dias_da_semana_de
 from app.domain.catalogo_agenda import CatalogoAgenda, DiaDoCatalogo, montar_catalogo
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def ler_catalogo(fonte: ScheduleDataSource, data: date) -> CatalogoAgenda:
                 com_falha.append(dia)
     if not lidos:
         raise CatalogoIndisponivelError("nenhum dia da semana pôde ser lido")
-    return montar_catalogo(lidos, dias_com_falha=tuple(com_falha))
+    return montar_catalogo(lidos, dias_com_falha=tuple(com_falha), apelidos=PROFISSIONAIS_APELIDOS)
 
 
 class CacheCatalogo:
@@ -117,3 +117,11 @@ def catalogo_ou_nada(fonte: ScheduleDataSource, data: date) -> CatalogoAgenda | 
     except Exception as erro:
         logger.warning("Catálogo da agenda indisponível (%s).", type(erro).__name__)
         return None
+
+
+def profissionais_do_catalogo(catalogo: CatalogoAgenda) -> dict[str, Profissional]:
+    """Os profissionais do catálogo no formato que `resolver_profissional` recebe."""
+    return {
+        p.id: Profissional(id=p.id, nome=p.nome, especialidade=p.especialidade)
+        for p in catalogo.profissionais.values()
+    }

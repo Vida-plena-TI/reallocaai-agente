@@ -111,6 +111,18 @@ MAPA_ALIAS_PROFISSIONAL: Final[dict[str, str]] = {
     "cabele": "calebe",
 }
 
+#: Apelidos de profissional confirmados pela coordenação: apelido normalizado -> id
+#: canônico.
+#:
+#: Diferente de `MAPA_ALIAS_PROFISSIONAL`, que corrige grafias da própria planilha
+#: na leitura: o apelido nunca está na planilha, só na conversa. Só entra aqui o
+#: que a coordenação confirmou, com a origem comentada; apelido suspeito e não
+#: confirmado vai para `docs/apelidos-pendentes.md`.
+PROFISSIONAIS_APELIDOS: Final[dict[str, str]] = {
+    # Confirmado pela coordenadora no chat real: "a beatriz seria bia".
+    "beatriz": "bia",
+}
+
 #: Colunas de profissional que a clínica pediu para não considerar na agenda.
 #:
 #: A chave é o id normalizado do nome que sobra na célula do profissional,
