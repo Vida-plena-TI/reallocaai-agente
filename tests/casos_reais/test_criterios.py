@@ -38,7 +38,7 @@ def _rodar(tipo: str, turno: TurnoObservado, **params: object) -> ResultadoCrite
 def test_casos_do_yaml_carregam() -> None:
     casos = carregar_casos()
     assert [caso.id for caso in casos] == [f"c0{n}" for n in range(1, 9)]
-    assert {caso.id for caso in casos if caso.xfail} == {"c02", "c03", "c04", "c05", "c06"}
+    assert {caso.id for caso in casos if caso.xfail} == {"c02", "c03", "c04", "c06"}
 
 
 def test_criterio_desconhecido_e_recusado(tmp_path: Path) -> None:

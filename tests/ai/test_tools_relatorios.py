@@ -61,10 +61,24 @@ def _gerar(
 
 def test_vagas_de_segunda_a_sexta_numa_chamada_lendo_cada_dia_uma_vez() -> None:
     fonte = FonteContadora(fonte_clinica())
+    tools = _tools(fonte)
+    # Criar as tools lê o catálogo da semana (uma vez por dia); aqui conta só o relatório.
+    fonte.leituras.clear()
 
-    texto, bloco = _gerar(
-        fonte, relatorio="vagas_livres", inicio=SEGUNDA.isoformat(), fim=SEXTA.isoformat()
+    mensagem = tools["gerar_relatorio"].invoke(
+        {
+            "name": "gerar_relatorio",
+            "args": {
+                "relatorio": "vagas_livres",
+                "inicio": SEGUNDA.isoformat(),
+                "fim": SEXTA.isoformat(),
+            },
+            "id": "c1",
+            "type": "tool_call",
+        }
     )
+    texto = str(mensagem.content)
+    bloco = BlocoRelatorio.model_validate(mensagem.artifact) if mensagem.artifact else None
 
     assert bloco is not None and bloco.tipo == "disponibilidade"
     assert (bloco.periodo.inicio, bloco.periodo.fim) == (SEGUNDA, SEXTA)

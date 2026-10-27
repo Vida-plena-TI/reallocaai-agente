@@ -30,7 +30,8 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import ValidationError
 
-from app.ai.prompts import prompt_de_sistema
+from app.ai.catalogo import catalogo_ou_nada
+from app.ai.prompts import prompt_de_sistema, resumo_da_equipe
 from app.ai.rastreamento import desligar_rastreamento_externo
 from app.ai.relatorios import BlocoRelatorio
 from app.ai.tools import DIAS_DA_SEMANA, criar_tools
@@ -95,12 +96,20 @@ def criar_agente(
     produção é o resultado de `criar_chat_model()`; em teste, um chat model
     falso que não faz nenhuma chamada de rede (ver `tests/ai/test_agente.py`).
     """
-    tools = criar_tools(fonte, continuidade, data_referencia)
+    # Uma leitura (com cache) serve ao resumo da equipe e aos enums das tools.
+    # Se a planilha falhar aqui, o chat segue: prompt sem o resumo e listas de
+    # reserva nas tools.
+    catalogo = catalogo_ou_nada(fonte, data_referencia)
+    tools = criar_tools(fonte, continuidade, data_referencia, catalogo=catalogo)
     variante = prompt_de_sistema(renderiza_relatorios=renderiza_relatorios)
     prompt = variante.format(
         data_referencia=data_referencia.strftime("%d/%m/%Y"),
         dia_da_semana=DIAS_DA_SEMANA[data_referencia.weekday()],
     )
+    if catalogo is not None:
+        prompt += resumo_da_equipe(catalogo)
+    else:
+        logger.warning("Prompt montado sem o resumo da equipe: catálogo indisponível.")
     return create_agent(model=chat_model, tools=tools, system_prompt=prompt)
 
 

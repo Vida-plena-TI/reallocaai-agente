@@ -7,6 +7,7 @@ mantém o módulo testável sem rede e sem depender de qual fase futura escolher
 """
 
 import logging
+from collections.abc import Mapping
 from datetime import date, time
 from difflib import SequenceMatcher
 from typing import Annotated, Literal
@@ -15,7 +16,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import (
-    MAPA_ALIAS_PROFISSIONAL,
     Especialidade,
     ItemSolicitacao,
     Paciente,
@@ -25,6 +25,7 @@ from app.domain import (
     dias_da_semana_de,
     normalizar_id,
 )
+from app.domain.nomes_profissionais import resolver_nome
 from app.engine.disponibilidade import SlotDisponivel, listar_disponibilidade
 from app.engine.encaixe import (
     OpcaoComCenario,
@@ -184,44 +185,25 @@ LocalizacaoProfissional = Annotated[
 ]
 
 
-def _uma_sequencia_e_prefixo_da_outra(palavras: list[str], outras: list[str]) -> bool:
-    """Se a sequência de palavras de um id é prefixo da do outro, em qualquer sentido."""
-    menor, maior = sorted((palavras, outras), key=len)
-    return bool(menor) and maior[: len(menor)] == menor
-
-
 def resolver_profissional(
-    profissionais: dict[str, Profissional], texto: str
+    profissionais: Mapping[str, Profissional], texto: str
 ) -> LocalizacaoProfissional:
     """Resolve o profissional citado em `texto` entre `profissionais` (id -> profissional).
 
-    As tools passam os profissionais da semana (`FotografiaPeriodo.profissionais`).
-    Correspondência pelo id normalizado (acento e caixa não importam), já
-    trocado pelo canônico quando é uma grafia em `MAPA_ALIAS_PROFISSIONAL`: o id
-    exato vence; sem ele, vale quando a sequência de palavras de um lado é
-    prefixo da do outro ("Rossana Belfort" encontra `rossana`, e "Ana" encontra
-    `ana-paula`). Se mais de um profissional casar, devolve todos como
-    candidatos e nunca escolhe sozinho.
+    As tools passam os profissionais da semana (`FotografiaPeriodo.profissionais`
+    ou o catálogo). As regras (acento, caixa, grafia, apelido, primeiro nome e
+    prefixo de palavras) estão em `app.domain.nomes_profissionais.resolver_nome`.
+    Se mais de um profissional casar, devolve todos como candidatos e nunca
+    escolhe sozinho.
     """
-    # A grafia antiga de quem tem alias ("Larissa") nunca existe na agenda: o
-    # parser já a trocou pela canônica, então a busca precisa fazer o mesmo.
-    alvo = normalizar_id(texto)
-    alvo = MAPA_ALIAS_PROFISSIONAL.get(alvo, alvo)
-    exato = profissionais.get(alvo) if alvo else None
-    if exato is not None:
-        return ProfissionalEncontrado(profissional_id=exato.id, nome=exato.nome)
-
-    palavras_alvo = alvo.split("-") if alvo else []
-    candidatos = [
-        profissional
-        for profissional in profissionais.values()
-        if _uma_sequencia_e_prefixo_da_outra(palavras_alvo, profissional.id.split("-"))
-    ]
-    if len(candidatos) == 1:
-        return ProfissionalEncontrado(profissional_id=candidatos[0].id, nome=candidatos[0].nome)
-    if candidatos:
+    ids = resolver_nome({p.id: p.nome for p in profissionais.values()}, texto)
+    if len(ids) == 1:
+        return ProfissionalEncontrado(profissional_id=ids[0], nome=profissionais[ids[0]].nome)
+    if ids:
         return ProfissionalAmbiguo(
-            candidatos=sorted(candidatos, key=lambda profissional: profissional.nome)
+            candidatos=sorted(
+                (profissionais[i] for i in ids), key=lambda profissional: profissional.nome
+            )
         )
     return ProfissionalNaoEncontrado(
         nomes_disponiveis=sorted(profissional.nome for profissional in profissionais.values())

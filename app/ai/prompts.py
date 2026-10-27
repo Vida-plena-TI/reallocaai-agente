@@ -1,5 +1,8 @@
 """Prompt de sistema do agente RealocAI (Fase 5b)."""
 
+from app.domain.catalogo_agenda import CatalogoAgenda
+from app.domain.formatacao import rotulo_enum
+
 #: Placeholder `{data_referencia}`/`{dia_da_semana}`: preenchidos por
 #: `criar_agente` a cada conversa (ver Parte D) — o agente nunca deve perguntar
 #: "qual a data de hoje", ela já vem pronta aqui.
@@ -207,3 +210,58 @@ def prompt_de_sistema(*, renderiza_relatorios: bool) -> str:
 
 PROMPT_SISTEMA = prompt_de_sistema(renderiza_relatorios=False)
 PROMPT_SISTEMA_COM_RELATORIOS = prompt_de_sistema(renderiza_relatorios=True)
+
+
+#: Limite do resumo da equipe no prompt, em tokens (≈ 4 caracteres por token).
+LIMITE_TOKENS_EQUIPE = 1_500
+_CARACTERES_POR_TOKEN = 4
+
+
+def _secao_equipe(linhas: list[str], apelidos: list[str]) -> str:
+    partes = [
+        "",
+        "## Equipe da semana",
+        "",
+        "Profissionais por especialidade, com o nome como está na planilha:",
+        *linhas,
+    ]
+    if apelidos:
+        partes.append(f"Apelidos confirmados: {'; '.join(apelidos)}.")
+    partes += [
+        "",
+        "Para dias, turnos, salas e postos, consulte `consultar_profissionais`; não adivinhe. "
+        "Passe às ferramentas o nome como a pessoa disse (apelido ou outra grafia): elas "
+        "resolvem. Se vierem candidatos, pergunte qual é; nunca escolha sozinho.",
+    ]
+    return "\n".join(partes) + "\n"
+
+
+def resumo_da_equipe(catalogo: CatalogoAgenda, limite_tokens: int = LIMITE_TOKENS_EQUIPE) -> str:
+    """Seção do prompt com a equipe por especialidade ("- Fonoaudiologia: Bia, Elo").
+
+    Só nomes e especialidades, em ordem fixa (enum e nome): o texto não muda
+    enquanto a equipe não muda, o que preserva o cache de prompt do provedor.
+    Nunca traz paciente (o catálogo não tem). Passando do limite, cada linha é
+    cortada com "e mais N".
+    """
+    grupos = [
+        (rotulo_enum(especialidade.value), [catalogo.profissionais[i].nome for i in ids])
+        for especialidade, ids in catalogo.especialidades.items()
+    ]
+    apelidos = sorted(
+        f"{apelido} = {p.nome}" for p in catalogo.profissionais.values() for apelido in p.apelidos
+    )
+    limite = limite_tokens * _CARACTERES_POR_TOKEN
+    maior = max((len(nomes) for _, nomes in grupos), default=0)
+    for corte in range(maior, 0, -1):
+        linhas = [
+            f"- {rotulo}: {', '.join(nomes[:corte])}"
+            + (f" e mais {len(nomes) - corte}" if len(nomes) > corte else "")
+            for rotulo, nomes in grupos
+        ]
+        secao = _secao_equipe(linhas, apelidos)
+        if len(secao) <= limite:
+            return secao
+    return _secao_equipe(
+        [f"- {rotulo}: {len(nomes)} profissionais" for rotulo, nomes in grupos], []
+    )
