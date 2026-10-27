@@ -65,6 +65,8 @@ class Agente:
     profissionais: Sequence[str] = field(default_factory=tuple)
     #: Interpretação estruturada antes do agente (`INTERPRETADOR_ATIVO`); `None` = desligada.
     interpretador: Interpretador | None = None
+    #: O cliente renderiza os relatórios: o texto não pode repetir a lista.
+    com_tela: bool = False
 
     def invoke(self, entrada: dict[str, Any]) -> dict[str, Any]:
         resultado: dict[str, Any] = self.grafo.invoke(entrada)
@@ -148,6 +150,7 @@ def criar_agente(
         create_agent(model=chat_model, tools=tools, system_prompt=prompt),
         profissionais,
         interpretador,
+        renderiza_relatorios,
     )
 
 
@@ -214,7 +217,11 @@ def perguntar_com_mensagens(
     resposta = _extrair_texto_da_resposta(mensagens[-1])
     blocos = extrair_blocos_do_turno(mensagens)
     problemas = verificar(
-        resposta, mensagens[len(historico_mensagens) :], historico_mensagens, profissionais
+        resposta,
+        mensagens[len(historico_mensagens) :],
+        historico_mensagens,
+        profissionais,
+        com_tela=agente.com_tela,
     )
     if problemas.ok:
         return resposta, mensagens, blocos
@@ -225,7 +232,9 @@ def perguntar_com_mensagens(
     resposta = _extrair_texto_da_resposta(refeito[-1])
     blocos = extrair_blocos_do_turno(refeito) or blocos
     turno = refeito[len(historico_mensagens) :]
-    problemas = verificar(resposta, turno, historico_mensagens, profissionais)
+    problemas = verificar(
+        resposta, turno, historico_mensagens, profissionais, com_tela=agente.com_tela
+    )
     if problemas.ok:
         return resposta, refeito, blocos
 

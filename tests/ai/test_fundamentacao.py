@@ -1,6 +1,7 @@
 """Verificação de fundamentação: horários, contagens, nomes e vocabulário da resposta."""
 
 import logging
+import re
 from datetime import date
 from typing import cast
 
@@ -135,3 +136,29 @@ def test_vocabulario_proibido_forca_nova_geracao(caplog: pytest.LogCaptureFixtur
     assert resposta == "Posso sugerir um horário?"
     assert "Vocabulário proibido forçou nova geração" in caplog.text
     assert "encaixei" not in caplog.text.lower()
+
+
+def test_com_tela_o_texto_nao_lista_horarios() -> None:
+    """Com renderiza_relatorios=True e relatório na rodada, linhas "HH:MM às HH:MM:" não saem."""
+    lista = (
+        "Vagas na segunda:\n"
+        "- 07:00 às 09:00: Fonoaudiologia com Elo na Sala 5.\n"
+        "- 15:00 às 18:00: Fonoaudiologia com Elo na Sala 5."
+    )
+    agente = _agente([CHAMADA, AIMessage(lista), AIMessage("Há 45 vagas na segunda.")])
+
+    resposta, _, blocos = perguntar_com_mensagens(
+        agente, [HumanMessage("quais horários vagos na segunda-feira?")]
+    )
+
+    assert [b.tipo for b in blocos] == ["disponibilidade"]
+    assert resposta == "Há 45 vagas na segunda."
+    assert not re.search(r"(?m)^\s*-?\s*\d{2}:\d{2} às \d{2}:\d{2}:", resposta)
+
+
+def test_sem_tela_a_lista_curta_pode_sair() -> None:
+    texto = "- 10:00 às 10:30: Fonoaudiologia com Bia na Sala 1."
+    turno: list[BaseMessage] = [
+        ToolMessage("- 10:00 às 10:30: Fonoaudiologia com Bia na Sala 1.", tool_call_id="t")
+    ]
+    assert verificar(texto, turno, [PERGUNTA], ["Bia"], com_tela=False).ok

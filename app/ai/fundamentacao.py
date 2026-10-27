@@ -77,6 +77,10 @@ _UNIDADES = (
 )
 _CONTAGEM = re.compile(rf"(?<![\d,.:/])(\d+)\s+(?:{_UNIDADES})\b", re.IGNORECASE)
 _PERCENTUAL = re.compile(r"(?<![\d,])(\d+(?:,\d+)?)\s?%")
+#: Linha de lista de horários ("- 10:00 às 10:30: ..."): com a tela, o relatório já mostra.
+_LINHA_DE_HORARIO = re.compile(
+    r"(?m)^\s*(?:[-*•]|\d+[.)])?\s*\**\d{1,2}:\d{2}\s*(?:às|as|-|\u2013)\s*\d{1,2}:\d{2}\**\s*:"
+)
 _NUMERO = re.compile(r"(?<![\d,])\d+(?:[,.]\d+)?")
 
 
@@ -116,14 +120,24 @@ class Problemas:
     horarios: list[str] = field(default_factory=list)
     numeros: list[str] = field(default_factory=list)
     nomes: list[str] = field(default_factory=list)
+    #: Linhas de lista de horários no texto quando a tela já mostra o relatório.
+    linhas_de_lista: int = 0
 
     @property
     def ok(self) -> bool:
-        return not (self.vocabulario or self.horarios or self.numeros or self.nomes)
+        return not (
+            self.vocabulario or self.horarios or self.numeros or self.nomes or self.linhas_de_lista
+        )
 
     @property
     def total(self) -> int:
-        return len(self.vocabulario) + len(self.horarios) + len(self.numeros) + len(self.nomes)
+        return (
+            len(self.vocabulario)
+            + len(self.horarios)
+            + len(self.numeros)
+            + len(self.nomes)
+            + self.linhas_de_lista
+        )
 
     def aviso(self) -> str:
         """Instrução para a nova geração (vai só para o modelo, nunca para o histórico)."""
@@ -136,6 +150,8 @@ class Problemas:
             partes.append(f"números que não vieram das ferramentas: {', '.join(self.numeros)}")
         if self.nomes:
             partes.append(f"profissionais que não vieram das ferramentas: {', '.join(self.nomes)}")
+        if self.linhas_de_lista:
+            partes.append("lista de horários linha a linha, que o relatório na tela já mostra")
         return (
             "[Verificação interna, não responda a esta mensagem como pergunta] A resposta "
             f"anterior não pode sair assim ({'; '.join(partes)}). Reescreva a resposta à última "
@@ -164,11 +180,23 @@ def verificar(
     mensagens_do_turno: Sequence[BaseMessage],
     historico: Sequence[BaseMessage],
     profissionais: Iterable[str] = (),
+    *,
+    com_tela: bool = False,
 ) -> Problemas:
-    """Confere `resposta` contra as ferramentas da rodada e o que foi dito na conversa."""
+    """Confere `resposta` contra as ferramentas da rodada e o que foi dito na conversa.
+
+    `com_tela`: o cliente renderiza os relatórios; se a rodada trouxe relatório,
+    o texto não pode repetir a lista de horários.
+    """
     vocabulario = termos_proibidos(resposta)
     if not chamou_ferramenta(mensagens_do_turno):
         return Problemas(vocabulario=vocabulario)
+    trouxe_relatorio = any(
+        isinstance(m, ToolMessage) and m.artifact is not None for m in mensagens_do_turno
+    )
+    linhas_de_lista = (
+        len(_LINHA_DE_HORARIO.findall(resposta)) if com_tela and trouxe_relatorio else 0
+    )
 
     fontes = _fontes(mensagens_do_turno)
     ditos = "\n".join(str(m.content) for m in historico if isinstance(m, HumanMessage))
@@ -197,6 +225,7 @@ def verificar(
         horarios=sem_fonte_horario,
         numeros=sem_fonte_numero,
         nomes=sem_fonte_nome,
+        linhas_de_lista=linhas_de_lista,
     )
 
 
