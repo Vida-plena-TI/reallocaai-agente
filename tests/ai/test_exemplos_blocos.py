@@ -49,3 +49,27 @@ def test_ha_exemplo_de_cada_tipo_de_bloco() -> None:
         "qualidade_agenda",
         "tabela_generica",
     }
+
+
+def test_so_o_plano_semanal_tem_periodo_nulo() -> None:
+    import json
+
+    for arquivo, conteudo in gerar_exemplos().items():
+        if arquivo.endswith(".schema.json"):
+            continue
+        bloco = json.loads(conteudo)
+        assert "periodo" in bloco, arquivo
+        if arquivo == "tabela_generica_plano_semanal.json":
+            assert bloco["periodo"] is None
+        else:
+            assert set(bloco["periodo"]) == {"inicio", "fim"}, arquivo
+
+
+def test_schema_exige_periodo_e_aceita_null() -> None:
+    import json
+
+    schema = json.loads(gerar_exemplos()["bloco_relatorio.schema.json"])
+    assert "periodo" in schema["required"]
+    assert schema["properties"]["periodo"] == {
+        "anyOf": [{"$ref": "#/$defs/PeriodoRelatorio"}, {"type": "null"}]
+    }

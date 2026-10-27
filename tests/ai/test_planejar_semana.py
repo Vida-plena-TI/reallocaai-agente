@@ -1,5 +1,7 @@
 """Tool `planejar_semana` sobre a semana fictícia de `tests/casos_reais/planilha.py`."""
 
+import json
+import re
 from datetime import date
 from typing import Any, cast
 
@@ -88,6 +90,33 @@ def test_caso_de_referencia_vira_tabela_generica_com_situacao() -> None:
     assert "não coube Terapia Ocupacional" in texto
     assert "bloco contínuo" not in texto
     assert "verificad" not in texto
+
+
+def test_plano_semanal_tem_periodo_nulo_e_nenhuma_data() -> None:
+    """A fonte é a grade semanal, sem datas: o bloco não inventa período."""
+    fonte = GoogleSheetsDataSource(cast(gspread.Spreadsheet, PlanilhaContada()))
+    tools = {t.name: t for t in criar_tools(fonte, SemHistoricoContinuidadeDataSource(), HOJE)}
+    mensagem = tools["planejar_semana"].invoke(
+        {
+            "name": "planejar_semana",
+            "args": {"dias_semana": ["quarta", "quinta"], "especialidades": QUATRO},
+            "id": "c1",
+            "type": "tool_call",
+        }
+    )
+    artefato = mensagem.artifact
+
+    assert "periodo" in artefato and artefato["periodo"] is None
+    assert BlocoRelatorio.model_validate(artefato).periodo is None
+    assert not re.search(r"\d{4}-\d{2}-\d{2}|\d{2}/\d{2}", json.dumps(artefato))
+    assert {linha["dia"] for linha in artefato["dados"]["linhas"]} <= {
+        "segunda-feira",
+        "terça-feira",
+        "quarta-feira",
+        "quinta-feira",
+        "sexta-feira",
+        "sábado",
+    }
 
 
 def test_uma_unica_leitura_da_planilha() -> None:

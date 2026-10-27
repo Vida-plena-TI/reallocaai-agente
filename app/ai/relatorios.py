@@ -331,7 +331,10 @@ class BlocoRelatorio(_ModeloRelatorio):
     versao: int = Field(default=1, ge=1, le=1, description="Versão do contrato do bloco: 1.")
     tipo: TipoRelatorio
     titulo: str
-    periodo: PeriodoRelatorio
+    # Obrigatório e sempre presente. `None` (null) só no plano semanal
+    # (`tabela_generica` com relatorio "plano_semanal"): a fonte é a grade
+    # semanal, sem datas. Os demais blocos sempre trazem {inicio, fim}.
+    periodo: PeriodoRelatorio | None
     meta: float | None
     parcial: bool
     # Datas ISO ordenadas dos dias cuja leitura falhou; vazia quando não é parcial.
