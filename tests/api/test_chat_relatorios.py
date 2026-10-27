@@ -135,9 +135,13 @@ def test_o_prompt_diz_que_o_agente_nao_envia_emails(client: TestClient, renderiz
     prompt = str(modelo.entradas[0][0].content)
     variante = PROMPT_SISTEMA_COM_RELATORIOS if renderiza else PROMPT_SISTEMA
     hoje = date.today()
-    assert prompt == variante.format(
+    base = variante.format(
         data_referencia=hoje.strftime("%d/%m/%Y"), dia_da_semana=DIAS_DA_SEMANA[hoje.weekday()]
     )
+    # Depois do prompt fixo vem só o resumo da equipe (quando o catálogo é lido).
+    assert prompt.startswith(base)
+    resto = prompt[len(base) :]
+    assert resto == "" or resto.startswith("\n## Equipe da semana")
     assert "Nunca ofereça envio por e-mail" in prompt
     assert "responda em uma frase que o agente não envia e-mails" in prompt
     # Só essa frase fala de e-mail: nenhuma tool nem regra de envio.
