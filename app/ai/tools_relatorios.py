@@ -278,7 +278,7 @@ def _resolver_especialidades(textos: list[str]) -> frozenset[Especialidade]:
     return frozenset(especialidades)
 
 
-def _resolver_salas(foto: FotografiaPeriodo, textos: list[str]) -> frozenset[str]:
+def resolver_salas(foto: FotografiaPeriodo, textos: list[str]) -> frozenset[str]:
     ids: set[str] = set()
     for texto in textos:
         alvo = normalizar_id(texto)
@@ -316,7 +316,7 @@ def _filtros(foto: FotografiaPeriodo, args: ArgsGerarRelatorio) -> FiltrosRelato
     return FiltrosRelatorio(
         profissional_ids=_resolver_profissionais(foto, args.profissionais or []),
         especialidades=_resolver_especialidades(args.especialidades or []),
-        sala_ids=_resolver_salas(foto, args.salas or []),
+        sala_ids=resolver_salas(foto, args.salas or []),
         convenios=_resolver_convenios(args.convenios or []),
         dias_semana=frozenset(_DIAS_DA_SEMANA_POR_NOME[d] for d in args.dias_semana or []),
         periodos=frozenset({Periodo(args.periodo_do_dia)}) if args.periodo_do_dia else frozenset(),

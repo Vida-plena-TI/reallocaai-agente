@@ -46,6 +46,7 @@ from app.domain import Especialidade
 from app.domain.constants import DURACAO_SLOT_MINUTOS
 from app.domain.formatacao import chave_natural, chave_texto, formatar_razao, rotulo_enum
 from app.engine.fotografia import FotografiaPeriodo
+from app.engine.planejamento import PlanoSemanal, SessaoPlano
 from app.engine.relatorio_generico import (
     Dimensao,
     LinhaRelatorio,
@@ -926,4 +927,135 @@ def agenda_paciente(
             for i in dia.intervalos
         )
     texto.append(f"Espera total entre terapias (sem o almoço): {espera} min.")
+    return "\n".join(texto), bloco
+
+
+# --- plano semanal -------------------------------------------------------
+
+#: Identificador estável do relatório do plano em `tabela_generica`.
+RELATORIO_PLANO_SEMANAL: Final[str] = "plano_semanal"
+
+#: Valores da coluna `situacao` do plano.
+SITUACAO_PLANO: Final[str] = "Plano"
+SITUACAO_NAO_COUBE: Final[str] = "Não coube"
+SITUACAO_ALTERNATIVA: Final[str] = "Alternativa"
+
+COLUNAS_PLANO: Final[list[tuple[str, str, Formato]]] = [
+    ("dia", "Dia", "texto"),
+    ("situacao", "Situação", "texto"),
+    ("especialidade", "Especialidade", "texto"),
+    ("horario", "Horário", "texto"),
+    ("profissional", "Profissional", "texto"),
+    ("sala", "Sala", "texto"),
+    ("posto", "Posto", "inteiro"),
+]
+
+#: Aviso fixo do plano: a recorrência é a grade, não o calendário.
+AVISO_PLANO_GRADE: Final[str] = (
+    "A recorrência semanal usa a grade semanal da planilha (uma fotografia da semana, "
+    "sem datas): feriados e exceções do calendário não são vistos."
+)
+
+
+def _horario(sessao: SessaoPlano) -> str:
+    return f"{sessao.inicio:%H:%M} às {sessao.fim:%H:%M}"
+
+
+def _linha_sessao(
+    foto: FotografiaPeriodo, sessao: SessaoPlano, situacao: str
+) -> dict[str, ValorSimples]:
+    return {
+        "dia": DIAS_DA_SEMANA[sessao.data.weekday()],
+        "situacao": situacao,
+        "especialidade": rotulo_enum(sessao.especialidade.value),
+        "horario": _horario(sessao),
+        "profissional": foto.nome_profissional(sessao.profissional_id),
+        "sala": foto.nome_sala(sessao.sala_id),
+        "posto": sessao.indice_posto + 1,
+    }
+
+
+def _sessao_no_texto(foto: FotografiaPeriodo, sessao: SessaoPlano) -> str:
+    return (
+        f"{rotulo_enum(sessao.especialidade.value)} {_horario(sessao)} com "
+        f"{foto.nome_profissional(sessao.profissional_id)} ({foto.nome_sala(sessao.sala_id)})"
+    )
+
+
+def plano_semanal(
+    foto: FotografiaPeriodo, plano: PlanoSemanal, titulo: str, avisos: list[str]
+) -> tuple[str, BlocoRelatorio]:
+    """O plano em `tabela_generica`: por dia, as sessões do plano e, para cada
+    especialidade que não coube, a linha "Não coube" seguida das alternativas.
+    """
+    pedidas = len(plano.pedido.itens)
+    linhas: list[dict[str, ValorSimples]] = []
+    texto = _cabecalho_texto(titulo, foto)
+    for dia in plano.dias:
+        nome_do_dia = DIAS_DA_SEMANA[dia.data.weekday()]
+        linhas.extend(_linha_sessao(foto, s, SITUACAO_PLANO) for s in dia.sessoes)
+        partes = [f"{len(dia.sessoes)} de {pedidas} especialidades"]
+        if dia.sessoes:
+            partes.append("; ".join(_sessao_no_texto(foto, s) for s in dia.sessoes))
+        for nao_coube in dia.nao_couberam:
+            especialidade = rotulo_enum(nao_coube.especialidade.value)
+            linhas.append(
+                {
+                    "dia": nome_do_dia,
+                    "situacao": SITUACAO_NAO_COUBE,
+                    "especialidade": especialidade,
+                    "horario": "—",
+                    "profissional": "—",
+                    "sala": "—",
+                    "posto": None,
+                }
+            )
+            linhas.extend(
+                _linha_sessao(foto, a, SITUACAO_ALTERNATIVA) for a in nao_coube.alternativas
+            )
+            alternativas = (
+                f"{len(nao_coube.alternativas)} alternativa(s) fora da janela na tabela"
+                if nao_coube.alternativas
+                else "sem alternativa na semana"
+            )
+            partes.append(f"não coube {especialidade} ({alternativas})")
+        texto.append(f"- {nome_do_dia.capitalize()}: {'. '.join(partes)}.")
+    texto.extend(avisos)
+
+    nao_couberam = sum(len(dia.nao_couberam) for dia in plano.dias)
+    resumo = [
+        ItemResumo(
+            rotulo=DIAS_DA_SEMANA[dia.data.weekday()].capitalize(),
+            valor=f"{len(dia.sessoes)} de {pedidas}",
+            formato="texto",
+            exibicao=f"{len(dia.sessoes)} de {pedidas} especialidades",
+        )
+        for dia in plano.dias
+    ]
+    resumo.append(
+        ItemResumo(
+            rotulo="Não couberam",
+            valor=nao_couberam,
+            formato="inteiro",
+            exibicao=str(nao_couberam),
+        )
+    )
+    bloco = _bloco(
+        "tabela_generica",
+        titulo,
+        foto,
+        avisos,
+        None,
+        resumo,
+        DadosTabelaGenerica(
+            relatorio=RELATORIO_PLANO_SEMANAL,
+            dimensoes=[],
+            metricas=[],
+            colunas=[ColunaTabela(chave=c, rotulo=r, formato=f) for c, r, f in COLUNAS_PLANO],
+            linhas=linhas,
+            total={},
+            linhas_omitidas=0,
+        ),
+        [tabela("Plano", COLUNAS_PLANO, linhas)],
+    )
     return "\n".join(texto), bloco

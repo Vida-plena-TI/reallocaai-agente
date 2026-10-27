@@ -798,6 +798,130 @@
   "descricao": "Relatório de QUALQUER período (um dia, a semana, segunda a sexta) numa chamada só.\n\nUse para: vagas/horários livres de mais de um dia ou com recorte (profissional,\nespecialidade, sala, manhã/tarde) -> vagas_livres; onde cabe 1 h ou 1 h 30 ->\njanelas_continuas; ranking_ocupacao; comparativo_dias; convenios e autorizações\npendentes; qualidade_agenda (buracos); salas_ociosas; capacidade_especialidade;\nagenda_paciente (só com o nome pedido pelo usuário); ou qualquer cruzamento ->\npersonalizado com dimensoes e metricas. Janela de horário (\"das 10h às 12h\") ->\nhora_inicio/hora_fim, não periodo_do_dia. Os números já vêm calculados: não recalcule.\nUMA chamada cobre o período inteiro: nunca chame uma vez por dia.",
   "formato_resposta": "content_and_artifact"
  },
+ "planejar_semana": {
+  "argumentos": {
+   "$defs": {
+    "DiaDaSemana": {
+     "enum": [
+      "segunda",
+      "terca",
+      "quarta",
+      "quinta",
+      "sexta",
+      "sabado"
+     ],
+     "title": "DiaDaSemana",
+     "type": "string"
+    },
+    "Especialidade": {
+     "enum": [
+      "terapia_ocupacional",
+      "fonoaudiologia",
+      "psicologia"
+     ],
+     "title": "Especialidade",
+     "type": "string"
+    }
+   },
+   "description": "Plano de um paciente: UMA sessão por especialidade em cada dia pedido, dentro da\njanela, sem sobreposição entre elas e SEM exigir que sejam seguidas.\n\nUse para \"semanalmente, quartas e quintas, fono, psicomotricidade, psicologia e TO,\ndas 10h às 12h, 30 min\" e para pedidos de várias especialidades num dia que não\nprecisam ser em sequência. UMA chamada cobre todos os dias: nunca chame por data.\nDiz o que não coube, com até 3 alternativas fora da janela. A recorrência é a grade\nsemanal (sem datas): nunca diga que datas do calendário foram verificadas.\nSessões seguidas, uma logo após a outra -> `buscar_encaixe`.",
+   "properties": {
+    "dias_semana": {
+     "description": "Dias da semana do plano ('quartas e quintas' -> quarta, quinta).",
+     "items": {
+      "$ref": "#/$defs/DiaDaSemana"
+     },
+     "minItems": 1,
+     "title": "Dias Semana",
+     "type": "array"
+    },
+    "duracao_minutos": {
+     "default": 30,
+     "description": "Duração de cada sessão em minutos (padrão 30; múltiplos de 30, arredondado para cima).",
+     "exclusiveMinimum": 0,
+     "title": "Duracao Minutos",
+     "type": "integer"
+    },
+    "especialidades": {
+     "description": "Especialidades pedidas, uma sessão de cada por dia.",
+     "items": {
+      "$ref": "#/$defs/Especialidade"
+     },
+     "maxItems": 6,
+     "minItems": 1,
+     "title": "Especialidades",
+     "type": "array"
+    },
+    "evitar_salas": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Salas a evitar ('Sala 3' ou '3'), quando o pedido citar.",
+     "title": "Evitar Salas"
+    },
+    "hora_fim": {
+     "anyOf": [
+      {
+       "format": "time",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Fim da janela (HH:MM): a sessão termina até ele. Em branco: fechamento.",
+     "title": "Hora Fim"
+    },
+    "hora_inicio": {
+     "anyOf": [
+      {
+       "format": "time",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Início da janela (HH:MM): a sessão começa nele ou depois. Vazio: abertura.",
+     "title": "Hora Inicio"
+    },
+    "profissionais_preferidos": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Profissionais preferidas, com o nome como foi dito (apelido vale): têm prioridade na especialidade delas, sem ser exigência. Só quando o pedido citar.",
+     "title": "Profissionais Preferidos"
+    }
+   },
+   "required": [
+    "dias_semana",
+    "especialidades"
+   ],
+   "title": "planejar_semana",
+   "type": "object"
+  },
+  "descricao": "Plano de um paciente: UMA sessão por especialidade em cada dia pedido, dentro da\njanela, sem sobreposição entre elas e SEM exigir que sejam seguidas.\n\nUse para \"semanalmente, quartas e quintas, fono, psicomotricidade, psicologia e TO,\ndas 10h às 12h, 30 min\" e para pedidos de várias especialidades num dia que não\nprecisam ser em sequência. UMA chamada cobre todos os dias: nunca chame por data.\nDiz o que não coube, com até 3 alternativas fora da janela. A recorrência é a grade\nsemanal (sem datas): nunca diga que datas do calendário foram verificadas.\nSessões seguidas, uma logo após a outra -> `buscar_encaixe`.",
+  "formato_resposta": "content_and_artifact"
+ },
  "sugerir_realocacao": {
   "argumentos": {
    "description": "Sugere um novo horário, no mesmo dia e com o mesmo profissional, para um atendimento.\n\nUse quando for preciso remanejar um atendimento específico (atraso,\ncancelamento de outro paciente etc.). Nunca troca o profissional do\natendimento — só propõe outro horário.",

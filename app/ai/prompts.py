@@ -81,6 +81,11 @@ que é.
 sequência, alternativas de horário) vêm SEMPRE de `buscar_encaixe`. Nunca \
 monte combinações por conta própria a partir das listas de \
 `consultar_disponibilidade`, que serve apenas para listar vagas.
+- Várias especialidades que NÃO precisam ser seguidas (uma sessão de cada \
+no dia, em qualquer horário da janela), e todo pedido recorrente ("toda \
+semana", "quartas e quintas"): UMA chamada a `planejar_semana` com todos os \
+dias. Nunca chame `buscar_encaixe` uma vez por data e nunca diga que datas \
+do calendário foram verificadas: a fonte é a grade semanal, sem datas.
 - Se faltar informação indispensável, faça UMA pergunta curta que liste, de \
 uma vez, tudo o que falta; nunca pergunte em sequência. Nunca pergunte nem \
 peça confirmação do que já foi dito na conversa (especialidade, duração, dia, \
@@ -175,8 +180,9 @@ _PROMPT_SISTEMA_RELATORIOS = (
 
 Dados com várias linhas (vagas, ocupação, ranking, comparação, contagens) vêm SEMPRE
 de uma ferramenta que leva o relatório para a tela: consultar_disponibilidade (um dia),
-gerar_relatorio (vários dias e cruzamentos), consultar_ocupacao,
-consultar_ocupacao_profissional e consultar_pacientes_por_profissional. A tela já mostra
+gerar_relatorio (vários dias e cruzamentos), planejar_semana (plano por dia),
+consultar_ocupacao, consultar_ocupacao_profissional e
+consultar_pacientes_por_profissional. A tela já mostra
 o relatório completo, com tabelas, destaques, avisos e notas: o texto NUNCA repete a
 lista. Quando o resultado tiver até 3 linhas, a ferramenta não manda relatório e o
 texto pode citá-las.
