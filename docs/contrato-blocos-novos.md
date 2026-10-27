@@ -192,14 +192,24 @@ e o bloco não traz data nenhuma; o dia vem só na coluna `dia`, como texto da g
 | `posto` | `inteiro` | A partir de 1; `null` em "Não coube" |
 
 Ordem das linhas, por dia pedido: as sessões do plano (por horário) e, para cada
-especialidade que não coube, a linha "Não coube" seguida de até 3 "Alternativa" fora da
-janela (mesmo dia primeiro, depois outros dias; o `dia` da alternativa é o dia em que ela
-acontece). `resumo`: um item por dia (`"3 de 4"`, formato `texto`) e `"Não couberam"`
-(`inteiro`). Tabela de exportação: **Plano** (mesmas colunas e linhas). `avisos` sempre traz
+especialidade que não coube, a linha "Não coube" seguida das "Alternativa" fora da janela
+que acontecem **nesse mesmo dia**. As alternativas só caem em dias pedidos: primeiro as do
+mesmo dia (até 3) e, se faltar, as que sobram no outro dia pedido em que a especialidade
+também não coube; essas aparecem no grupo do dia em que acontecem, sob o "Não coube" dela.
+Cada alternativa aparece uma vez na tabela inteira, e o `dia` de toda linha é o do grupo.
+Horários em dias não pedidos não entram na tabela (o texto da resposta oferece mostrá-los).
+
+Com sessões seguidas (`planejar_semana` com `seguidas: true`; o `titulo` começa com
+`"Plano semanal com sessões seguidas"`), as linhas "Plano" de cada dia são a maior
+sequência de sessões uma logo após a outra, e quem ficou de fora tem só a linha "Não coube",
+sem "Alternativa". Colunas e valores de `situacao` são os mesmos.
+
+`resumo`: um item por dia (`"3 de 4"`, formato `texto`) e `"Não couberam"` (`inteiro`). Tabela de exportação: **Plano** (mesmas colunas e linhas). `avisos` sempre traz
 que a recorrência usa a grade semanal e não vê feriados nem exceções.
 
 ## Histórico de mudanças (versão 1)
 
 | Data | Mudança | Compatibilidade |
 | --- | --- | --- |
+| 2026-10-27 | Plano semanal: alternativas só nos dias pedidos, sem repetição, sempre no grupo do dia em que acontecem (antes podiam vir de dias não pedidos, repetidas em cada grupo, com `dia` diferente do grupo); e o modo `seguidas` (mesmo formato). Nenhuma coluna nem valor de `situacao` mudou. | Compatível: `versao` continua `1`, formato igual. Só muda quais linhas vêm e a ordem dentro do grupo de cada dia. |
 | 2026-10-27 | `periodo` passou a aceitar `null` (o campo continua obrigatório e sempre presente). Só o plano semanal (`relatorio: "plano_semanal"`) envia `null`; nenhum outro tipo de bloco mudou. O schema (`bloco_relatorio.schema.json`) aceita `null` em qualquer tipo, por ser um envelope único. | Compatível: `versao` continua `1`. Quem guarda cópia do schema precisa atualizá-la, e quem exibe ou exporta o plano deve tratar `periodo` nulo (sem linha de período). |
