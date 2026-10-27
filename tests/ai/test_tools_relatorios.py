@@ -81,6 +81,7 @@ def test_vagas_de_segunda_a_sexta_numa_chamada_lendo_cada_dia_uma_vez() -> None:
     bloco = BlocoRelatorio.model_validate(mensagem.artifact) if mensagem.artifact else None
 
     assert bloco is not None and bloco.tipo == "disponibilidade"
+    assert bloco.periodo is not None
     assert (bloco.periodo.inicio, bloco.periodo.fim) == (SEGUNDA, SEXTA)
     assert bloco.titulo == "Vagas livres de 28/09/2026 a 02/10/2026"
     assert set(fonte.leituras.values()) == {1}
@@ -95,6 +96,7 @@ def test_sem_datas_usa_a_semana_de_hoje() -> None:
     _, bloco = _gerar(relatorio="comparativo_dias")
 
     assert bloco is not None
+    assert bloco.periodo is not None
     assert (bloco.periodo.inicio, bloco.periodo.fim) == (SEGUNDA, SABADO)
     assert len(bloco.tabelas[0].linhas) == 6
 

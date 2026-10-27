@@ -1362,7 +1362,14 @@
       "type": "string"
     },
     "periodo": {
-      "$ref": "#/$defs/PeriodoRelatorio"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PeriodoRelatorio"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "meta": {
       "anyOf": [

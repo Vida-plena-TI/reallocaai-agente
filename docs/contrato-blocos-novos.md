@@ -15,7 +15,7 @@ desatualizados (regenerar: `uv run python scripts/gerar_exemplos_blocos.py`).
 | Regra | Detalhe |
 | --- | --- |
 | **Percentual é fração** | `0.8` = 80%. Vale para `meta`, para a métrica `ocupacao` e para todo valor com `formato: "percentual"`. Não é limitado a 1: acima de 1 indica inconsistência na planilha. O texto pronto para exibir está em `resumo[].exibicao` (ex.: `"23,6%"`). |
-| **Datas ISO** | `AAAA-MM-DD` (`periodo.inicio`, `periodo.fim`, `dias_nao_lidos[]`, todo campo `data` e toda coluna com `formato: "data"`). Horários são `HH:MM`. |
+| **Datas ISO** | `AAAA-MM-DD` (`periodo.inicio` e `periodo.fim` quando `periodo` não é `null`, `dias_nao_lidos[]`, todo campo `data` e toda coluna com `formato: "data"`). Horários são `HH:MM`. |
 | **Posto 1-based** | `posto` é o número de exibição, contado a partir de 1 (`>= 1` no schema). |
 | **`meta` sempre presente** | O campo nunca é omitido. É `null` quando não se aplica: sempre em `disponibilidade`, `convenio`, `agenda_paciente` e `qualidade_agenda`; em `tabela_generica`, é `0.8` quando o relatório pede `ocupacao` ou `slots_para_meta` e `null` nos demais. No schema: `required` e `number \| null`. |
 | **Booleanos JSON** | Valores booleanos (em `dados` e nas linhas das tabelas) saem como `true`/`false` do JSON, nunca como texto (`"Sim"`, `"Não"`, `"true"`). As colunas booleanas das tabelas (`abaixo_da_meta`, `aguardando_autorizacao`) vêm com `formato: "texto"`, porque o enum de formatos não tem booleano: o front decide como exibir. |
@@ -37,7 +37,7 @@ objetos do contrato.
 | `versao` | integer (`1`) | não (default `1`) | Versão do contrato; sempre sai `1`. |
 | `tipo` | string (enum) | sim | Um dos tipos do schema; igual a `dados.tipo`. |
 | `titulo` | string | sim | Pronto para exibir. |
-| `periodo` | `{inicio: date, fim: date}` | sim | Inclusive. |
+| `periodo` | `{inicio: date, fim: date}` \| `null` | sim | Inclusive. Sempre presente (nunca omitido). `null` só no plano semanal (`tabela_generica` com `relatorio: "plano_semanal"`), cuja fonte é a grade semanal, sem datas; todos os outros blocos trazem `{inicio, fim}`. |
 | `meta` | number \| null | sim | Ver regras gerais. |
 | `parcial` | boolean | sim | `true` exatamente quando `dias_nao_lidos` não é vazia. |
 | `dias_nao_lidos` | list[date] | sim | Ordenada, sem repetição. |
@@ -176,6 +176,10 @@ dia pedido). Usa o mesmo tipo `tabela_generica`, sem tipo novo de bloco. `relato
 identificador estável `"plano_semanal"`; `titulo` é legível (ex.: `"Plano semanal: quarta e
 quinta, das 10:00 às 12:00 (sessões de 30 min)"`). `dimensoes` e `metricas` vêm vazias,
 `total` é `{}`, `meta` é `null` e `linhas_omitidas` é `0`. Não traz paciente.
+**`periodo` é `null`** (presente, nunca omitido): a recorrência é a grade semanal, sem datas,
+e o bloco não traz data nenhuma; o dia vem só na coluna `dia`, como texto da grade
+(`"quinta-feira"`), em todas as linhas ("Plano", "Não coube" e "Alternativa"). Exemplo em
+[`exemplos-blocos/tabela_generica_plano_semanal.json`](exemplos-blocos/tabela_generica_plano_semanal.json).
 
 | Coluna | Formato | Valores |
 | --- | --- | --- |
@@ -193,3 +197,9 @@ janela (mesmo dia primeiro, depois outros dias; o `dia` da alternativa é o dia 
 acontece). `resumo`: um item por dia (`"3 de 4"`, formato `texto`) e `"Não couberam"`
 (`inteiro`). Tabela de exportação: **Plano** (mesmas colunas e linhas). `avisos` sempre traz
 que a recorrência usa a grade semanal e não vê feriados nem exceções.
+
+## Histórico de mudanças (versão 1)
+
+| Data | Mudança | Compatibilidade |
+| --- | --- | --- |
+| 2026-10-27 | `periodo` passou a aceitar `null` (o campo continua obrigatório e sempre presente). Só o plano semanal (`relatorio: "plano_semanal"`) envia `null`; nenhum outro tipo de bloco mudou. O schema (`bloco_relatorio.schema.json`) aceita `null` em qualquer tipo, por ser um envelope único. | Compatível: `versao` continua `1`. Quem guarda cópia do schema precisa atualizá-la, e quem exibe ou exporta o plano deve tratar `periodo` nulo (sem linha de período). |

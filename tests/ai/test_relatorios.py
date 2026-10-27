@@ -418,7 +418,7 @@ def test_titulo_do_agregado_traz_a_data_em_dd_mm_aaaa() -> None:
         mensagem_tool("consultar_ocupacao", {"data": dia.isoformat()}, fonte).artifact
     )
     assert bloco.titulo == "Ocupação de 05/10/2026"
-    assert bloco.periodo.inicio == dia
+    assert bloco.periodo is not None and bloco.periodo.inicio == dia
     assert isinstance(bloco.dados, DadosOcupacaoAgregada) and bloco.dados.data == dia
 
 

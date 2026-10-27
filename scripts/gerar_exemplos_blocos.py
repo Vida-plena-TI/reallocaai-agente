@@ -65,6 +65,15 @@ VARIANTES_GERAIS: dict[str, dict[str, Any]] = {
         "periodo_do_dia": "tarde",
     },
 }
+#: Arquivo -> argumentos de `planejar_semana` (sobre `fonte_clinica`).
+VARIANTES_PLANO: dict[str, dict[str, Any]] = {
+    "tabela_generica_plano_semanal.json": {
+        "dias_semana": ["quarta", "quinta"],
+        "especialidades": ["psicologia", "fonoaudiologia", "terapia_ocupacional"],
+        "hora_inicio": "10:00",
+        "hora_fim": "12:00",
+    },
+}
 ARQUIVO_SCHEMA = "bloco_relatorio.schema.json"
 
 
@@ -85,6 +94,9 @@ def gerar_exemplos() -> dict[str, str]:
     chamadas = [(arquivo, tools, nome, args) for arquivo, (nome, args) in VARIANTES.items()]
     chamadas += [
         (arquivo, gerais, "gerar_relatorio", args) for arquivo, args in VARIANTES_GERAIS.items()
+    ]
+    chamadas += [
+        (arquivo, gerais, "planejar_semana", args) for arquivo, args in VARIANTES_PLANO.items()
     ]
     arquivos: dict[str, str] = {}
     for arquivo, disponiveis, nome, args in chamadas:

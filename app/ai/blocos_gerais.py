@@ -210,12 +210,15 @@ def _bloco(
     resumo: list[ItemResumo],
     dados: object,
     tabelas: list[object],
+    *,
+    com_periodo: bool = True,
 ) -> BlocoRelatorio:
+    """Envelope comum. `com_periodo=False` só no plano semanal: `periodo` vai null."""
     return BlocoRelatorio.model_validate(
         {
             "tipo": tipo,
             "titulo": titulo,
-            "periodo": PeriodoRelatorio(inicio=foto.inicio, fim=foto.fim),
+            "periodo": PeriodoRelatorio(inicio=foto.inicio, fim=foto.fim) if com_periodo else None,
             "meta": meta,
             "parcial": foto.parcial,
             "dias_nao_lidos": foto.dias_nao_lidos,
@@ -1057,5 +1060,7 @@ def plano_semanal(
             linhas_omitidas=0,
         ),
         [tabela("Plano", COLUNAS_PLANO, linhas)],
+        # A recorrência é a grade semanal, sem datas: o bloco não inventa período.
+        com_periodo=False,
     )
     return "\n".join(texto), bloco

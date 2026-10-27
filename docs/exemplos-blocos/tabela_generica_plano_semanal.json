@@ -1,0 +1,393 @@
+{
+  "versao": 1,
+  "tipo": "tabela_generica",
+  "titulo": "Plano semanal: quarta e quinta, das 10:00 às 12:00 (sessões de 30 min)",
+  "periodo": null,
+  "meta": null,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "A recorrência semanal usa a grade semanal da planilha (uma fotografia da semana, sem datas): feriados e exceções do calendário não são vistos."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Quarta-feira",
+      "valor": "2 de 3",
+      "formato": "texto",
+      "exibicao": "2 de 3 especialidades"
+    },
+    {
+      "rotulo": "Quinta-feira",
+      "valor": "1 de 3",
+      "formato": "texto",
+      "exibicao": "1 de 3 especialidades"
+    },
+    {
+      "rotulo": "Não couberam",
+      "valor": 3,
+      "formato": "inteiro",
+      "exibicao": "3"
+    }
+  ],
+  "dados": {
+    "tipo": "tabela_generica",
+    "relatorio": "plano_semanal",
+    "dimensoes": [],
+    "metricas": [],
+    "colunas": [
+      {
+        "chave": "dia",
+        "rotulo": "Dia",
+        "formato": "texto"
+      },
+      {
+        "chave": "situacao",
+        "rotulo": "Situação",
+        "formato": "texto"
+      },
+      {
+        "chave": "especialidade",
+        "rotulo": "Especialidade",
+        "formato": "texto"
+      },
+      {
+        "chave": "horario",
+        "rotulo": "Horário",
+        "formato": "texto"
+      },
+      {
+        "chave": "profissional",
+        "rotulo": "Profissional",
+        "formato": "texto"
+      },
+      {
+        "chave": "sala",
+        "rotulo": "Sala",
+        "formato": "texto"
+      },
+      {
+        "chave": "posto",
+        "rotulo": "Posto",
+        "formato": "inteiro"
+      }
+    ],
+    "linhas": [
+      {
+        "dia": "quarta-feira",
+        "situacao": "Plano",
+        "especialidade": "Psicologia",
+        "horario": "10:00 às 10:30",
+        "profissional": "Ana Lima",
+        "sala": "Sala 1",
+        "posto": 1
+      },
+      {
+        "dia": "quarta-feira",
+        "situacao": "Plano",
+        "especialidade": "Fonoaudiologia",
+        "horario": "10:30 às 11:00",
+        "profissional": "Beto Reis",
+        "sala": "Sala 2",
+        "posto": 1
+      },
+      {
+        "dia": "quarta-feira",
+        "situacao": "Não coube",
+        "especialidade": "Terapia Ocupacional",
+        "horario": "—",
+        "profissional": "—",
+        "sala": "—",
+        "posto": null
+      },
+      {
+        "dia": "quarta-feira",
+        "situacao": "Alternativa",
+        "especialidade": "Terapia Ocupacional",
+        "horario": "13:30 às 14:00",
+        "profissional": "Cau Melo",
+        "sala": "Sala 2",
+        "posto": 2
+      },
+      {
+        "dia": "quarta-feira",
+        "situacao": "Alternativa",
+        "especialidade": "Terapia Ocupacional",
+        "horario": "14:00 às 14:30",
+        "profissional": "Cau Melo",
+        "sala": "Sala 2",
+        "posto": 2
+      },
+      {
+        "dia": "quarta-feira",
+        "situacao": "Alternativa",
+        "especialidade": "Terapia Ocupacional",
+        "horario": "14:30 às 15:00",
+        "profissional": "Cau Melo",
+        "sala": "Sala 2",
+        "posto": 2
+      },
+      {
+        "dia": "quinta-feira",
+        "situacao": "Plano",
+        "especialidade": "Psicologia",
+        "horario": "10:00 às 10:30",
+        "profissional": "Ana Lima",
+        "sala": "Sala 1",
+        "posto": 1
+      },
+      {
+        "dia": "quinta-feira",
+        "situacao": "Não coube",
+        "especialidade": "Fonoaudiologia",
+        "horario": "—",
+        "profissional": "—",
+        "sala": "—",
+        "posto": null
+      },
+      {
+        "dia": "segunda-feira",
+        "situacao": "Alternativa",
+        "especialidade": "Fonoaudiologia",
+        "horario": "09:30 às 10:00",
+        "profissional": "Beto Reis",
+        "sala": "Sala 2",
+        "posto": 1
+      },
+      {
+        "dia": "segunda-feira",
+        "situacao": "Alternativa",
+        "especialidade": "Fonoaudiologia",
+        "horario": "10:00 às 10:30",
+        "profissional": "Beto Reis",
+        "sala": "Sala 2",
+        "posto": 1
+      },
+      {
+        "dia": "segunda-feira",
+        "situacao": "Alternativa",
+        "especialidade": "Fonoaudiologia",
+        "horario": "10:30 às 11:00",
+        "profissional": "Beto Reis",
+        "sala": "Sala 2",
+        "posto": 1
+      },
+      {
+        "dia": "quinta-feira",
+        "situacao": "Não coube",
+        "especialidade": "Terapia Ocupacional",
+        "horario": "—",
+        "profissional": "—",
+        "sala": "—",
+        "posto": null
+      },
+      {
+        "dia": "quinta-feira",
+        "situacao": "Alternativa",
+        "especialidade": "Terapia Ocupacional",
+        "horario": "13:00 às 13:30",
+        "profissional": "Cau Melo",
+        "sala": "Sala 2",
+        "posto": 2
+      },
+      {
+        "dia": "quinta-feira",
+        "situacao": "Alternativa",
+        "especialidade": "Terapia Ocupacional",
+        "horario": "13:30 às 14:00",
+        "profissional": "Cau Melo",
+        "sala": "Sala 2",
+        "posto": 2
+      },
+      {
+        "dia": "quinta-feira",
+        "situacao": "Alternativa",
+        "especialidade": "Terapia Ocupacional",
+        "horario": "14:00 às 14:30",
+        "profissional": "Cau Melo",
+        "sala": "Sala 2",
+        "posto": 2
+      }
+    ],
+    "total": {},
+    "linhas_omitidas": 0
+  },
+  "tabelas": [
+    {
+      "nome": "Plano",
+      "colunas": [
+        {
+          "chave": "dia",
+          "rotulo": "Dia",
+          "formato": "texto"
+        },
+        {
+          "chave": "situacao",
+          "rotulo": "Situação",
+          "formato": "texto"
+        },
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "horario",
+          "rotulo": "Horário",
+          "formato": "texto"
+        },
+        {
+          "chave": "profissional",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "sala",
+          "rotulo": "Sala",
+          "formato": "texto"
+        },
+        {
+          "chave": "posto",
+          "rotulo": "Posto",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "dia": "quarta-feira",
+          "situacao": "Plano",
+          "especialidade": "Psicologia",
+          "horario": "10:00 às 10:30",
+          "profissional": "Ana Lima",
+          "sala": "Sala 1",
+          "posto": 1
+        },
+        {
+          "dia": "quarta-feira",
+          "situacao": "Plano",
+          "especialidade": "Fonoaudiologia",
+          "horario": "10:30 às 11:00",
+          "profissional": "Beto Reis",
+          "sala": "Sala 2",
+          "posto": 1
+        },
+        {
+          "dia": "quarta-feira",
+          "situacao": "Não coube",
+          "especialidade": "Terapia Ocupacional",
+          "horario": "—",
+          "profissional": "—",
+          "sala": "—",
+          "posto": null
+        },
+        {
+          "dia": "quarta-feira",
+          "situacao": "Alternativa",
+          "especialidade": "Terapia Ocupacional",
+          "horario": "13:30 às 14:00",
+          "profissional": "Cau Melo",
+          "sala": "Sala 2",
+          "posto": 2
+        },
+        {
+          "dia": "quarta-feira",
+          "situacao": "Alternativa",
+          "especialidade": "Terapia Ocupacional",
+          "horario": "14:00 às 14:30",
+          "profissional": "Cau Melo",
+          "sala": "Sala 2",
+          "posto": 2
+        },
+        {
+          "dia": "quarta-feira",
+          "situacao": "Alternativa",
+          "especialidade": "Terapia Ocupacional",
+          "horario": "14:30 às 15:00",
+          "profissional": "Cau Melo",
+          "sala": "Sala 2",
+          "posto": 2
+        },
+        {
+          "dia": "quinta-feira",
+          "situacao": "Plano",
+          "especialidade": "Psicologia",
+          "horario": "10:00 às 10:30",
+          "profissional": "Ana Lima",
+          "sala": "Sala 1",
+          "posto": 1
+        },
+        {
+          "dia": "quinta-feira",
+          "situacao": "Não coube",
+          "especialidade": "Fonoaudiologia",
+          "horario": "—",
+          "profissional": "—",
+          "sala": "—",
+          "posto": null
+        },
+        {
+          "dia": "segunda-feira",
+          "situacao": "Alternativa",
+          "especialidade": "Fonoaudiologia",
+          "horario": "09:30 às 10:00",
+          "profissional": "Beto Reis",
+          "sala": "Sala 2",
+          "posto": 1
+        },
+        {
+          "dia": "segunda-feira",
+          "situacao": "Alternativa",
+          "especialidade": "Fonoaudiologia",
+          "horario": "10:00 às 10:30",
+          "profissional": "Beto Reis",
+          "sala": "Sala 2",
+          "posto": 1
+        },
+        {
+          "dia": "segunda-feira",
+          "situacao": "Alternativa",
+          "especialidade": "Fonoaudiologia",
+          "horario": "10:30 às 11:00",
+          "profissional": "Beto Reis",
+          "sala": "Sala 2",
+          "posto": 1
+        },
+        {
+          "dia": "quinta-feira",
+          "situacao": "Não coube",
+          "especialidade": "Terapia Ocupacional",
+          "horario": "—",
+          "profissional": "—",
+          "sala": "—",
+          "posto": null
+        },
+        {
+          "dia": "quinta-feira",
+          "situacao": "Alternativa",
+          "especialidade": "Terapia Ocupacional",
+          "horario": "13:00 às 13:30",
+          "profissional": "Cau Melo",
+          "sala": "Sala 2",
+          "posto": 2
+        },
+        {
+          "dia": "quinta-feira",
+          "situacao": "Alternativa",
+          "especialidade": "Terapia Ocupacional",
+          "horario": "13:30 às 14:00",
+          "profissional": "Cau Melo",
+          "sala": "Sala 2",
+          "posto": 2
+        },
+        {
+          "dia": "quinta-feira",
+          "situacao": "Alternativa",
+          "especialidade": "Terapia Ocupacional",
+          "horario": "14:00 às 14:30",
+          "profissional": "Cau Melo",
+          "sala": "Sala 2",
+          "posto": 2
+        }
+      ]
+    }
+  ]
+}
