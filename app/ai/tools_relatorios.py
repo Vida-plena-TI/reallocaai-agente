@@ -171,6 +171,17 @@ class ArgsGerarRelatorio(BaseModel):
     periodo_do_dia: Literal["manha", "tarde"] | None = Field(
         default=None, description="Só manhã (antes das 12h) ou só tarde (depois das 13h)."
     )
+    hora_inicio: hora_do_dia | None = Field(
+        default=None,
+        description=(
+            "Início da janela de horário (HH:MM), quando o pedido citar uma ('das 10h às "
+            "12h'): só vagas que começam nele ou depois. Mais preciso que periodo_do_dia."
+        ),
+    )
+    hora_fim: hora_do_dia | None = Field(
+        default=None,
+        description="Fim da janela de horário (HH:MM): a vaga precisa terminar até ele.",
+    )
     duracao_minutos: int | None = Field(
         default=None,
         description="janelas_continuas: duração do atendimento em minutos (60 = 1 h, 90 = 1 h 30).",
@@ -309,6 +320,8 @@ def _filtros(foto: FotografiaPeriodo, args: ArgsGerarRelatorio) -> FiltrosRelato
         convenios=_resolver_convenios(args.convenios or []),
         dias_semana=frozenset(_DIAS_DA_SEMANA_POR_NOME[d] for d in args.dias_semana or []),
         periodos=frozenset({Periodo(args.periodo_do_dia)}) if args.periodo_do_dia else frozenset(),
+        hora_inicio=args.hora_inicio,
+        hora_fim=args.hora_fim,
     )
 
 
@@ -322,8 +335,16 @@ def _recorte(foto: FotografiaPeriodo, filtros: FiltrosRelatorio) -> str:
         *sorted(rotulo_convenio(c) for c in filtros.convenios),
         *(nomes_dias[d] for d in sorted(filtros.dias_semana)),
         *("manhã" if p is Periodo.MANHA else "tarde" for p in sorted(filtros.periodos)),
+        *([_rotulo_janela(filtros)] if filtros.hora_inicio or filtros.hora_fim else []),
     ]
     return f" ({' · '.join(partes)})" if partes else ""
+
+
+def _rotulo_janela(filtros: FiltrosRelatorio) -> str:
+    """`10:00-12:00`; o lado em branco vira a abertura ou o fechamento."""
+    inicio = filtros.hora_inicio or HORARIO_ABERTURA
+    fim = filtros.hora_fim or HORARIO_FECHAMENTO
+    return f"{inicio:%H:%M}-{fim:%H:%M}"
 
 
 def _avisos(foto: FotografiaPeriodo) -> list[str]:
@@ -359,6 +380,9 @@ def _ajustar_combinacao(args: ArgsGerarRelatorio) -> tuple[ArgsGerarRelatorio, l
         )
     if args.relatorio == "ranking_ocupacao" and args.dimensoes and len(args.dimensoes) != 1:
         raise ParametroInvalidoError("ranking_ocupacao aceita exatamente uma dimensão.")
+    inicio, fim = args.hora_inicio, args.hora_fim
+    if inicio is not None and fim is not None and fim <= inicio:
+        raise ParametroInvalidoError("hora_fim precisa ser depois de hora_inicio.")
 
     # "Vagas de 1 h" é pedido de janela contínua.
     if args.relatorio == "vagas_livres" and args.duracao_minutos is not None:
@@ -422,9 +446,9 @@ def vagas_de_um_dia(
 ) -> tuple[str, dict[str, Any] | None, int]:
     """Vagas de um dia pelo mesmo caminho de `gerar_relatorio(vagas_livres, inicio=fim=dia)`.
 
-    É o núcleo de `consultar_disponibilidade`. A janela [`inicio`, `fim`] é
-    aplicada nos slots antes de agrupar (a vaga precisa começar em `inicio` ou
-    depois e terminar em `fim` ou antes). Devolve o texto, o bloco
+    É o núcleo de `consultar_disponibilidade`. A janela [`inicio`, `fim`] é o
+    filtro de horário do motor (a vaga precisa começar em `inicio` ou depois e
+    terminar em `fim` ou antes). Devolve o texto, o bloco
     `disponibilidade` em JSON e quantas faixas ele tem; `None` sem agenda.
     """
     foto = fotografar_periodo(fonte, dia, dia)
@@ -441,25 +465,13 @@ def vagas_de_um_dia(
             None,
             0,
         )
-    if inicio is not None or fim is not None:
-        foto = foto.model_copy(
-            update={
-                "slots": [
-                    slot
-                    for slot in foto.slots
-                    if (inicio is None or slot.hora_inicio >= inicio)
-                    and (fim is None or slot.hora_fim <= fim)
-                ]
-            }
-        )
     filtros = FiltrosRelatorio(
         profissional_ids=frozenset({profissional_id}) if profissional_id else frozenset(),
         especialidades=frozenset({especialidade}) if especialidade else frozenset(),
+        hora_inicio=inicio,
+        hora_fim=fim,
     )
     recorte = _recorte(foto, filtros)
-    if inicio is not None or fim is not None:
-        janela = f"{(inicio or HORARIO_ABERTURA):%H:%M}-{(fim or HORARIO_FECHAMENTO):%H:%M}"
-        recorte = f"{recorte[:-1]} · {janela})" if recorte else f" ({janela})"
     relatorio = vagas_livres(foto, filtros, 1)
     texto, bloco = blocos_gerais.disponibilidade(foto, relatorio, _avisos(foto), recorte)
     return texto, bloco.model_dump(mode="json"), len(relatorio.faixas)
@@ -711,7 +723,8 @@ def criar_tools_relatorios(fonte: ScheduleDataSource, data_referencia: date) -> 
         janelas_continuas; ranking_ocupacao; comparativo_dias; convenios e autorizações
         pendentes; qualidade_agenda (buracos); salas_ociosas; capacidade_especialidade;
         agenda_paciente (só com o nome pedido pelo usuário); ou qualquer cruzamento ->
-        personalizado com dimensoes e metricas. Os números já vêm calculados: não recalcule.
+        personalizado com dimensoes e metricas. Janela de horário ("das 10h às 12h") ->
+        hora_inicio/hora_fim, não periodo_do_dia. Os números já vêm calculados: não recalcule.
         UMA chamada cobre o período inteiro: nunca chame uma vez por dia.
         """
         args = ArgsGerarRelatorio.model_validate(kwargs)

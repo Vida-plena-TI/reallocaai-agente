@@ -6,9 +6,9 @@ impedem um estado inválido de ser construído.
 
 from datetime import date, time
 from itertools import pairwise
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.domain.constants import (
     DURACAO_SLOT_MINUTOS,
@@ -123,12 +123,13 @@ class ItemSolicitacao(BaseModel):
 
     `profissional_id`, quando informado, restringe a busca a esse profissional
     específico (continuidade terapêutica); quando `None`, qualquer profissional
-    disponível daquela especialidade serve.
+    disponível daquela especialidade serve. `especialidade` `None` = qualquer
+    especialidade da agenda do dia ("pode ser qualquer uma").
     """
 
     model_config = ConfigDict(validate_assignment=True)
 
-    especialidade: Especialidade
+    especialidade: Especialidade | None
     duracao_em_slots: int = Field(ge=1)
     profissional_id: str | None = None
 
@@ -154,6 +155,9 @@ class SolicitacaoAtendimento(BaseModel):
     #: Horário exato desejado, quando o paciente/família pediu um horário
     #: específico.
     horario_desejado: time | None = None
+    #: Nunca sugerir opção que termine depois deste horário (fechado no início,
+    #: aberto no fim: com 12:00, 11:30-12:00 serve e 11:30-12:30 não).
+    horario_maximo: time | None = None
 
     @field_validator("horario_minimo")
     @classmethod
@@ -166,6 +170,22 @@ class SolicitacaoAtendimento(BaseModel):
         if horario_desejado is None:
             return None
         return _validar_horario_no_expediente(horario_desejado, campo="horario_desejado")
+
+    @field_validator("horario_maximo")
+    @classmethod
+    def _validar_horario_maximo_no_expediente(cls, horario_maximo: time | None) -> time | None:
+        if horario_maximo is None:
+            return None
+        return _validar_horario_no_expediente(horario_maximo, campo="horario_maximo")
+
+    @model_validator(mode="after")
+    def _validar_janela(self) -> Self:
+        if self.horario_maximo is not None and self.horario_maximo <= self.horario_minimo:
+            raise ValueError(
+                f"horario_maximo {self.horario_maximo:%H:%M} precisa ser depois de "
+                f"horario_minimo {self.horario_minimo:%H:%M}."
+            )
+        return self
 
     @property
     def total_de_slots(self) -> int:

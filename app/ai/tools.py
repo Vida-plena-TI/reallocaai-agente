@@ -543,11 +543,16 @@ def _formatar_resultado_encaixe(
     resultado: ResultadoBuscaEncaixe,
     horario_minimo: time,
     duracao_total_minutos: int,
+    horario_maximo: time | None = None,
+    quantidade_de_itens: int = 1,
 ) -> str:
     """Texto de `buscar_encaixe` para cada um dos três resultados possíveis.
 
-    `horario_minimo` e `duracao_total_minutos` só entram no texto de "nenhum":
-    deixam explícito que o dia inteiro foi varrido, e não só o horário pedido.
+    `horario_minimo`, `horario_maximo` e `duracao_total_minutos` só entram no
+    texto de "nenhum": deixam explícito que a janela inteira foi varrida, e não
+    só o horário pedido. Com 2 ou mais itens, "nenhum" quer dizer que não há
+    horários SEGUIDOS; o texto diz isso e aponta `planejar_semana`, que monta
+    uma sessão por especialidade sem exigir que sejam seguidas.
     """
     if isinstance(resultado, ResultadoExato):
         return "Horário encontrado:\n" + _formatar_opcao_encaixe(fonte, dia, resultado.opcao)
@@ -560,12 +565,29 @@ def _formatar_resultado_encaixe(
         ]
         return "Não há vaga exatamente no horário pedido. Alternativas:\n\n" + "\n\n".join(blocos)
 
+    if quantidade_de_itens >= 2:
+        limite = (
+            f"{horario_maximo:%H:%M}"
+            if horario_maximo is not None
+            else f"o fechamento ({HORARIO_FECHAMENTO:%H:%M})"
+        )
+        return (
+            f"Em {dia.strftime('%d/%m/%Y')}, de {horario_minimo:%H:%M} até {limite}, não há "
+            f"horários SEGUIDOS para as {quantidade_de_itens} especialidades, uma logo "
+            "após a outra. Se elas não precisam ser seguidas (uma sessão de cada, em "
+            "qualquer horário da janela, sem se sobrepor), use planejar_semana: ele monta "
+            "o plano por dia e diz o que não coube, com alternativas."
+        )
+    varrido = (
+        f"A janela inteira foi verificada, de {horario_minimo:%H:%M} até {horario_maximo:%H:%M}"
+        if horario_maximo is not None
+        else f"O dia inteiro foi verificado, de {horario_minimo:%H:%M} até o fechamento "
+        f"({HORARIO_FECHAMENTO:%H:%M})"
+    )
     return (
         f"Nenhum horário disponível em {dia.strftime('%d/%m/%Y')} para essa combinação "
-        f"de especialidades. O dia inteiro foi verificado, de "
-        f"{horario_minimo.strftime('%H:%M')} até o fechamento "
-        f"({HORARIO_FECHAMENTO.strftime('%H:%M')}), e não existe nenhum bloco contínuo "
-        f"livre de {duracao_total_minutos} minutos que atenda ao pedido."
+        f"de especialidades. {varrido}, e não existe nenhum bloco contínuo livre de "
+        f"{duracao_total_minutos} minutos que atenda ao pedido."
     )
 
 
@@ -577,7 +599,13 @@ class ArgsBuscarPaciente(BaseModel):
 class ItemDemandaEntrada(BaseModel):
     """Um item de demanda de `buscar_encaixe`, na unidade que a LLM conhece (minutos)."""
 
-    especialidade: Especialidade = Field(description="Especialidade do atendimento pedido.")
+    especialidade: Especialidade | None = Field(
+        default=None,
+        description=(
+            "Especialidade do atendimento pedido. Em branco = qualquer especialidade "
+            '("pode ser qualquer uma").'
+        ),
+    )
     duracao_minutos: int = Field(
         gt=0,
         description=(
@@ -617,6 +645,13 @@ class ArgsBuscarEncaixe(BaseModel):
         description=(
             "Horário mais cedo aceitável para o início do atendimento (HH:MM). "
             "Deixe em branco para usar o padrão da clínica."
+        ),
+    )
+    horario_maximo: time | None = Field(
+        default=None,
+        description=(
+            "Horário-limite para o FIM do atendimento (HH:MM), quando o pedido citar uma "
+            "janela ('entre 10h e 12h' -> 12:00). Em branco: até o fechamento."
         ),
     )
     horario_desejado: time | None = Field(
@@ -743,7 +778,7 @@ def criar_tools(
         catalogo = catalogo_ou_nada(fonte, data_referencia)
     validas = especialidades_validas(catalogo)
     especialidade = tipo_especialidade(validas)
-    args_item = _com_especialidade(ItemDemandaEntrada, especialidade, opcional=False)
+    args_item = _com_especialidade(ItemDemandaEntrada, especialidade, opcional=True)
     args_buscar_encaixe = create_model(
         "ArgsBuscarEncaixe",
         __base__=ArgsBuscarEncaixe,
@@ -821,6 +856,7 @@ def criar_tools(
         paciente: str | None = None,
         horario_minimo: time | None = None,
         horario_desejado: time | None = None,
+        horario_maximo: time | None = None,
     ) -> str:
         """Busca um horário de encaixe, casando uma ou mais especialidades sem buraco entre elas.
 
@@ -830,7 +866,10 @@ def criar_tools(
         horário (sessões longas, várias especialidades em sequência,
         alternativas). O paciente é opcional e pode ser qualquer nome, esteja
         ou não na agenda: chame direto, sem verificar o paciente antes com
-        `buscar_paciente`.
+        `buscar_paciente`. Janela "entre 10h e 12h": horario_minimo 10:00 e
+        horario_maximo 12:00. "Qualquer especialidade": item sem especialidade.
+        Várias especialidades que NÃO precisam ser seguidas (uma sessão de cada,
+        ou toda semana em certos dias) -> `planejar_semana`.
         """
         nota = ""
         try:
@@ -876,7 +915,11 @@ def criar_tools(
 
             itens_brutos = [
                 ItemDemandaBruta(
-                    especialidade=como_especialidade(item.especialidade),
+                    especialidade=(
+                        como_especialidade(item.especialidade)
+                        if item.especialidade is not None
+                        else None
+                    ),
                     duracao_em_slots=math.ceil(item.duracao_minutos / DURACAO_SLOT_MINUTOS),
                     profissional_id=fixado.id if fixado is not None else None,
                 )
@@ -885,6 +928,11 @@ def criar_tools(
             horario_minimo_efetivo = (
                 horario_minimo if horario_minimo is not None else HORARIO_PREFERENCIAL_PADRAO
             )
+            if horario_maximo is not None and horario_maximo <= horario_minimo_efetivo:
+                return (
+                    f"O horário-limite ({horario_maximo:%H:%M}) precisa ser depois do "
+                    f"horário mínimo ({horario_minimo_efetivo:%H:%M})."
+                ) + nota
             resultado = buscar_encaixe(
                 fonte,
                 continuidade_efetiva,
@@ -893,6 +941,7 @@ def criar_tools(
                 itens_brutos,
                 horario_minimo=horario_minimo_efetivo,
                 horario_desejado=horario_desejado,
+                horario_maximo=horario_maximo,
             )
         except Exception as erro:
             return f"Erro ao buscar encaixe: {erro}"
@@ -902,13 +951,19 @@ def criar_tools(
             and fixados[0] is not None
             and not isinstance(resultado, ResultadoExato | ResultadoAlternativas)
         ):
-            return texto_sem_vaga(fixados[0], data, horario_minimo_efetivo, None) + nota
+            return texto_sem_vaga(fixados[0], data, horario_minimo_efetivo, horario_maximo) + nota
         duracao_total_minutos = sum(
             item.duracao_em_slots * DURACAO_SLOT_MINUTOS for item in itens_brutos
         )
         return (
             _formatar_resultado_encaixe(
-                fonte, data, resultado, horario_minimo_efetivo, duracao_total_minutos
+                fonte,
+                data,
+                resultado,
+                horario_minimo_efetivo,
+                duracao_total_minutos,
+                horario_maximo,
+                len(itens_brutos),
             )
             + nota
         )

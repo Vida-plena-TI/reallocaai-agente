@@ -215,7 +215,8 @@ class ItemDemandaBruta(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    especialidade: Especialidade
+    #: `None` = qualquer especialidade da agenda do dia.
+    especialidade: Especialidade | None
     duracao_em_slots: int = Field(ge=1)
     profissional_id: str | None = None
 
@@ -228,19 +229,25 @@ def montar_solicitacao(
     itens: list[ItemDemandaBruta],
     horario_minimo: time,
     horario_desejado: time | None,
+    horario_maximo: time | None = None,
 ) -> SolicitacaoAtendimento:
     """Monta a `SolicitacaoAtendimento` resolvendo continuidade item a item.
 
     Um item sem `profissional_id` consulta
     `continuidade.profissional_habitual` e o preenche se houver retorno; um
-    item que já veio com `profissional_id` explícito nunca é sobrescrito.
+    item que já veio com `profissional_id` explícito nunca é sobrescrito, e um
+    item sem especialidade ("qualquer uma") não tem profissional habitual.
     """
     itens_resolvidos = [
         ItemSolicitacao(
             especialidade=item.especialidade,
             duracao_em_slots=item.duracao_em_slots,
             profissional_id=item.profissional_id
-            or continuidade.profissional_habitual(paciente_id, item.especialidade),
+            or (
+                continuidade.profissional_habitual(paciente_id, item.especialidade)
+                if item.especialidade is not None
+                else None
+            ),
         )
         for item in itens
     ]
@@ -250,6 +257,7 @@ def montar_solicitacao(
         itens=itens_resolvidos,
         horario_minimo=horario_minimo,
         horario_desejado=horario_desejado,
+        horario_maximo=horario_maximo,
     )
 
 
@@ -296,6 +304,7 @@ def buscar_encaixe(
     itens: list[ItemDemandaBruta],
     horario_minimo: time,
     horario_desejado: time | None,
+    horario_maximo: time | None = None,
 ) -> ResultadoBuscaEncaixe:
     """Orquestra a busca de encaixe: monta a solicitação e delega à engine.
 
@@ -310,7 +319,14 @@ def buscar_encaixe(
     direto, já que não existe "alternativa" para um pedido sem horário certo.
     """
     solicitacao = montar_solicitacao(
-        fonte, continuidade, paciente_id, data, itens, horario_minimo, horario_desejado
+        fonte,
+        continuidade,
+        paciente_id,
+        data,
+        itens,
+        horario_minimo,
+        horario_desejado,
+        horario_maximo,
     )
 
     opcao = buscar_melhor_encaixe(fonte, solicitacao)
