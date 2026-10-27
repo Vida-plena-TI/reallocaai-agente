@@ -231,6 +231,56 @@ def intervalos(turno: TurnoObservado) -> list[tuple[time, time]]:
     return achados
 
 
+#: `dados.relatorio` e valores de `situacao` da tabela do plano semanal
+#: (`planejar_semana`); repetidos aqui para o critério não depender de `app`.
+RELATORIO_PLANO = "plano_semanal"
+SITUACAO_PLANO = "Plano"
+
+
+@dataclass(frozen=True)
+class SessaoDoPlano:
+    dia: str
+    inicio: time
+    fim: time
+    sala: str
+    especialidade: str
+
+
+def linhas_do_plano(turnos: Sequence[TurnoObservado], situacao: str) -> list[dict[str, Any]]:
+    """Linhas da tabela do plano semanal com essa `situacao`, em todos os blocos."""
+    return [
+        linha
+        for turno in turnos
+        for bloco in turno.blocos
+        if bloco.get("dados", {}).get("relatorio") == RELATORIO_PLANO
+        for linha in bloco["dados"]["linhas"]
+        if linha.get("situacao") == situacao
+    ]
+
+
+def sessoes_do_plano(turnos: Sequence[TurnoObservado]) -> list[SessaoDoPlano] | None:
+    """As sessões "Plano" da tabela; `None` quando o turno não trouxe plano."""
+    if not any(
+        bloco.get("dados", {}).get("relatorio") == RELATORIO_PLANO
+        for turno in turnos
+        for bloco in turno.blocos
+    ):
+        return None
+    sessoes: list[SessaoDoPlano] = []
+    for linha in linhas_do_plano(turnos, SITUACAO_PLANO):
+        inicio, _, fim = str(linha["horario"]).partition(" às ")
+        sessoes.append(
+            SessaoDoPlano(
+                dia=_normalizar(str(linha["dia"])).split("-")[0],
+                inicio=_hora(inicio),
+                fim=_hora(fim),
+                sala=str(linha["sala"]),
+                especialidade=str(linha["especialidade"]),
+            )
+        )
+    return sessoes
+
+
 def _erro(turnos: Sequence[TurnoObservado]) -> str | None:
     return next((turno.erro for turno in turnos if turno.erro), None)
 
@@ -304,7 +354,14 @@ def _vagas_dentro_da_janela(
     c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
 ) -> ResultadoCriterio:
     inicio, fim = _hora(c.params["inicio"]), _hora(c.params["fim"])
-    achados = [faixa for turno in turnos for faixa in intervalos(turno)]
+    # Com plano semanal, só as sessões "Plano" contam: as alternativas ficam
+    # fora da janela de propósito.
+    plano = sessoes_do_plano(turnos)
+    achados = (
+        [(s.inicio, s.fim) for s in plano]
+        if plano is not None
+        else [faixa for turno in turnos for faixa in intervalos(turno)]
+    )
     if not achados:
         return _resultado(c, False, "nenhuma vaga devolvida")
     fora = sorted({faixa for faixa in achados if faixa[0] < inicio or faixa[1] > fim})
@@ -319,9 +376,12 @@ _DIA_NO_TEXTO = re.compile(r"segunda|terca|quarta|quinta|sexta|sabado|\b\d{2}/\d
 def _sem_sobreposicao_no_dia(
     c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
 ) -> ResultadoCriterio:
-    """Sessões (`HH:MM às HH:MM`) de uma mesma seção de dia não se cruzam."""
+    """Sessões de um mesmo dia não se cruzam: as "Plano" da tabela do plano semanal,
+    ou, sem ela, as `HH:MM às HH:MM` de cada seção de dia do texto."""
     secoes: dict[str, list[tuple[time, time]]] = {}
-    for turno in turnos:
+    for sessao in sessoes_do_plano(turnos) or []:
+        secoes.setdefault(sessao.dia, []).append((sessao.inicio, sessao.fim))
+    for turno in turnos if not secoes else []:
         secao = ""
         for linha in turno.visivel.splitlines():
             achado = _DIA_NO_TEXTO.search(_normalizar(linha))
@@ -348,8 +408,47 @@ def _nao_coube_com_alternativas(
     c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
 ) -> ResultadoCriterio:
     texto = _normalizar(" ".join(turno.visivel for turno in turnos))
-    tem = {"nao coube": "nao coube" in texto, "alternativa": "alternativa" in texto}
+    tem = {
+        "nao coube": "nao coube" in texto or bool(linhas_do_plano(turnos, "Não coube")),
+        "alternativa": "alternativa" in texto or bool(linhas_do_plano(turnos, "Alternativa")),
+    }
+    especialidade = c.params.get("especialidade")
+    if especialidade is not None:
+        nao_couberam = {str(n["especialidade"]) for n in linhas_do_plano(turnos, "Não coube")}
+        tem[f"{especialidade} nao coube"] = especialidade in nao_couberam
     return _resultado(c, all(tem.values()), f"{tem}")
+
+
+def _meias_horas(inicio: time, fim: time) -> list[time]:
+    """`10:00`, `10:30` para uma sessão de 10:00 às 11:00."""
+    momento, limite = datetime.combine(date.min, inicio), datetime.combine(date.min, fim)
+    horas: list[time] = []
+    while momento < limite:
+        horas.append(momento.time())
+        momento += timedelta(minutes=30)
+    return horas
+
+
+@_sobre_a_saida
+def _plano_em_vagas_reais(
+    c: Criterio, turnos: Sequence[TurnoObservado], ctx: Contexto
+) -> ResultadoCriterio:
+    """Cada slot de cada sessão "Plano" é uma célula vazia da grade crua (oráculo)."""
+    plano = sessoes_do_plano(turnos)
+    if not plano:
+        return _resultado(c, False, "sem sessões de plano")
+    livres = {
+        (dia, vaga.sala, vaga.hora)
+        for dia in {s.dia for s in plano}
+        for vaga in oraculo.vagas(ctx.payload, ctx.semana[dia])
+    }
+    falsas = [
+        f"{s.dia} {s.sala} {momento.strftime('%H:%M')}"
+        for s in plano
+        for momento in _meias_horas(s.inicio, s.fim)
+        if (s.dia, _numero_da_sala(s.sala), momento) not in livres
+    ]
+    return _resultado(c, not falsas, f"{len(plano)} sessão(ões); sem vaga: {', '.join(falsas[:5])}")
 
 
 @_sobre_a_saida
@@ -507,6 +606,7 @@ CRITERIOS: dict[
     "vagas_dentro_da_janela": _vagas_dentro_da_janela,
     "sem_sobreposicao_no_dia": _sem_sobreposicao_no_dia,
     "nao_coube_com_alternativas": _nao_coube_com_alternativas,
+    "plano_em_vagas_reais": _plano_em_vagas_reais,
     "frase_proibida": _frase_proibida,
     "vocabulario_proibido": _vocabulario_proibido,
     "nao_pede_atendimento_id": _nao_pede_atendimento_id,

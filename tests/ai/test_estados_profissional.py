@@ -143,6 +143,11 @@ CHAMADAS_COM_APELIDO: dict[str, dict[str, Any]] = {
     "consultar_pacientes_por_profissional": {"profissional": "beatriz"},
     "consultar_profissionais": {"nomes": ["beatriz"]},
     "gerar_relatorio": {"relatorio": "vagas_livres", "profissionais": ["beatriz"]},
+    "planejar_semana": {
+        "dias_semana": ["quinta"],
+        "especialidades": ["fonoaudiologia"],
+        "profissionais_preferidos": ["beatriz"],
+    },
 }
 
 

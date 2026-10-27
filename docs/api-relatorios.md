@@ -78,6 +78,8 @@ Corpo (JSON). Só `relatorio` é obrigatório. Campo desconhecido devolve `422`.
 | `convenios` | lista de texto | `unimed`, `klini`, `sulamerica`, `particular`, `nao_informado`. |
 | `dias_semana` | lista | `segunda` … `sabado`, dentro do período. |
 | `periodo_do_dia` | `manha` \| `tarde` | Só manhã (antes das 12h) ou só tarde (a partir das 13h). |
+| `hora_inicio` | `HH:MM` | Janela de horário: só slots que começam neste horário ou depois. |
+| `hora_fim` | `HH:MM` | Janela de horário: só slots que terminam até este horário (fechada no início, aberta no fim: com 10:00 a 12:00, 11:30-12:00 entra e 09:30-10:00 não). Precisa ser depois de `hora_inicio`. |
 | `duracao_minutos` | inteiro | `janelas_continuas`: duração do atendimento (60 = 1 h, 90 = 1 h 30). |
 | `dimensoes` | lista | `personalizado`: por onde agrupar; `ranking_ocupacao`: uma dimensão. |
 | `metricas` | lista | `personalizado` (obrigatório): o que calcular. |

@@ -41,20 +41,18 @@
 - id: c02
   descricao: Encaixe na terça de manhã, entre 10h e 12h, 30 min, qualquer especialidade
   hoje: 2026-09-28
-  xfail: >-
-    buscar_encaixe não tem limite de término nem aceita "qualquer
-    especialidade": com as fonos lotadas das 10h às 12h, devolve a tarde, e
-    a vaga de psicologia das 10:00 nem é procurada.
   turnos:
     - pergunta: >-
         tenho um paciente pra encaixar na terça de manhã, entre 10h e 12h,
         30 minutos, pode ser qualquer especialidade. o que tem?
+      # Item sem especialidade = qualquer uma; horario_maximo fecha a janela.
       chamada:
         tool: buscar_encaixe
         args:
           data: "{terca}"
-          itens: [{especialidade: fonoaudiologia, duracao_minutos: 30}]
+          itens: [{duracao_minutos: 30}]
           horario_minimo: "10:00"
+          horario_maximo: "12:00"
           horario_desejado: "10:00"
   criterios:
     - {tipo: vagas_dentro_da_janela, inicio: "10:00", fim: "12:00"}
@@ -62,9 +60,6 @@
 - id: c03
   descricao: Disponibilidade quarta e quinta, fono e psicomotricidade, 10h às 12h
   hoje: 2026-09-28
-  xfail: >-
-    gerar_relatorio não tem janela de horário, só manhã/tarde: as faixas das
-    07:00 às 10:00 entram junto.
   turnos:
     - pergunta: >-
         quais as vagas de fono e psicomotricidade na quarta e na quinta,
@@ -76,7 +71,8 @@
           inicio: "{quarta}"
           fim: "{quinta}"
           especialidades: [fono, psicomotricidade]
-          periodo_do_dia: manha
+          hora_inicio: "10:00"
+          hora_fim: "12:00"
   criterios:
     - {tipo: bloco_presente, bloco: disponibilidade}
     - {tipo: vagas_dentro_da_janela, inicio: "10:00", fim: "12:00"}
@@ -84,27 +80,29 @@
 - id: c04
   descricao: Plano semanal quarta e quinta, 4 especialidades de 30 min, 10h às 12h
   hoje: 2026-09-28
-  xfail: Ainda não existe a tool de plano semanal (planejar_semana).
   turnos:
     - pergunta: >-
         monta pra mim um plano na quarta e na quinta, das 10h às 12h, com
         fono, psicomotricidade, psicologia e terapia ocupacional, 30 minutos
         cada
+      # Recorrência pela grade semanal: dias da semana, não datas.
       chamada:
         tool: planejar_semana
         args:
-          dias: ["{quarta}", "{quinta}"]
-          inicio: "10:00"
-          fim: "12:00"
-          itens:
-            - {especialidade: fonoaudiologia, duracao_minutos: 30}
-            - {especialidade: psicomotricidade, duracao_minutos: 30}
-            - {especialidade: psicologia, duracao_minutos: 30}
-            - {especialidade: terapia_ocupacional, duracao_minutos: 30}
+          dias_semana: [quarta, quinta]
+          especialidades: [fonoaudiologia, psicomotricidade, psicologia, terapia_ocupacional]
+          hora_inicio: "10:00"
+          hora_fim: "12:00"
+          duracao_minutos: 30
   criterios:
+    # Os três primeiros olham só as linhas "Plano" da tabela: as alternativas
+    # ficam fora da janela de propósito.
     - {tipo: sem_sobreposicao_no_dia}
     - {tipo: vagas_dentro_da_janela, inicio: "10:00", fim: "12:00"}
-    - {tipo: nao_coube_com_alternativas}
+    - {tipo: plano_em_vagas_reais}
+    - {tipo: nao_coube_com_alternativas, especialidade: Terapia Ocupacional}
+    - {tipo: max_chamadas_planilha, maximo: 1}
+    - {tipo: max_segundos, maximo: 20}
     - tipo: frase_proibida
       frases: ["bloco contínuo de 120 minutos", "cada data foi verificada"]
 

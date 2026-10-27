@@ -20,7 +20,7 @@ mesmos números:
 
 from collections import defaultdict
 from collections.abc import Callable, Iterable
-from datetime import date
+from datetime import date, time
 from enum import StrEnum
 from typing import Final
 
@@ -149,6 +149,11 @@ class FiltrosRelatorio(BaseModel):
     #: `date.weekday()`, de 0 (segunda) a 5 (sábado).
     dias_semana: frozenset[int] = frozenset()
     periodos: frozenset[Periodo] = frozenset()
+    #: Janela de horário: o slot começa em `hora_inicio` ou depois e termina em
+    #: `hora_fim` ou antes (fechada no início, aberta no fim: 11:30-12:00 cabe
+    #: em 10:00-12:00; 09:30-10:00 não). `None` = sem limite daquele lado.
+    hora_inicio: time | None = None
+    hora_fim: time | None = None
 
     def aceita(self, slot: SlotFotografado) -> bool:
         """Se o slot entra no recorte."""
@@ -161,6 +166,10 @@ class FiltrosRelatorio(BaseModel):
         if self.dias_semana and slot.data.weekday() not in self.dias_semana:
             return False
         if self.periodos and slot.periodo not in self.periodos:
+            return False
+        if self.hora_inicio is not None and slot.hora_inicio < self.hora_inicio:
+            return False
+        if self.hora_fim is not None and slot.hora_fim > self.hora_fim:
             return False
         return not self.convenios or (
             slot.convenio is not None and bool(self.convenios & set(slot.convenio.split("+")))
@@ -198,6 +207,9 @@ class ConsultaRelatorio(BaseModel):
             raise ConsultaInvalidaError(
                 f"ordenar_por='{self.ordenar_por.value}' precisa estar entre as dimensões pedidas."
             )
+        inicio, fim = self.filtros.hora_inicio, self.filtros.hora_fim
+        if inicio is not None and fim is not None and fim <= inicio:
+            raise ConsultaInvalidaError("O fim da janela de horário precisa ser depois do início.")
         if self.slots_por_janela > MAX_SLOTS_POR_JANELA:
             raise ConsultaInvalidaError(
                 f"Janela de {self.slots_por_janela} slots é longa demais: o máximo é "

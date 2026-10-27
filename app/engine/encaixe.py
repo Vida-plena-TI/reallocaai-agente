@@ -149,9 +149,13 @@ def _resolver_item(
     # escolhe o profissional de id lexicograficamente menor e, dentro dele, o
     # menor posto.
     profissional_id, sala_id, indice_posto = min(candidatos)
+    # Item sem especialidade ("qualquer uma"): vale a de quem foi escolhido.
+    especialidade = item.especialidade or next(
+        d.especialidade for d in disponiveis if d.profissional_id == profissional_id
+    )
 
     return ItemEncaixeResolvido(
-        especialidade=item.especialidade,
+        especialidade=especialidade,
         profissional_id=profissional_id,
         sala_id=sala_id,
         indice_posto=indice_posto,
@@ -195,6 +199,7 @@ def _tentar_a_partir_de(
     """Tenta montar uma `OpcaoEncaixe` começando exatamente em
     `horario_inicio_candidato`, testando todas as ordens possíveis dos itens.
 
+    Opção que termina depois de `solicitacao.horario_maximo` não conta.
     Desempate simples e determinístico (não é regra de negócio): a primeira
     ordem que funcionar, seguindo a sequência que `itertools.permutations`
     gera a partir da ordem original de `solicitacao.itens`, é a escolhida.
@@ -203,10 +208,15 @@ def _tentar_a_partir_de(
         opcao = _tentar_ordem(
             fonte, solicitacao.data, ordem, horario_inicio_candidato, excluir_atendimento_id
         )
-        if opcao is not None:
+        if opcao is not None and _termina_a_tempo(solicitacao, opcao):
             return opcao
 
     return None
+
+
+def _termina_a_tempo(solicitacao: SolicitacaoAtendimento, opcao: OpcaoEncaixe) -> bool:
+    """A opção termina até `horario_maximo` (sem limite quando ele é `None`)."""
+    return solicitacao.horario_maximo is None or opcao.horario_fim <= solicitacao.horario_maximo
 
 
 def _horarios_de_inicio_do_dia(dia: date, piso: time) -> list[time]:

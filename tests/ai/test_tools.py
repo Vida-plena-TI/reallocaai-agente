@@ -331,7 +331,7 @@ def test_buscar_encaixe_tool_retorna_nenhum_sem_opcao() -> None:
     )
 
 
-def test_buscar_encaixe_tool_nenhum_informa_horario_minimo_e_duracao_total() -> None:
+def test_buscar_encaixe_tool_nenhum_com_varios_itens_fala_de_horarios_seguidos() -> None:
     origem = FakeScheduleDataSource(pacientes={DIA: [PACIENTE_UM]})
     tool = _tool(origem, _continuidade_vazia(), "buscar_encaixe")
 
@@ -348,7 +348,9 @@ def test_buscar_encaixe_tool_nenhum_informa_horario_minimo_e_duracao_total() -> 
     )
 
     assert "de 07:00 até o fechamento (18:00)" in resultado
-    assert "bloco contínuo livre de 60 minutos" in resultado
+    assert "não há horários SEGUIDOS para as 2 especialidades" in resultado
+    assert "planejar_semana" in resultado
+    assert "bloco contínuo" not in resultado
 
 
 def _origem_com_ana_livre() -> FakeScheduleDataSource:

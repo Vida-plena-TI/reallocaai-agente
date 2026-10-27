@@ -168,3 +168,28 @@ Relatórios `ranking_ocupacao`, `comparativo_dias`, `salas_ociosas`,
 
 Tabelas: **Resultado** (mesmas colunas e linhas de `dados`) e **Total** (colunas de métrica e
 `abaixo_da_meta`, uma linha).
+
+### Plano semanal (`relatorio: "plano_semanal"`)
+
+Vem da tool `planejar_semana` (plano de um paciente: uma sessão por especialidade em cada
+dia pedido). Usa o mesmo tipo `tabela_generica`, sem tipo novo de bloco. `relatorio` é o
+identificador estável `"plano_semanal"`; `titulo` é legível (ex.: `"Plano semanal: quarta e
+quinta, das 10:00 às 12:00 (sessões de 30 min)"`). `dimensoes` e `metricas` vêm vazias,
+`total` é `{}`, `meta` é `null` e `linhas_omitidas` é `0`. Não traz paciente.
+
+| Coluna | Formato | Valores |
+| --- | --- | --- |
+| `dia` | `texto` | `"quarta-feira"` etc. (grade semanal, sem data) |
+| `situacao` | `texto` | `"Plano"`, `"Não coube"` ou `"Alternativa"` |
+| `especialidade` | `texto` | Rótulo (`"Terapia Ocupacional"`) |
+| `horario` | `texto` | `"10:00 às 10:30"`; `"—"` em "Não coube" |
+| `profissional` | `texto` | Nome; `"—"` em "Não coube" |
+| `sala` | `texto` | Nome da sala; `"—"` em "Não coube" |
+| `posto` | `inteiro` | A partir de 1; `null` em "Não coube" |
+
+Ordem das linhas, por dia pedido: as sessões do plano (por horário) e, para cada
+especialidade que não coube, a linha "Não coube" seguida de até 3 "Alternativa" fora da
+janela (mesmo dia primeiro, depois outros dias; o `dia` da alternativa é o dia em que ela
+acontece). `resumo`: um item por dia (`"3 de 4"`, formato `texto`) e `"Não couberam"`
+(`inteiro`). Tabela de exportação: **Plano** (mesmas colunas e linhas). `avisos` sempre traz
+que a recorrência usa a grade semanal e não vê feriados nem exceções.
