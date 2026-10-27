@@ -22,6 +22,12 @@ resolvedor de nomes e o catálogo da semana ("beto" agora encontra Beto Reis;
 quem está na grade mas fora de `listar_profissionais` agora aparece); e as
 de especialidade fora da semana, que o enum do catálogo recusa antes de chegar
 à tool ("Parâmetros inválidos (especialidade)").
+
+Em `feature/interpretacao-e-respostas`, `consultar_disponibilidade` virou
+invólucro sobre o motor (o mesmo caminho de `gerar_relatorio(vagas_livres)`):
+as saídas dela foram atualizadas depois de uma verificação única de que o
+conjunto (horário, especialidade, profissional, sala) é o mesmo, com as
+diferenças das fontes "parcial" e "borda" listadas no PR.
 """
 
 import json

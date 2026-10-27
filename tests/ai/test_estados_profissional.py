@@ -64,8 +64,7 @@ def test_atende_sem_vaga_na_janela() -> None:
 def test_apelido_com_vaga_na_janela() -> None:
     assert _disponibilidade("beatriz", **JANELA) == (
         "Horários livres em 01/10/2026 (10:00 às 12:00):\n"
-        "- 10:00 às 10:30: Fonoaudiologia com Bia na Sala 1.\n"
-        "- 10:30 às 11:00: Fonoaudiologia com Bia na Sala 1."
+        "- 10:00 às 11:00: Fonoaudiologia com Bia na Sala 1."
     )
 
 

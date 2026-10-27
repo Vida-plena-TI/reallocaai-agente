@@ -60,7 +60,11 @@ from app.ai.textos_profissional import (
     texto_sem_vaga,
 )
 from app.ai.tools_equipe import criar_tool_consultar_profissionais
-from app.ai.tools_relatorios import criar_tools_relatorios
+from app.ai.tools_relatorios import (
+    MAXIMO_DE_LINHAS_EM_TEXTO,
+    criar_tools_relatorios,
+    vagas_de_um_dia,
+)
 from app.data_sources.continuidade import (
     ContinuidadeDataSource,
     SemHistoricoContinuidadeDataSource,
@@ -909,89 +913,100 @@ def criar_tools(
             + nota
         )
 
-    @tool("consultar_disponibilidade", args_schema=args_disponibilidade)
+    @tool(
+        "consultar_disponibilidade",
+        args_schema=args_disponibilidade,
+        response_format="content_and_artifact",
+    )
     def consultar_disponibilidade_tool(
         data: date,
         especialidade: Especialidade | None = None,
         profissional: str | None = None,
         horario_inicio: time | None = None,
         horario_fim: time | None = None,
-    ) -> str:
-        """Lista CADA horário livre de UM único dia, com filtro opcional de especialidade,
-        profissional e janela de horário.
+    ) -> tuple[str, dict[str, Any] | None]:
+        """Vagas livres de UM único dia, com filtro opcional de especialidade, profissional
+        e janela de horário.
 
-        Use só para a lista detalhada de um dia ("quais horários estão livres de
-        psicologia hoje?", "a Bia tem vaga na quinta entre 10h e 12h?"). Com
-        profissional, diz se ela não existe na grade, não atende no dia ou está
-        sem vaga na janela. Para mais de um dia ("de segunda a sexta", "na
-        semana"), contagens, janelas de 1 h ou recortes por sala/período, use
+        Use para qualquer pergunta de vagas de um dia ("quais horários vagos na
+        segunda?", "tem psicologia livre hoje?", "a Bia tem vaga na quinta entre
+        10h e 12h?"). Com mais de 3 faixas, a tela mostra o relatório de
+        disponibilidade; com até 3, o texto já traz as faixas. Com profissional,
+        diz se ela não existe na grade, não atende no dia ou está sem vaga na
+        janela. Para mais de um dia ("de segunda a sexta", "na semana"),
+        contagens, janelas de 1 h ou recortes por sala/período, use
         `gerar_relatorio` (uma chamada só). Para casar várias especialidades de
         um atendimento, use `buscar_encaixe`.
         """
-        # A futura reescrita desta tool sobre o motor (prompt P2) deve preservar
-        # `horario_inicio` e `horario_fim`: é com eles que a busca por profissional
-        # distingue "atende, mas está sem vaga na janela".
+        # Invólucro sobre o motor: o mesmo caminho de gerar_relatorio(vagas_livres,
+        # inicio=fim=data), com profissional, janela (`horario_inicio`/`horario_fim`)
+        # e os três estados da busca por profissional, que vieram do P1.
         if horario_inicio is not None and horario_fim is not None and horario_fim <= horario_inicio:
-            return "O horário final da janela precisa ser depois do inicial."
+            return "O horário final da janela precisa ser depois do inicial.", None
         atendente: ProfissionalCatalogo | None = None
         if especialidade is not None:
             especialidade = como_especialidade(especialidade)
         try:
-            foto = fotografar_periodo(fonte, data, data)
             if profissional is not None:
                 catalogo = catalogo_da_semana(fonte, data)
                 localizacao = resolver_profissional(
                     profissionais_do_catalogo(catalogo), profissional
                 )
                 if isinstance(localizacao, ProfissionalAmbiguo):
-                    return texto_ambiguo(profissional, localizacao)
+                    return texto_ambiguo(profissional, localizacao), None
                 if isinstance(localizacao, ProfissionalNaoEncontrado):
-                    return texto_inexistente(profissional, catalogo)
+                    return texto_inexistente(profissional, catalogo), None
                 atendente = catalogo.profissionais[localizacao.profissional_id]
                 if not atendente.atende_no_dia(data):
-                    return texto_nao_atende(atendente, data)
+                    return texto_nao_atende(atendente, data), None
                 if especialidade is not None and atendente.especialidade != especialidade:
                     return (
                         f"{atendente.nome} é de {_rotulo_especialidade(atendente.especialidade)}, "
                         f"não de {_rotulo_especialidade(especialidade)}."
-                    )
+                    ), None
 
-            disponiveis = [
-                disponivel
-                for disponivel in visoes_fotografia.disponibilidade(
-                    foto,
-                    data,
-                    especialidade=especialidade,
-                    profissional_id=atendente.id if atendente is not None else None,
-                )
-                if _na_janela(disponivel.slot, horario_inicio, horario_fim)
-            ]
+            texto, bloco, faixas = vagas_de_um_dia(
+                fonte,
+                data,
+                profissional_id=atendente.id if atendente is not None else None,
+                especialidade=especialidade,
+                inicio=horario_inicio,
+                fim=horario_fim,
+            )
         except Exception as erro:
-            return f"Erro ao consultar disponibilidade: {erro}"
+            return f"Erro ao consultar disponibilidade: {erro}", None
 
-        if not disponiveis:
+        if bloco is None:
+            return texto, None
+        if faixas == 0:
             if atendente is not None:
-                return texto_sem_vaga(atendente, data, horario_inicio, horario_fim)
+                return texto_sem_vaga(atendente, data, horario_inicio, horario_fim), None
             return (
                 f"Nenhum horário livre encontrado em {data.strftime('%d/%m/%Y')} para os "
                 "filtros informados."
-            )
+            ), None
+        if faixas <= MAXIMO_DE_LINHAS_EM_TEXTO:
+            # Resultado curto: o texto traz as faixas e não vai bloco para a tela.
+            janela = _rotulo_janela(horario_inicio, horario_fim)
+            lista = bloco["dados"]["faixas"]
 
-        # Mesmo horário, sala e profissional em mais de um posto são vagas
-        # distintas (colunas diferentes da sala); sem o posto no texto elas
-        # pareceriam a mesma linha repetida.
-        vagas_por_chave = Counter(_chave_sem_posto(disponivel) for disponivel in disponiveis)
-        linhas = [
-            f"- {disponivel.slot.hora_inicio.strftime('%H:%M')} às "
-            f"{disponivel.slot.hora_fim.strftime('%H:%M')}: "
-            f"{_rotulo_especialidade(disponivel.especialidade)} com "
-            f"{_nome_na_foto(foto, disponivel.profissional_id)} na "
-            f"{foto.nome_sala(disponivel.sala_id)}"
-            f"{_sufixo_posto(disponivel, vagas_por_chave)}."
-            for disponivel in disponiveis
-        ]
-        janela = _rotulo_janela(horario_inicio, horario_fim)
-        return f"Horários livres em {data.strftime('%d/%m/%Y')}{janela}:\n" + "\n".join(linhas)
+            def chave(f: dict[str, Any]) -> tuple[str, str, str, str]:
+                return (f["sala_nome"], f["profissional"]["nome"], f["inicio"], f["fim"])
+
+            # O posto só aparece quando, sem ele, duas faixas pareceriam a mesma.
+            repetidas = Counter(chave(f) for f in lista)
+            linhas = [
+                f"- {f['inicio']} às {f['fim']}: {f['profissional']['especialidade'] or '—'} "
+                f"com {f['profissional']['nome']} na {f['sala_nome']}"
+                + (f" (posto {f['posto']})" if repetidas[chave(f)] > 1 else "")
+                + "."
+                for f in lista
+            ]
+            return (
+                f"Horários livres em {data.strftime('%d/%m/%Y')}{janela}:\n" + "\n".join(linhas),
+                None,
+            )
+        return texto, bloco
 
     # langchain_core instalado: convert.tool aceita content_and_artifact;
     # base.BaseTool desempacota (content, artifact). ToolMessage.artifact não

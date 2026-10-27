@@ -456,8 +456,9 @@ def test_consultar_disponibilidade_tool_lista_horarios_livres() -> None:
     assert "Sala 1" in resultado
 
 
-def test_consultar_disponibilidade_tool_nao_mescla_slots_consecutivos() -> None:
-    """4 slots seguidos do mesmo profissional/sala saem um a um, nunca numa faixa só."""
+def test_consultar_disponibilidade_tool_junta_vagas_seguidas_numa_faixa() -> None:
+    """4 vagas seguidas do mesmo profissional/sala saem numa faixa só (a regra antiga,
+    uma linha por vaga, fazia a resposta de um dia virar dezenas de linhas)."""
     horas = [time(7, 0), time(7, 30), time(8, 0), time(8, 30)]
     origem = FakeScheduleDataSource(
         salas={DIA: [Sala(id="sala-1", nome="Sala 1")]},
@@ -470,12 +471,9 @@ def test_consultar_disponibilidade_tool_nao_mescla_slots_consecutivos() -> None:
 
     resultado = tool.invoke({"data": "2026-09-08"})
 
-    assert "07:00 às 07:30" in resultado
-    assert "07:30 às 08:00" in resultado
-    assert "08:00 às 08:30" in resultado
-    assert "08:30 às 09:00" in resultado
-    assert "07:00 às 08:30" not in resultado
-    assert "07:00 às 09:00" not in resultado
+    assert resultado == (
+        "Horários livres em 08/09/2026:\n- 07:00 às 09:00: Psicologia com Ana na Sala 1."
+    )
 
 
 def test_consultar_disponibilidade_tool_distingue_postos_do_mesmo_titular() -> None:

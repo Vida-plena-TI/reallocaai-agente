@@ -178,7 +178,7 @@
      "type": "string"
     }
    },
-   "description": "Lista CADA horário livre de UM único dia, com filtro opcional de especialidade,\nprofissional e janela de horário.\n\nUse só para a lista detalhada de um dia (\"quais horários estão livres de\npsicologia hoje?\", \"a Bia tem vaga na quinta entre 10h e 12h?\"). Com\nprofissional, diz se ela não existe na grade, não atende no dia ou está\nsem vaga na janela. Para mais de um dia (\"de segunda a sexta\", \"na\nsemana\"), contagens, janelas de 1 h ou recortes por sala/período, use\n`gerar_relatorio` (uma chamada só). Para casar várias especialidades de\num atendimento, use `buscar_encaixe`.",
+   "description": "Vagas livres de UM único dia, com filtro opcional de especialidade, profissional\ne janela de horário.\n\nUse para qualquer pergunta de vagas de um dia (\"quais horários vagos na\nsegunda?\", \"tem psicologia livre hoje?\", \"a Bia tem vaga na quinta entre\n10h e 12h?\"). Com mais de 3 faixas, a tela mostra o relatório de\ndisponibilidade; com até 3, o texto já traz as faixas. Com profissional,\ndiz se ela não existe na grade, não atende no dia ou está sem vaga na\njanela. Para mais de um dia (\"de segunda a sexta\", \"na semana\"),\ncontagens, janelas de 1 h ou recortes por sala/período, use\n`gerar_relatorio` (uma chamada só). Para casar várias especialidades de\num atendimento, use `buscar_encaixe`.",
    "properties": {
     "data": {
      "description": "Data a consultar, no formato AAAA-MM-DD.",
@@ -246,8 +246,8 @@
    "title": "consultar_disponibilidade",
    "type": "object"
   },
-  "descricao": "Lista CADA horário livre de UM único dia, com filtro opcional de especialidade,\nprofissional e janela de horário.\n\nUse só para a lista detalhada de um dia (\"quais horários estão livres de\npsicologia hoje?\", \"a Bia tem vaga na quinta entre 10h e 12h?\"). Com\nprofissional, diz se ela não existe na grade, não atende no dia ou está\nsem vaga na janela. Para mais de um dia (\"de segunda a sexta\", \"na\nsemana\"), contagens, janelas de 1 h ou recortes por sala/período, use\n`gerar_relatorio` (uma chamada só). Para casar várias especialidades de\num atendimento, use `buscar_encaixe`.",
-  "formato_resposta": "content"
+  "descricao": "Vagas livres de UM único dia, com filtro opcional de especialidade, profissional\ne janela de horário.\n\nUse para qualquer pergunta de vagas de um dia (\"quais horários vagos na\nsegunda?\", \"tem psicologia livre hoje?\", \"a Bia tem vaga na quinta entre\n10h e 12h?\"). Com mais de 3 faixas, a tela mostra o relatório de\ndisponibilidade; com até 3, o texto já traz as faixas. Com profissional,\ndiz se ela não existe na grade, não atende no dia ou está sem vaga na\njanela. Para mais de um dia (\"de segunda a sexta\", \"na semana\"),\ncontagens, janelas de 1 h ou recortes por sala/período, use\n`gerar_relatorio` (uma chamada só). Para casar várias especialidades de\num atendimento, use `buscar_encaixe`.",
+  "formato_resposta": "content_and_artifact"
  },
  "consultar_ocupacao": {
   "argumentos": {

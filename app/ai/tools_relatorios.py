@@ -14,6 +14,7 @@ como exceção que derrubaria o turno), inclusive erros de validação do schema
 import logging
 import time
 from datetime import date
+from datetime import time as hora_do_dia
 from typing import Any, Final, Literal
 
 from langchain_core.tools import BaseTool, tool
@@ -404,6 +405,64 @@ def _ordenar_por(valor: str | None) -> Metrica | Dimensao | None:
         f"ordenar_por='{valor}' não é métrica nem dimensão. Use uma das métricas ou "
         "dimensões pedidas."
     )
+
+
+#: Até quantas linhas de dado a resposta fica só em texto; acima disso, vai bloco.
+MAXIMO_DE_LINHAS_EM_TEXTO: Final[int] = 3
+
+
+def vagas_de_um_dia(
+    fonte: ScheduleDataSource,
+    dia: date,
+    *,
+    profissional_id: str | None = None,
+    especialidade: Especialidade | None = None,
+    inicio: hora_do_dia | None = None,
+    fim: hora_do_dia | None = None,
+) -> tuple[str, dict[str, Any] | None, int]:
+    """Vagas de um dia pelo mesmo caminho de `gerar_relatorio(vagas_livres, inicio=fim=dia)`.
+
+    É o núcleo de `consultar_disponibilidade`. A janela [`inicio`, `fim`] é
+    aplicada nos slots antes de agrupar (a vaga precisa começar em `inicio` ou
+    depois e terminar em `fim` ou antes). Devolve o texto, o bloco
+    `disponibilidade` em JSON e quantas faixas ele tem; `None` sem agenda.
+    """
+    foto = fotografar_periodo(fonte, dia, dia)
+    if not foto.slots:
+        if dia.weekday() == 6:
+            return (
+                f"Não há agenda {blocos_gerais.rotulo_periodo(dia, dia)} (domingo não tem "
+                "expediente).",
+                None,
+                0,
+            )
+        return (
+            f"Nenhum horário livre encontrado em {dia:%d/%m/%Y} para os filtros informados.",
+            None,
+            0,
+        )
+    if inicio is not None or fim is not None:
+        foto = foto.model_copy(
+            update={
+                "slots": [
+                    slot
+                    for slot in foto.slots
+                    if (inicio is None or slot.hora_inicio >= inicio)
+                    and (fim is None or slot.hora_fim <= fim)
+                ]
+            }
+        )
+    filtros = FiltrosRelatorio(
+        profissional_ids=frozenset({profissional_id}) if profissional_id else frozenset(),
+        especialidades=frozenset({especialidade}) if especialidade else frozenset(),
+    )
+    recorte = _recorte(foto, filtros)
+    if inicio is not None or fim is not None:
+        janela = f"{(inicio or HORARIO_ABERTURA):%H:%M}-{(fim or HORARIO_FECHAMENTO):%H:%M}"
+        recorte = f"{recorte[:-1]} · {janela})" if recorte else f" ({janela})"
+    relatorio = vagas_livres(foto, filtros, 1)
+    texto, bloco = blocos_gerais.disponibilidade(foto, relatorio, _avisos(foto), recorte)
+    return texto, bloco.model_dump(mode="json"), len(relatorio.faixas)
 
 
 def executar_relatorio(
