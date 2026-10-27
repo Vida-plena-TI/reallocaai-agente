@@ -26,7 +26,7 @@ from typing import Any
 
 from langchain.agents import create_agent
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
@@ -39,6 +39,7 @@ from app.ai.fundamentacao import (
     resumo_deterministico,
     verificar,
 )
+from app.ai.interpretador import Interpretador, contexto_para_o_agente, pergunta_das_lacunas
 from app.ai.prompts import prompt_de_sistema, resumo_da_equipe
 from app.ai.rastreamento import desligar_rastreamento_externo
 from app.ai.relatorios import BlocoRelatorio
@@ -62,6 +63,8 @@ class Agente:
 
     grafo: CompiledStateGraph[Any, Any, Any, Any]
     profissionais: Sequence[str] = field(default_factory=tuple)
+    #: Interpretação estruturada antes do agente (`INTERPRETADOR_ATIVO`); `None` = desligada.
+    interpretador: Interpretador | None = None
 
     def invoke(self, entrada: dict[str, Any]) -> dict[str, Any]:
         resultado: dict[str, Any] = self.grafo.invoke(entrada)
@@ -91,7 +94,13 @@ def criar_chat_model() -> BaseChatModel:
 
     if provider == "openai":
         api_key = exigir(settings.openai_api_key, "OPENAI_API_KEY")
-        model = exigir(settings.openai_model, "OPENAI_MODEL")
+        model = settings.openai_model_resposta or exigir(settings.openai_model, "OPENAI_MODEL")
+        if settings.openai_reasoning_effort_resposta:
+            return ChatOpenAI(
+                model=model,
+                api_key=api_key,
+                reasoning_effort=settings.openai_reasoning_effort_resposta,
+            )
         return ChatOpenAI(model=model, api_key=api_key)
 
     if provider == "google":
@@ -110,6 +119,7 @@ def criar_agente(
     chat_model: BaseChatModel,
     data_referencia: date,
     renderiza_relatorios: bool = False,
+    interpretador: Interpretador | None = None,
 ) -> Agente:
     """Monta o agente RealocAI: tools da Parte B + prompt de sistema da Parte C.
 
@@ -134,7 +144,11 @@ def criar_agente(
     profissionais = (
         tuple(p.nome for p in catalogo.profissionais.values()) if catalogo is not None else ()
     )
-    return Agente(create_agent(model=chat_model, tools=tools, system_prompt=prompt), profissionais)
+    return Agente(
+        create_agent(model=chat_model, tools=tools, system_prompt=prompt),
+        profissionais,
+        interpretador,
+    )
 
 
 def _extrair_texto_da_resposta(mensagem: BaseMessage) -> str:
@@ -184,8 +198,19 @@ def perguntar_com_mensagens(
     determinístico do relatório.
     """
     profissionais = agente.profissionais
-    resultado = agente.invoke({"messages": historico_mensagens})
-    mensagens: list[BaseMessage] = resultado["messages"]
+    entrada = list(historico_mensagens)
+    contexto = None
+    if agente.interpretador is not None and historico_mensagens:
+        pedido = agente.interpretador(historico_mensagens)
+        if pedido is not None and pedido.lacunas:
+            # Falta o que só quem perguntou sabe: UMA pergunta, sem chamar o agente.
+            pergunta = pergunta_das_lacunas(pedido)
+            return pergunta, [*historico_mensagens, AIMessage(pergunta)], []
+        if pedido is not None:
+            contexto = contexto_para_o_agente(pedido)
+            entrada = [*historico_mensagens[:-1], contexto, historico_mensagens[-1]]
+    resultado = agente.invoke({"messages": entrada})
+    mensagens: list[BaseMessage] = _sem(resultado["messages"], contexto)
     resposta = _extrair_texto_da_resposta(mensagens[-1])
     blocos = extrair_blocos_do_turno(mensagens)
     problemas = verificar(
@@ -196,11 +221,7 @@ def perguntar_com_mensagens(
 
     registrar_nova_geracao(problemas)
     aviso = HumanMessage(problemas.aviso())
-    refeito: list[BaseMessage] = agente.invoke({"messages": [*mensagens, aviso]})["messages"]
-    # O aviso é só para o modelo: sai da lista (o grafo pode ter copiado a mensagem).
-    refeito = [
-        m for m in refeito if not (isinstance(m, HumanMessage) and m.content == aviso.content)
-    ]
+    refeito = _sem(agente.invoke({"messages": [*mensagens, aviso]})["messages"], aviso)
     resposta = _extrair_texto_da_resposta(refeito[-1])
     blocos = extrair_blocos_do_turno(refeito) or blocos
     turno = refeito[len(historico_mensagens) :]
@@ -210,6 +231,13 @@ def perguntar_com_mensagens(
 
     registrar_resumo_deterministico(problemas)
     return resumo_deterministico(blocos, turno), refeito, blocos
+
+
+def _sem(mensagens: list[BaseMessage], retirar: BaseMessage | None) -> list[BaseMessage]:
+    """`mensagens` sem a mensagem interna `retirar` (o grafo pode tê-la copiado)."""
+    if retirar is None:
+        return list(mensagens)
+    return [m for m in mensagens if not (type(m) is type(retirar) and m.content == retirar.content)]
 
 
 def extrair_blocos_do_turno(mensagens: list[BaseMessage]) -> list[BlocoRelatorio]:

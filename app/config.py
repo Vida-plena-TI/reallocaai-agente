@@ -105,6 +105,17 @@ class Settings(BaseSettings):
     ai_provider: str | None = None
     openai_api_key: str | None = None
     openai_model: str | None = None
+    #: Opcionais. Modelo da resposta do agente e do interpretador de pedidos;
+    #: vazios, valem `openai_model`.
+    openai_model_resposta: str | None = None
+    openai_model_interpretador: str | None = None
+    #: Opcionais. Esforço de raciocínio (`reasoning_effort` do `ChatOpenAI`, para
+    #: modelos de raciocínio): vazios, não é enviado e vale o padrão do provedor.
+    openai_reasoning_effort_resposta: str | None = None
+    openai_reasoning_effort_interpretador: str | None = None
+    #: Interpretação estruturada do pedido antes do agente (desligada por padrão:
+    #: só liga depois de melhorar a régua dos casos reais).
+    interpretador_ativo: bool = False
     google_api_key: str | None = None
     google_model: str | None = None
 
@@ -137,6 +148,10 @@ class Settings(BaseSettings):
         "ai_provider",
         "openai_api_key",
         "openai_model",
+        "openai_model_resposta",
+        "openai_model_interpretador",
+        "openai_reasoning_effort_resposta",
+        "openai_reasoning_effort_interpretador",
         "google_api_key",
         "google_model",
         "google_sheets_credentials_path",
