@@ -168,6 +168,34 @@ def _profissional(foto: FotografiaPeriodo, profissional_id: str) -> Profissional
     )
 
 
+#: Especialidade de vaga sem especialidade no cadastro nem na grade.
+ESPECIALIDADE_NAO_INFORMADA = "Não informada"
+
+
+def _especialidade_da_faixa(especialidade: Especialidade | None) -> str:
+    return (
+        rotulo_enum(especialidade.value)
+        if especialidade is not None
+        else (ESPECIALIDADE_NAO_INFORMADA)
+    )
+
+
+def _profissional_da_faixa(
+    foto: FotografiaPeriodo, profissional_id: str, especialidade_da_grade: Especialidade | None
+) -> ProfissionalRelatorio:
+    """Como `_profissional`, mas a vaga nunca sai sem especialidade.
+
+    Quem está na grade mas fora de `listar_profissionais` não tem cadastro: vale a
+    especialidade da própria grade (do slot) e, se nem ela existir, "Não informada".
+    """
+    profissional = _profissional(foto, profissional_id)
+    if profissional.especialidade is not None:
+        return profissional
+    return profissional.model_copy(
+        update={"especialidade": _especialidade_da_faixa(especialidade_da_grade)}
+    )
+
+
 def _rotulo_especialidade(especialidade: Especialidade | None) -> str:
     return rotulo_enum(especialidade.value) if especialidade is not None else "—"
 
@@ -249,7 +277,7 @@ def disponibilidade(
             data=f.data,
             dia_semana=DIAS_DA_SEMANA[f.data.weekday()],
             periodo=f.periodo.value,
-            profissional=_profissional(foto, f.profissional_id),
+            profissional=_profissional_da_faixa(foto, f.profissional_id, f.especialidade),
             sala_id=f.sala_id,
             sala_nome=f.sala_nome,
             posto=f.indice_posto + 1,
@@ -385,7 +413,7 @@ def disponibilidade(
         texto.append("Maiores faixas livres:")
         texto.extend(
             f"- {_dia_curto(f.data)} {_hora(f.inicio)}-{_hora(f.fim)}: {f.profissional_nome} "
-            f"({_rotulo_especialidade(f.especialidade)}), {f.sala_nome}"
+            f"({_especialidade_da_faixa(f.especialidade)}), {f.sala_nome}"
             for f in maiores[:5]
         )
     return "\n".join(texto), bloco

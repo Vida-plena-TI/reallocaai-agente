@@ -3685,7 +3685,7 @@
  },
  "015 borda consultar_disponibilidade {\"data\": \"2026-10-02\"}": {
   "bloco": null,
-  "texto": "Horários livres em 02/10/2026:\n- 07:00 às 09:00: Psicologia com Ana Lima na Sala 1.\n- 10:00 às 12:00: Psicologia com Ana Lima na Sala 1.\n- 13:30 às 18:00: — com Cau Melo na Sala 2."
+  "texto": "Horários livres em 02/10/2026:\n- 07:00 às 09:00: Psicologia com Ana Lima na Sala 1.\n- 10:00 às 12:00: Psicologia com Ana Lima na Sala 1.\n- 13:30 às 18:00: Terapia Ocupacional com Cau Melo na Sala 2."
  },
  "016 borda consultar_disponibilidade {\"data\": \"2026-10-03\"}": {
   "bloco": null,
@@ -3693,7 +3693,7 @@
  },
  "017 borda consultar_disponibilidade {\"data\": \"2026-10-02\", \"profissional\": \"cau-melo\"}": {
   "bloco": null,
-  "texto": "Horários livres em 02/10/2026:\n- 13:30 às 18:00: — com Cau Melo na Sala 2."
+  "texto": "Horários livres em 02/10/2026:\n- 13:30 às 18:00: Terapia Ocupacional com Cau Melo na Sala 2."
  },
  "018 clinica consultar_ocupacao {\"data\": \"2026-09-28\"}": {
   "bloco": {
