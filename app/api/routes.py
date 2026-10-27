@@ -17,6 +17,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
 
 from app.ai.agente import criar_agente, perguntar_com_mensagens
+from app.ai.interpretador import criar_interpretador_configurado
 from app.ai.servico_agenda import consultar_disponibilidade_do_dia, consultar_ocupacao_do_dia
 from app.api.dependencies import (
     obter_armazenamento_conversas,
@@ -168,6 +169,7 @@ def conversar_com_agente(
         chat_model,
         data_referencia=date.today(),
         renderiza_relatorios=corpo.renderiza_relatorios,
+        interpretador=criar_interpretador_configurado(date.today()),
     )
     try:
         resposta, _, blocos = perguntar_com_mensagens(

@@ -54,7 +54,7 @@ def test_llm_sem_confirmar_so_estima(
     )
     saida = capsys.readouterr().out
     assert codigo == 0
-    assert "Estimativa: 8 caso(s), 14 turno(s)" in saida
+    assert "Estimativa: 8 caso(s), 15 turno(s)" in saida
     assert "Nada foi chamado" in saida
     assert list(tmp_path.iterdir()) == []
 
@@ -75,7 +75,7 @@ def test_deterministico_ponta_a_ponta_sem_nomes_de_pacientes(
         "c05": "passou",
         "c06": "xfail",
         "c07": "passou",
-        "c08": "n/a",
+        "c08": "passou",
     }
     for texto in (saida, arquivo.read_text(encoding="utf-8")):
         assert "Paciente Ficticio" not in texto

@@ -66,9 +66,13 @@ def test_semana_e_datas_nos_argumentos() -> None:
 
 def test_vocabulario_proibido_por_palavra_inteira() -> None:
     assert termos_proibidos("Encaixei no Slot das 10h; vou REGISTRAR.") == [
-        "registrar",
-        "encaixei",
         "slot",
+        "encaixei",
+        "registrar",
+    ]
+    assert termos_proibidos("Parâmetros inválidos: o bloco foi agendado.") == [
+        "parâmetros inválidos",
+        "bloco",
     ]
     assert termos_proibidos("3 slots livres; o atendimento_id é x") == ["atendimento_id", "slot"]
     assert termos_proibidos("Toolbox e slotting não contam; registro também não.") == []

@@ -19,18 +19,27 @@ configuração dos dois provedores).
 """
 
 import logging
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
 from langchain.agents import create_agent
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from langgraph.graph.state import CompiledStateGraph
 from pydantic import ValidationError
 
 from app.ai.catalogo import catalogo_ou_nada
+from app.ai.fundamentacao import (
+    registrar_nova_geracao,
+    registrar_resumo_deterministico,
+    resumo_deterministico,
+    verificar,
+)
+from app.ai.interpretador import Interpretador, contexto_para_o_agente, pergunta_das_lacunas
 from app.ai.prompts import prompt_de_sistema, resumo_da_equipe
 from app.ai.rastreamento import desligar_rastreamento_externo
 from app.ai.relatorios import BlocoRelatorio
@@ -39,12 +48,29 @@ from app.config import exigir, get_settings
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import ScheduleDataSource
 
-#: `create_agent` devolve um `CompiledStateGraph` parametrizado com tipos
-#: internos do LangGraph que não precisamos nomear aqui: usamos `Any` nos
-#: quatro parâmetros genéricos (estado, contexto, entrada, saída) porque só
-#: chamamos `.invoke` sobre ele, nunca inspecionamos esses tipos.
-Agente = CompiledStateGraph[Any, Any, Any, Any]
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Agente:
+    """O grafo de `create_agent` e o que a verificação de fundamentação precisa saber.
+
+    `grafo` é um `CompiledStateGraph` parametrizado com tipos internos do
+    LangGraph que não precisamos nomear (`Any` nos quatro genéricos): só
+    chamamos `.invoke` sobre ele. `profissionais` são os nomes da equipe da
+    semana, para conferir nomes citados na resposta.
+    """
+
+    grafo: CompiledStateGraph[Any, Any, Any, Any]
+    profissionais: Sequence[str] = field(default_factory=tuple)
+    #: Interpretação estruturada antes do agente (`INTERPRETADOR_ATIVO`); `None` = desligada.
+    interpretador: Interpretador | None = None
+    #: O cliente renderiza os relatórios: o texto não pode repetir a lista.
+    com_tela: bool = False
+
+    def invoke(self, entrada: dict[str, Any]) -> dict[str, Any]:
+        resultado: dict[str, Any] = self.grafo.invoke(entrada)
+        return resultado
 
 
 def criar_chat_model() -> BaseChatModel:
@@ -70,7 +96,13 @@ def criar_chat_model() -> BaseChatModel:
 
     if provider == "openai":
         api_key = exigir(settings.openai_api_key, "OPENAI_API_KEY")
-        model = exigir(settings.openai_model, "OPENAI_MODEL")
+        model = settings.openai_model_resposta or exigir(settings.openai_model, "OPENAI_MODEL")
+        if settings.openai_reasoning_effort_resposta:
+            return ChatOpenAI(
+                model=model,
+                api_key=api_key,
+                reasoning_effort=settings.openai_reasoning_effort_resposta,
+            )
         return ChatOpenAI(model=model, api_key=api_key)
 
     if provider == "google":
@@ -89,6 +121,7 @@ def criar_agente(
     chat_model: BaseChatModel,
     data_referencia: date,
     renderiza_relatorios: bool = False,
+    interpretador: Interpretador | None = None,
 ) -> Agente:
     """Monta o agente RealocAI: tools da Parte B + prompt de sistema da Parte C.
 
@@ -110,7 +143,15 @@ def criar_agente(
         prompt += resumo_da_equipe(catalogo)
     else:
         logger.warning("Prompt montado sem o resumo da equipe: catálogo indisponível.")
-    return create_agent(model=chat_model, tools=tools, system_prompt=prompt)
+    profissionais = (
+        tuple(p.nome for p in catalogo.profissionais.values()) if catalogo is not None else ()
+    )
+    return Agente(
+        create_agent(model=chat_model, tools=tools, system_prompt=prompt),
+        profissionais,
+        interpretador,
+        renderiza_relatorios,
+    )
 
 
 def _extrair_texto_da_resposta(mensagem: BaseMessage) -> str:
@@ -153,10 +194,59 @@ def perguntar_com_mensagens(
     A lista inclui o histórico de entrada seguido das mensagens geradas no
     turno (chamadas de tool e seus retornos) — útil para inspecionar quais
     tools o agente usou (ver `scripts/chat_manual.py --verbose`).
+
+    Antes de devolver, a resposta passa pela verificação de fundamentação
+    (`app.ai.fundamentacao`): se algo não bater, UMA nova geração com o aviso
+    do erro (o aviso nunca entra no histórico); se ainda não bater, um resumo
+    determinístico do relatório.
     """
-    resultado = agente.invoke({"messages": historico_mensagens})
-    mensagens: list[BaseMessage] = resultado["messages"]
-    return _extrair_texto_da_resposta(mensagens[-1]), mensagens, extrair_blocos_do_turno(mensagens)
+    profissionais = agente.profissionais
+    entrada = list(historico_mensagens)
+    contexto = None
+    if agente.interpretador is not None and historico_mensagens:
+        pedido = agente.interpretador(historico_mensagens)
+        if pedido is not None and pedido.lacunas:
+            # Falta o que só quem perguntou sabe: UMA pergunta, sem chamar o agente.
+            pergunta = pergunta_das_lacunas(pedido)
+            return pergunta, [*historico_mensagens, AIMessage(pergunta)], []
+        if pedido is not None:
+            contexto = contexto_para_o_agente(pedido)
+            entrada = [*historico_mensagens[:-1], contexto, historico_mensagens[-1]]
+    resultado = agente.invoke({"messages": entrada})
+    mensagens: list[BaseMessage] = _sem(resultado["messages"], contexto)
+    resposta = _extrair_texto_da_resposta(mensagens[-1])
+    blocos = extrair_blocos_do_turno(mensagens)
+    problemas = verificar(
+        resposta,
+        mensagens[len(historico_mensagens) :],
+        historico_mensagens,
+        profissionais,
+        com_tela=agente.com_tela,
+    )
+    if problemas.ok:
+        return resposta, mensagens, blocos
+
+    registrar_nova_geracao(problemas)
+    aviso = HumanMessage(problemas.aviso())
+    refeito = _sem(agente.invoke({"messages": [*mensagens, aviso]})["messages"], aviso)
+    resposta = _extrair_texto_da_resposta(refeito[-1])
+    blocos = extrair_blocos_do_turno(refeito) or blocos
+    turno = refeito[len(historico_mensagens) :]
+    problemas = verificar(
+        resposta, turno, historico_mensagens, profissionais, com_tela=agente.com_tela
+    )
+    if problemas.ok:
+        return resposta, refeito, blocos
+
+    registrar_resumo_deterministico(problemas)
+    return resumo_deterministico(blocos, turno), refeito, blocos
+
+
+def _sem(mensagens: list[BaseMessage], retirar: BaseMessage | None) -> list[BaseMessage]:
+    """`mensagens` sem a mensagem interna `retirar` (o grafo pode tê-la copiado)."""
+    if retirar is None:
+        return list(mensagens)
+    return [m for m in mensagens if not (type(m) is type(retirar) and m.content == retirar.content)]
 
 
 def extrair_blocos_do_turno(mensagens: list[BaseMessage]) -> list[BlocoRelatorio]:

@@ -9,7 +9,11 @@
 #   xfail             motivo de o caso ainda falhar; o pytest marca xfail
 #                     estrito (passar sem tirar a marca também é erro)
 #   turnos            perguntas em sequência, na mesma conversa; `chamada` é
-#                     a tool que o modo --deterministico executa no lugar da LLM
+#                     a tool que o modo --deterministico executa no lugar da LLM;
+#                     `respostas_simuladas` (opcional, só no --deterministico)
+#                     roda o turno pelo agente real com um modelo roteirizado
+#                     que responde esses textos em ordem: testa a verificação
+#                     de fundamentação e vocabulário do código, não o modelo
 #   criterios         verificações; `turno: N` (a partir de 1) limita a um turno
 #
 # Datas nos argumentos: "{segunda}" ... "{sabado}" viram a data desse dia na
@@ -20,9 +24,14 @@
   hoje: 2026-09-28
   turnos:
     - pergunta: quais horários vagos na segunda-feira?
+      # O dia único vai pela tool de um dia, que agora devolve o relatório.
       chamada:
-        tool: gerar_relatorio
-        args: {relatorio: vagas_livres, inicio: "{segunda}", fim: "{segunda}"}
+        tool: consultar_disponibilidade
+        args: {data: "{segunda}"}
+      respostas_simuladas:
+        # Repete a lista que a tela já mostra: a verificação recusa.
+        - "Vagas na segunda:\n- 07:00 às 09:00: Fonoaudiologia com Elo na Sala 5.\n- 15:00 às 18:00: Fonoaudiologia com Elo na Sala 5."
+        - "Há 45 vagas livres na segunda-feira; as maiores faixas são da Elo, na fono."
   criterios:
     - {tipo: bloco_presente, bloco: disponibilidade}
     - {tipo: vagas_iguais_ao_oraculo, dias: [segunda]}
@@ -187,7 +196,20 @@
           data: "{segunda}"
           itens: [{especialidade: fonoaudiologia, duracao_minutos: 30}]
           horario_desejado: "09:00"
+      respostas_simuladas:
+        - "Encaixei a fono às 10:00 com a Bia."
+        - "Às 09:00 não há vaga de fono; sugiro 10:00 às 10:30 com a Bia, ou 08:30 às 09:00."
+    - pergunta: tem musicoterapia livre na segunda?
+      chamada:
+        tool: consultar_disponibilidade
+        args: {data: "{segunda}", especialidade: musicoterapia}
+      respostas_simuladas:
+        - "Parâmetros inválidos (especialidade)."
+        - "Nesta semana não há musicoterapia na agenda."
     - pergunta: beleza, então marca esse horário pra ela
       chamada: null
+      respostas_simuladas:
+        - "Pronto, agendei!"
+        - "Eu só sugiro horários: quem marca é a equipe, na planilha."
   criterios:
     - {tipo: vocabulario_proibido}

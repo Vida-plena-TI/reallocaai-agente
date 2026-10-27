@@ -524,6 +524,9 @@ Veja `.env.example`. Resumo:
 | `INTERNAL_API_KEY` | **sim** | Chave exigida no header `X-API-Key` (todas as rotas, menos `/health`) |
 | `AI_PROVIDER` | **sim** | `openai` ou `google` |
 | `OPENAI_API_KEY` / `OPENAI_MODEL` | se `AI_PROVIDER=openai` | Chave e modelo da OpenAI |
+| `OPENAI_MODEL_RESPOSTA` / `OPENAI_MODEL_INTERPRETADOR` | não | Modelo da resposta do agente e do interpretador de pedidos; vazios, vale `OPENAI_MODEL` |
+| `OPENAI_REASONING_EFFORT_RESPOSTA` / `OPENAI_REASONING_EFFORT_INTERPRETADOR` | não | `reasoning_effort` dos modelos de raciocínio (`minimal`, `low`, `medium`, `high`); vazios, não é enviado (padrão do provedor) |
+| `INTERPRETADOR_ATIVO` | não | `true` liga a interpretação estruturada do pedido antes do agente (só com `AI_PROVIDER=openai`; padrão `false`) |
 | `GOOGLE_API_KEY` / `GOOGLE_MODEL` | se `AI_PROVIDER=google` | Chave e modelo do Google AI Studio |
 | `GOOGLE_SHEETS_SPREADSHEET_ID` | **sim** | ID da planilha da agenda |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | uma das duas | JSON da service account (puro ou base64); prioridade sobre o arquivo, só em memória |
