@@ -19,6 +19,8 @@ configuração dos dois provedores).
 """
 
 import logging
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -31,6 +33,12 @@ from langgraph.graph.state import CompiledStateGraph
 from pydantic import ValidationError
 
 from app.ai.catalogo import catalogo_ou_nada
+from app.ai.fundamentacao import (
+    registrar_nova_geracao,
+    registrar_resumo_deterministico,
+    resumo_deterministico,
+    verificar,
+)
 from app.ai.prompts import prompt_de_sistema, resumo_da_equipe
 from app.ai.rastreamento import desligar_rastreamento_externo
 from app.ai.relatorios import BlocoRelatorio
@@ -39,12 +47,25 @@ from app.config import exigir, get_settings
 from app.data_sources.continuidade import ContinuidadeDataSource
 from app.domain import ScheduleDataSource
 
-#: `create_agent` devolve um `CompiledStateGraph` parametrizado com tipos
-#: internos do LangGraph que não precisamos nomear aqui: usamos `Any` nos
-#: quatro parâmetros genéricos (estado, contexto, entrada, saída) porque só
-#: chamamos `.invoke` sobre ele, nunca inspecionamos esses tipos.
-Agente = CompiledStateGraph[Any, Any, Any, Any]
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class Agente:
+    """O grafo de `create_agent` e o que a verificação de fundamentação precisa saber.
+
+    `grafo` é um `CompiledStateGraph` parametrizado com tipos internos do
+    LangGraph que não precisamos nomear (`Any` nos quatro genéricos): só
+    chamamos `.invoke` sobre ele. `profissionais` são os nomes da equipe da
+    semana, para conferir nomes citados na resposta.
+    """
+
+    grafo: CompiledStateGraph[Any, Any, Any, Any]
+    profissionais: Sequence[str] = field(default_factory=tuple)
+
+    def invoke(self, entrada: dict[str, Any]) -> dict[str, Any]:
+        resultado: dict[str, Any] = self.grafo.invoke(entrada)
+        return resultado
 
 
 def criar_chat_model() -> BaseChatModel:
@@ -110,7 +131,10 @@ def criar_agente(
         prompt += resumo_da_equipe(catalogo)
     else:
         logger.warning("Prompt montado sem o resumo da equipe: catálogo indisponível.")
-    return create_agent(model=chat_model, tools=tools, system_prompt=prompt)
+    profissionais = (
+        tuple(p.nome for p in catalogo.profissionais.values()) if catalogo is not None else ()
+    )
+    return Agente(create_agent(model=chat_model, tools=tools, system_prompt=prompt), profissionais)
 
 
 def _extrair_texto_da_resposta(mensagem: BaseMessage) -> str:
@@ -153,10 +177,39 @@ def perguntar_com_mensagens(
     A lista inclui o histórico de entrada seguido das mensagens geradas no
     turno (chamadas de tool e seus retornos) — útil para inspecionar quais
     tools o agente usou (ver `scripts/chat_manual.py --verbose`).
+
+    Antes de devolver, a resposta passa pela verificação de fundamentação
+    (`app.ai.fundamentacao`): se algo não bater, UMA nova geração com o aviso
+    do erro (o aviso nunca entra no histórico); se ainda não bater, um resumo
+    determinístico do relatório.
     """
+    profissionais = agente.profissionais
     resultado = agente.invoke({"messages": historico_mensagens})
     mensagens: list[BaseMessage] = resultado["messages"]
-    return _extrair_texto_da_resposta(mensagens[-1]), mensagens, extrair_blocos_do_turno(mensagens)
+    resposta = _extrair_texto_da_resposta(mensagens[-1])
+    blocos = extrair_blocos_do_turno(mensagens)
+    problemas = verificar(
+        resposta, mensagens[len(historico_mensagens) :], historico_mensagens, profissionais
+    )
+    if problemas.ok:
+        return resposta, mensagens, blocos
+
+    registrar_nova_geracao(problemas)
+    aviso = HumanMessage(problemas.aviso())
+    refeito: list[BaseMessage] = agente.invoke({"messages": [*mensagens, aviso]})["messages"]
+    # O aviso é só para o modelo: sai da lista (o grafo pode ter copiado a mensagem).
+    refeito = [
+        m for m in refeito if not (isinstance(m, HumanMessage) and m.content == aviso.content)
+    ]
+    resposta = _extrair_texto_da_resposta(refeito[-1])
+    blocos = extrair_blocos_do_turno(refeito) or blocos
+    turno = refeito[len(historico_mensagens) :]
+    problemas = verificar(resposta, turno, historico_mensagens, profissionais)
+    if problemas.ok:
+        return resposta, refeito, blocos
+
+    registrar_resumo_deterministico(problemas)
+    return resumo_deterministico(blocos, turno), refeito, blocos
 
 
 def extrair_blocos_do_turno(mensagens: list[BaseMessage]) -> list[BlocoRelatorio]:
