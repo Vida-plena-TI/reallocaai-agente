@@ -17,12 +17,19 @@ preenche via function calling. `create_agent` (Parte D) espera uma lista de
 import math
 from collections import Counter
 from datetime import date, time
+from types import EllipsisType
 from typing import Any, Literal
 
 from langchain_core.tools import BaseTool, tool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, create_model
 
-from app.ai.catalogo import catalogo_da_semana, profissionais_do_catalogo
+from app.ai.catalogo import catalogo_da_semana, catalogo_ou_nada, profissionais_do_catalogo
+from app.ai.parametros_catalogo import (
+    como_especialidade,
+    especialidades_validas,
+    mensagem_de_parametro_invalido,
+    tipo_especialidade,
+)
 from app.ai.relatorios import (
     AVISO_ACIMA_DE_CEM,
     NOTA_GRADE_SEMANAL,
@@ -52,6 +59,7 @@ from app.ai.textos_profissional import (
     texto_nao_atende,
     texto_sem_vaga,
 )
+from app.ai.tools_equipe import criar_tool_consultar_profissionais
 from app.ai.tools_relatorios import criar_tools_relatorios
 from app.data_sources.continuidade import (
     ContinuidadeDataSource,
@@ -699,10 +707,21 @@ class ArgsSugerirRealocacao(BaseModel):
     )
 
 
+def _com_especialidade(base: type[BaseModel], tipo: Any, *, opcional: bool) -> type[BaseModel]:
+    """`base` com o campo `especialidade` trocado por `tipo` (enum do catálogo)."""
+    campo = base.model_fields["especialidade"]
+    if opcional:
+        definicao: Any = (tipo | None, Field(default=None, description=campo.description))
+    else:
+        definicao = (tipo, Field(description=campo.description))
+    return create_model(base.__name__, __base__=base, especialidade=definicao)
+
+
 def criar_tools(
     fonte: ScheduleDataSource,
     continuidade: ContinuidadeDataSource,
     data_referencia: date,
+    catalogo: CatalogoAgenda | EllipsisType | None = ...,
 ) -> list[BaseTool]:
     """Tools do agente RealocAI, já fechadas sobre `fonte` e `continuidade`.
 
@@ -710,7 +729,32 @@ def criar_tools(
     fixado aqui, em código, no momento em que as tools são construídas.
     `data_referencia` é a data "hoje" da conversa (ver `criar_agente`), usada
     como padrão pelas tools semanais quando a LLM não informar uma data.
+
+    `catalogo` é o da semana de `data_referencia` (lido aqui quando não é
+    passado): restringe os parâmetros de especialidade às da semana. Se a
+    leitura falhar (`None`), valem as listas de reserva e as tools continuam
+    funcionando.
     """
+    if isinstance(catalogo, EllipsisType):
+        catalogo = catalogo_ou_nada(fonte, data_referencia)
+    validas = especialidades_validas(catalogo)
+    especialidade = tipo_especialidade(validas)
+    args_item = _com_especialidade(ItemDemandaEntrada, especialidade, opcional=False)
+    args_buscar_encaixe = create_model(
+        "ArgsBuscarEncaixe",
+        __base__=ArgsBuscarEncaixe,
+        itens=(
+            list[args_item],  # type: ignore[valid-type]
+            Field(min_length=1, description=ArgsBuscarEncaixe.model_fields["itens"].description),
+        ),
+    )
+    args_disponibilidade = _com_especialidade(
+        ArgsConsultarDisponibilidade, especialidade, opcional=True
+    )
+    args_pacientes = _com_especialidade(
+        ArgsConsultarPacientesPorProfissional, especialidade, opcional=True
+    )
+    parametro_invalido = mensagem_de_parametro_invalido(validas)
 
     @tool("buscar_paciente", args_schema=ArgsBuscarPaciente)
     def buscar_paciente_tool(nome_ou_id: str, data: date) -> str:
@@ -766,7 +810,7 @@ def criar_tools(
             "impede buscar encaixe, que aceita qualquer nome."
         )
 
-    @tool("buscar_encaixe", args_schema=ArgsBuscarEncaixe)
+    @tool("buscar_encaixe", args_schema=args_buscar_encaixe)
     def buscar_encaixe_tool(
         data: date,
         itens: list[ItemDemandaEntrada],
@@ -828,7 +872,7 @@ def criar_tools(
 
             itens_brutos = [
                 ItemDemandaBruta(
-                    especialidade=item.especialidade,
+                    especialidade=como_especialidade(item.especialidade),
                     duracao_em_slots=math.ceil(item.duracao_minutos / DURACAO_SLOT_MINUTOS),
                     profissional_id=fixado.id if fixado is not None else None,
                 )
@@ -865,7 +909,7 @@ def criar_tools(
             + nota
         )
 
-    @tool("consultar_disponibilidade", args_schema=ArgsConsultarDisponibilidade)
+    @tool("consultar_disponibilidade", args_schema=args_disponibilidade)
     def consultar_disponibilidade_tool(
         data: date,
         especialidade: Especialidade | None = None,
@@ -890,6 +934,8 @@ def criar_tools(
         if horario_inicio is not None and horario_fim is not None and horario_fim <= horario_inicio:
             return "O horário final da janela precisa ser depois do inicial."
         atendente: ProfissionalCatalogo | None = None
+        if especialidade is not None:
+            especialidade = como_especialidade(especialidade)
         try:
             foto = fotografar_periodo(fonte, data, data)
             if profissional is not None:
@@ -1058,7 +1104,7 @@ def criar_tools(
 
     @tool(
         "consultar_pacientes_por_profissional",
-        args_schema=ArgsConsultarPacientesPorProfissional,
+        args_schema=args_pacientes,
         response_format="content_and_artifact",
     )
     def consultar_pacientes_por_profissional_tool(
@@ -1214,6 +1260,13 @@ def criar_tools(
             )
         return "Nova opção de horário:\n" + _formatar_opcao_encaixe(fonte, data, opcao)
 
+    for com_enum in (
+        buscar_encaixe_tool,
+        consultar_disponibilidade_tool,
+        consultar_pacientes_por_profissional_tool,
+    ):
+        com_enum.handle_validation_error = parametro_invalido
+
     return [
         buscar_paciente_tool,
         buscar_encaixe_tool,
@@ -1222,5 +1275,6 @@ def criar_tools(
         consultar_ocupacao_profissional_tool,
         consultar_pacientes_por_profissional_tool,
         sugerir_realocacao_tool,
+        criar_tool_consultar_profissionais(fonte, data_referencia, catalogo),
         *criar_tools_relatorios(fonte, data_referencia),
     ]

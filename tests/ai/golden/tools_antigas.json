@@ -41,7 +41,7 @@
  },
  "010 clinica consultar_disponibilidade {\"data\": \"2026-09-28\", \"especialidade\": \"musicoterapia\"}": {
   "bloco": null,
-  "texto": "Nenhum horário livre encontrado em 28/09/2026 para os filtros informados."
+  "texto": "Parâmetros inválidos (especialidade). Especialidades nesta semana: Terapia Ocupacional, Fonoaudiologia, Psicologia. Corrija e chame de novo."
  },
  "011 parcial consultar_disponibilidade {\"data\": \"2026-09-30\"}": {
   "bloco": null,
@@ -8287,11 +8287,11 @@
  },
  "059 clinica consultar_pacientes_por_profissional {\"especialidade\": \"xyz\"}": {
   "bloco": null,
-  "texto": "Especialidade 'xyz' não reconhecida. Especialidades válidas: Terapia Ocupacional, Fonoaudiologia, Psicologia, Terapia Alimentar, Psicomotricidade, Psicopedagogia, Musicoterapia."
+  "texto": "Parâmetros inválidos (especialidade). Especialidades nesta semana: Terapia Ocupacional, Fonoaudiologia, Psicologia. Corrija e chame de novo."
  },
  "060 clinica consultar_pacientes_por_profissional {\"especialidade\": \"musicoterapia\"}": {
   "bloco": null,
-  "texto": "Nenhuma profissional de Musicoterapia tem agenda na semana de 28/09 a 03/10/2026."
+  "texto": "Parâmetros inválidos (especialidade). Especialidades nesta semana: Terapia Ocupacional, Fonoaudiologia, Psicologia. Corrija e chame de novo."
  },
  "061 clinica consultar_pacientes_por_profissional {\"especialidade\": \"psicologia\", \"profissional\": \"beto\"}": {
   "bloco": null,

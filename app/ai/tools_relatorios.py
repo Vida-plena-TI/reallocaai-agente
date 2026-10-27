@@ -628,7 +628,9 @@ def criar_tools_relatorios(fonte: ScheduleDataSource, data_referencia: date) -> 
         postos, convênios por cor, dias com agenda e o que significa cada métrica e relatório.
 
         Use quando precisar saber quem/onde/o quê existe antes de montar um relatório, ou
-        quando perguntarem o que significa uma métrica. Não traz pacientes.
+        quando perguntarem o que significa uma métrica. Para perguntas sobre a equipe
+        (especialidade, dias, turnos, salas e postos de cada profissional), use
+        `consultar_profissionais`. Não traz pacientes.
         """
         semana = dias_da_semana_de(data or data_referencia)
         try:

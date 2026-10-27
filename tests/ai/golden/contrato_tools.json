@@ -3,21 +3,15 @@
   "argumentos": {
    "$defs": {
     "Especialidade": {
-     "description": "Especialidades atendidas pela clínica.\n\nUm profissional atende exatamente uma especialidade (regra do negócio),\npor isso a especialidade é um valor único e não uma coleção.",
      "enum": [
       "terapia_ocupacional",
       "fonoaudiologia",
-      "psicologia",
-      "terapia_alimentar",
-      "psicomotricidade",
-      "psicopedagogia",
-      "musicoterapia"
+      "psicologia"
      ],
      "title": "Especialidade",
      "type": "string"
     },
     "ItemDemandaEntrada": {
-     "description": "Um item de demanda de `buscar_encaixe`, na unidade que a LLM conhece (minutos).",
      "properties": {
       "duracao_minutos": {
        "description": "Duração do atendimento em minutos (a agenda trabalha em blocos de 30 minutos; valores que não forem múltiplos exatos são arredondados para cima).",
@@ -148,7 +142,7 @@
  },
  "consultar_catalogo": {
   "argumentos": {
-   "description": "Mapa da clínica na semana: profissionais por especialidade (dias e salas), salas e\npostos, convênios por cor, dias com agenda e o que significa cada métrica e relatório.\n\nUse quando precisar saber quem/onde/o quê existe antes de montar um relatório, ou\nquando perguntarem o que significa uma métrica. Não traz pacientes.",
+   "description": "Mapa da clínica na semana: profissionais por especialidade (dias e salas), salas e\npostos, convênios por cor, dias com agenda e o que significa cada métrica e relatório.\n\nUse quando precisar saber quem/onde/o quê existe antes de montar um relatório, ou\nquando perguntarem o que significa uma métrica. Para perguntas sobre a equipe\n(especialidade, dias, turnos, salas e postos de cada profissional), use\n`consultar_profissionais`. Não traz pacientes.",
    "properties": {
     "data": {
      "anyOf": [
@@ -168,22 +162,17 @@
    "title": "consultar_catalogo",
    "type": "object"
   },
-  "descricao": "Mapa da clínica na semana: profissionais por especialidade (dias e salas), salas e\npostos, convênios por cor, dias com agenda e o que significa cada métrica e relatório.\n\nUse quando precisar saber quem/onde/o quê existe antes de montar um relatório, ou\nquando perguntarem o que significa uma métrica. Não traz pacientes.",
+  "descricao": "Mapa da clínica na semana: profissionais por especialidade (dias e salas), salas e\npostos, convênios por cor, dias com agenda e o que significa cada métrica e relatório.\n\nUse quando precisar saber quem/onde/o quê existe antes de montar um relatório, ou\nquando perguntarem o que significa uma métrica. Para perguntas sobre a equipe\n(especialidade, dias, turnos, salas e postos de cada profissional), use\n`consultar_profissionais`. Não traz pacientes.",
   "formato_resposta": "content"
  },
  "consultar_disponibilidade": {
   "argumentos": {
    "$defs": {
     "Especialidade": {
-     "description": "Especialidades atendidas pela clínica.\n\nUm profissional atende exatamente uma especialidade (regra do negócio),\npor isso a especialidade é um valor único e não uma coleção.",
      "enum": [
       "terapia_ocupacional",
       "fonoaudiologia",
-      "psicologia",
-      "terapia_alimentar",
-      "psicomotricidade",
-      "psicopedagogia",
-      "musicoterapia"
+      "psicologia"
      ],
      "title": "Especialidade",
      "type": "string"
@@ -315,6 +304,17 @@
  },
  "consultar_pacientes_por_profissional": {
   "argumentos": {
+   "$defs": {
+    "Especialidade": {
+     "enum": [
+      "terapia_ocupacional",
+      "fonoaudiologia",
+      "psicologia"
+     ],
+     "title": "Especialidade",
+     "type": "string"
+    }
+   },
    "description": "QUANTOS PACIENTES cada profissional (ou uma) atende, por dia ou na semana.\n\nUse quando perguntarem quantos pacientes as profissionais atendem\n(\"quantos pacientes cada profissional atende por dia?\", \"quantos\npacientes a Rossana atende?\", \"quantos pacientes de fono na\nterça?\"). Padrão: semana de hoje, todas as profissionais, com o\ndetalhe por dia. NÃO use para taxa de ocupação (slots) — para isso,\n`consultar_ocupacao_profissional` ou `consultar_ocupacao`.",
    "properties": {
     "data": {
@@ -344,15 +344,14 @@
     "especialidade": {
      "anyOf": [
       {
-       "type": "string"
+       "$ref": "#/$defs/Especialidade"
       },
       {
        "type": "null"
       }
      ],
      "default": null,
-     "description": "Especialidade como citada na pergunta (ex.: 'psicologia', 'fono', 'TO'), só quando a pergunta filtrar por uma. Deixe em branco para todas.",
-     "title": "Especialidade"
+     "description": "Especialidade como citada na pergunta (ex.: 'psicologia', 'fono', 'TO'), só quando a pergunta filtrar por uma. Deixe em branco para todas."
     },
     "profissional": {
      "anyOf": [
@@ -373,6 +372,80 @@
   },
   "descricao": "QUANTOS PACIENTES cada profissional (ou uma) atende, por dia ou na semana.\n\nUse quando perguntarem quantos pacientes as profissionais atendem\n(\"quantos pacientes cada profissional atende por dia?\", \"quantos\npacientes a Rossana atende?\", \"quantos pacientes de fono na\nterça?\"). Padrão: semana de hoje, todas as profissionais, com o\ndetalhe por dia. NÃO use para taxa de ocupação (slots) — para isso,\n`consultar_ocupacao_profissional` ou `consultar_ocupacao`.",
   "formato_resposta": "content_and_artifact"
+ },
+ "consultar_profissionais": {
+  "argumentos": {
+   "$defs": {
+    "DiaDaSemana": {
+     "enum": [
+      "segunda",
+      "terca",
+      "quarta",
+      "quinta",
+      "sexta",
+      "sabado"
+     ],
+     "title": "DiaDaSemana",
+     "type": "string"
+    },
+    "Especialidade": {
+     "enum": [
+      "terapia_ocupacional",
+      "fonoaudiologia",
+      "psicologia"
+     ],
+     "title": "Especialidade",
+     "type": "string"
+    }
+   },
+   "description": "A equipe da semana: especialidade de cada profissional, dias e turnos em que\natende, salas e postos.\n\nUse para \"você sabe as especialidades deles?\", \"quem atende fono no sábado?\",\n\"em que sala a Bia fica na terça?\". Não traz vagas (para isso,\n`consultar_disponibilidade` ou `gerar_relatorio`) nem pacientes.",
+   "properties": {
+    "dia": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/DiaDaSemana"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Só quem atende neste dia da semana, quando a pergunta citar um."
+    },
+    "especialidade": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Especialidade"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Só desta especialidade, quando a pergunta citar uma."
+    },
+    "nomes": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Profissionais citadas, com o nome como foi dito (apelido e grafia diferente valem). Em branco: toda a equipe (ou a filtrada).",
+     "title": "Nomes"
+    }
+   },
+   "title": "consultar_profissionais",
+   "type": "object"
+  },
+  "descricao": "A equipe da semana: especialidade de cada profissional, dias e turnos em que\natende, salas e postos.\n\nUse para \"você sabe as especialidades deles?\", \"quem atende fono no sábado?\",\n\"em que sala a Bia fica na terça?\". Não traz vagas (para isso,\n`consultar_disponibilidade` ou `gerar_relatorio`) nem pacientes.",
+  "formato_resposta": "content"
  },
  "gerar_relatorio": {
   "argumentos": {

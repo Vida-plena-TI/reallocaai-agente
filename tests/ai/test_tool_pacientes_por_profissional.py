@@ -230,25 +230,23 @@ def test_filtro_por_especialidade_psicologa_no_dia() -> None:
 def test_especialidade_desconhecida_lista_as_validas() -> None:
     resultado = _tool(_semana_exemplo()).invoke({"especialidade": "astrologia"})
 
+    # O parâmetro é um enum das especialidades da semana: o valor não chega à tool.
     assert resultado == (
-        "Especialidade 'astrologia' não reconhecida. Especialidades válidas: Terapia "
-        "Ocupacional, Fonoaudiologia, Psicologia, Terapia Alimentar, Psicomotricidade, "
-        "Psicopedagogia, Musicoterapia."
+        "Parâmetros inválidos (especialidade). Especialidades nesta semana: "
+        "Fonoaudiologia, Psicologia. Corrija e chame de novo."
     )
 
 
-def test_especialidade_sem_ninguem_com_agenda() -> None:
+def test_especialidade_sem_ninguem_na_semana_nem_entra_no_schema() -> None:
     resultado = _tool(_semana_exemplo()).invoke({"especialidade": "musicoterapia"})
 
-    assert resultado == (
-        "Nenhuma profissional de Musicoterapia tem agenda na semana de 28/09 a 03/10/2026."
-    )
+    assert resultado.startswith("Parâmetros inválidos (especialidade).")
 
 
 def test_profissional_de_outra_especialidade() -> None:
-    resultado = _tool(_semana_exemplo()).invoke({"profissional": "Bruno", "especialidade": "TO"})
+    resultado = _tool(_semana_exemplo()).invoke({"profissional": "Bruno", "especialidade": "psico"})
 
-    assert resultado == "Bruno (Fonoaudiologia) não é de Terapia Ocupacional."
+    assert resultado == "Bruno (Fonoaudiologia) não é de Psicologia."
 
 
 def test_domingo_no_escopo_dia() -> None:

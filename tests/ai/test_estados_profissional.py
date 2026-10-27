@@ -142,6 +142,7 @@ CHAMADAS_COM_APELIDO: dict[str, dict[str, Any]] = {
     "consultar_disponibilidade": {"data": QUINTA.isoformat(), "profissional": "beatriz"},
     "consultar_ocupacao_profissional": {"profissional": "beatriz"},
     "consultar_pacientes_por_profissional": {"profissional": "beatriz"},
+    "consultar_profissionais": {"nomes": ["beatriz"]},
     "gerar_relatorio": {"relatorio": "vagas_livres", "profissionais": ["beatriz"]},
 }
 

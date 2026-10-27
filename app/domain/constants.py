@@ -123,6 +123,11 @@ PROFISSIONAIS_APELIDOS: Final[dict[str, str]] = {
     "beatriz": "bia",
 }
 
+#: Especialidades aceitas pelas tools quando o catálogo da semana não pôde ser
+#: lido (ou veio vazio): o chat continua funcionando, só sem restringir às
+#: especialidades que a planilha mostra na semana.
+ESPECIALIDADES_RESERVA: Final[tuple[Especialidade, ...]] = tuple(Especialidade)
+
 #: Colunas de profissional que a clínica pediu para não considerar na agenda.
 #:
 #: A chave é o id normalizado do nome que sobra na célula do profissional,

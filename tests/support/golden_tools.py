@@ -19,7 +19,9 @@ o arquivo inteiro), em `feature/catalogo-agenda`: o contrato das tools que
 ganharam parâmetros, enums ou passaram a aceitar nome e apelido; e as saídas
 de `consultar_disponibilidade` com profissional, que passou a usar o
 resolvedor de nomes e o catálogo da semana ("beto" agora encontra Beto Reis;
-quem está na grade mas fora de `listar_profissionais` agora aparece).
+quem está na grade mas fora de `listar_profissionais` agora aparece); e as
+de especialidade fora da semana, que o enum do catálogo recusa antes de chegar
+à tool ("Parâmetros inválidos (especialidade)").
 """
 
 import json
