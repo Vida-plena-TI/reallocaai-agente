@@ -35,10 +35,17 @@ DIAS = ("segunda", "terca", "quarta", "quinta", "sexta", "sabado")
 VOCABULARIO_PROIBIDO = (
     "atendimento_id",
     "exatamente como veio",
-    "registrar",
-    "encaixei",
+    "parâmetros inválidos",
     "tool",
     "slot",
+    "bloco",
+    "encaixar",
+    "encaixei",
+    "registrar",
+    "registrei",
+    "agendar",
+    "agendei",
+    "marquei",
 )
 
 Status = Literal["passou", "falhou", "xfail", "xpass", "n/a", "pulado"]
@@ -54,6 +61,11 @@ class Chamada:
 class Turno:
     pergunta: str
     chamada: Chamada | None
+    #: Só no --deterministico: o turno roda pelo agente real (tool, verificação de
+    #: fundamentação) com um modelo roteirizado que responde estes textos em ordem
+    #: (o segundo só é usado se o primeiro for recusado). Testa a última barreira
+    #: do código, não o modelo.
+    respostas_simuladas: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -157,6 +169,7 @@ def _caso(bruto: Mapping[str, Any]) -> Caso:
                 if turno.get("chamada")
                 else None
             ),
+            respostas_simuladas=tuple(str(r) for r in turno.get("respostas_simuladas") or ()),
         )
         for turno in bruto["turnos"]
     )

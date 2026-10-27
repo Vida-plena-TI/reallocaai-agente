@@ -51,11 +51,13 @@ if str(_PROJECT_ROOT) not in sys.path:
 import gspread  # noqa: E402
 from langchain_core.language_models import BaseChatModel  # noqa: E402
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage  # noqa: E402
+from langchain_core.tools import BaseTool  # noqa: E402
 from tests.casos_reais.casos import (  # noqa: E402
     Caso,
     Contexto,
     ResultadoCriterio,
     Status,
+    Turno,
     TurnoObservado,
     avaliar,
     carregar_casos,
@@ -63,6 +65,7 @@ from tests.casos_reais.casos import (  # noqa: E402
     status_do_caso,
 )
 from tests.casos_reais.planilha import PlanilhaContada, payload_da_semana  # noqa: E402
+from tests.support.fake_chat_model import FakeToolCallingChatModel  # noqa: E402
 
 from app.ai.agente import (  # noqa: E402
     criar_agente,
@@ -127,18 +130,26 @@ def executar_deterministico(caso: Caso, planilha: PlanilhaContada) -> list[Turno
     Criar as tools lê o catálogo da semana: essa leitura (e o tempo dela) conta
     no primeiro turno executado, como contaria numa conversa de verdade.
     """
+    # Uma fonte por caso, como numa conversa: o cache dela vale para todos os turnos.
+    fonte = _fonte(planilha)
     criacao: tuple[int, float] | None = (planilha.chamadas, time.perf_counter())
-    tools = {
-        tool.name: tool
-        for tool in criar_tools(_fonte(planilha), SemHistoricoContinuidadeDataSource(), caso.hoje)
-    }
+    tools: dict[str, BaseTool] | None = None
     observados: list[TurnoObservado] = []
     for indice, turno in enumerate(caso.turnos, start=1):
+        if turno.respostas_simuladas:
+            observados.append(_turno_simulado(caso, turno, indice, fonte, planilha, criacao))
+            criacao = None
+            continue
+        if tools is None and turno.chamada is not None:
+            tools = {
+                tool.name: tool
+                for tool in criar_tools(fonte, SemHistoricoContinuidadeDataSource(), caso.hoje)
+            }
         observado = TurnoObservado()
         observados.append(observado)
         if turno.chamada is None:
             continue
-        tool = tools.get(turno.chamada.tool)
+        tool = (tools or {}).get(turno.chamada.tool)
         if tool is None:
             observado.erro = f"tool inexistente: {turno.chamada.tool}"
             continue
@@ -164,6 +175,62 @@ def executar_deterministico(caso: Caso, planilha: PlanilhaContada) -> list[Turno
         observado.segundos = time.perf_counter() - inicio
         observado.chamadas_planilha = planilha.chamadas - antes
     return observados
+
+
+def _turno_simulado(
+    caso: Caso,
+    turno: Turno,
+    indice: int,
+    fonte: GoogleSheetsDataSource,
+    planilha: PlanilhaContada,
+    criacao: tuple[int, float] | None,
+) -> TurnoObservado:
+    """O turno pelo agente real, com tela, e um modelo roteirizado no lugar da LLM."""
+    roteiro: list[BaseMessage] = []
+    if turno.chamada is not None:
+        roteiro.append(
+            AIMessage(
+                "",
+                tool_calls=[
+                    {
+                        "name": turno.chamada.tool,
+                        "args": resolver_datas(turno.chamada.args, caso.semana),
+                        "id": f"{caso.id}-{indice}",
+                    }
+                ],
+            )
+        )
+    roteiro.extend(AIMessage(texto) for texto in turno.respostas_simuladas)
+    observado = TurnoObservado()
+    antes, inicio = criacao or (planilha.chamadas, time.perf_counter())
+    try:
+        agente = criar_agente(
+            fonte,
+            SemHistoricoContinuidadeDataSource(),
+            FakeToolCallingChatModel(responses=roteiro),
+            caso.hoje,
+            renderiza_relatorios=True,
+        )
+        historico: list[BaseMessage] = [HumanMessage(turno.pergunta)]
+        resposta, mensagens, blocos = perguntar_com_mensagens(agente, historico)
+    except Exception as erro:
+        observado.erro = f"agente levantou {type(erro).__name__}"
+    else:
+        novas = mensagens[len(historico) :]
+        observado.resposta = resposta
+        observado.tools = [
+            chamada["name"]
+            for mensagem in novas
+            if isinstance(mensagem, AIMessage)
+            for chamada in mensagem.tool_calls
+        ]
+        observado.textos_das_tools = [
+            str(mensagem.content) for mensagem in novas if isinstance(mensagem, ToolMessage)
+        ]
+        observado.blocos = [bloco.model_dump(mode="json") for bloco in blocos]
+    observado.segundos = time.perf_counter() - inicio
+    observado.chamadas_planilha = planilha.chamadas - antes
+    return observado
 
 
 def executar_llm(

@@ -109,7 +109,11 @@ conferida na planilha**. Com isso:
        - {tipo: maximo_de_frases, maximo: 3}
    ```
 
-   `"{segunda}"` ... `"{sabado}"` viram a data daquele dia na semana de `hoje`. Para conversas
+   `"{segunda}"` ... `"{sabado}"` viram a data daquele dia na semana de `hoje`. Para testar no
+   `--deterministico` as regras do texto (vocabulário, lista com tela, fundamentação), um turno
+   pode ter `respostas_simuladas`: o turno roda pelo agente real, com a tool e a verificação do
+   código, e um modelo roteirizado responde esses textos em ordem (o segundo só se o primeiro for
+   recusado). Isso testa a última barreira do código, não o modelo; o modelo é medido no `--llm`. Para conversas
    com mais de uma pergunta, liste os turnos em ordem; `turno: N` (a partir de 1) limita um
    critério a um turno. Um turno sem tool (ex.: "pode marcar") leva `chamada: null`.
 4. **Escolha os critérios** (catálogo em `tests/casos_reais/casos.py`, `CRITERIOS`):
@@ -143,11 +147,11 @@ conferida na planilha**. Com isso:
 
 | Caso | Pergunta | Status (determinístico) |
 | --- | --- | --- |
-| c01 | Vagas de um dia | passou |
+| c01 | Vagas de um dia (pela tool de um dia, com relatório) | passou |
 | c02 | Encaixe na terça, 10h às 12h, 30 min, qualquer especialidade | xfail: `buscar_encaixe` sem limite de término nem "qualquer especialidade" |
 | c03 | Vagas quarta e quinta, fono e psicomotricidade, 10h às 12h | xfail: `gerar_relatorio` sem janela de horário |
 | c04 | Plano semanal quarta e quinta, 4 especialidades | xfail: falta a tool de plano semanal |
 | c05 | Nomes (apelido, grafia, três estados) | passou |
 | c06 | Realocação com autorização do usuário | xfail: falta a tool de realocação por pedido |
 | c07 | Vagas de segunda a sexta (1 leitura da planilha, < 20 s) | passou |
-| c08 | Vocabulário proibido | n/a (só no `--llm`) |
+| c08 | Vocabulário proibido | passou (com `respostas_simuladas`; o modelo, no `--llm`) |
