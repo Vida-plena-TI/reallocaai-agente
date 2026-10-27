@@ -54,7 +54,7 @@ def test_llm_sem_confirmar_so_estima(
     )
     saida = capsys.readouterr().out
     assert codigo == 0
-    assert "Estimativa: 8 caso(s), 15 turno(s)" in saida
+    assert "Estimativa: 10 caso(s), 18 turno(s)" in saida
     assert "Nada foi chamado" in saida
     assert list(tmp_path.iterdir()) == []
 
@@ -76,15 +76,18 @@ def test_deterministico_ponta_a_ponta_sem_nomes_de_pacientes(
         "c06": "xfail",
         "c07": "passou",
         "c08": "passou",
+        "c09": "passou",
+        "c10": "passou",
     }
     for texto in (saida, arquivo.read_text(encoding="utf-8")):
         assert "Paciente Ficticio" not in texto
 
 
 def test_planilha_de_testes_pula_casos_so_da_ficticia() -> None:
-    casos = [caso for caso in carregar_casos() if caso.id in ("c01", "c05")]
+    """Cenário próprio (c09) só existe na planilha fictícia: também é pulado."""
+    casos = [caso for caso in carregar_casos() if caso.id in ("c01", "c05", "c09")]
     resultados = avaliar_deterministico(casos, payload=payload_da_semana())
-    assert [r.status for r in resultados] == ["passou", "pulado"]
+    assert [r.status for r in resultados] == ["passou", "pulado", "pulado"]
 
 
 def test_xpass_e_falha_inesperada_contam_como_falha() -> None:

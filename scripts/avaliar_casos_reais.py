@@ -36,7 +36,7 @@ import json
 import os
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from functools import partial
@@ -287,6 +287,10 @@ def executar_llm(
     return observados
 
 
+def _sempre(payload: dict[str, Any], _params: Mapping[str, str] | None) -> dict[str, Any]:
+    return payload
+
+
 def avaliar_casos(
     casos: Sequence[Caso],
     payload: dict[str, Any],
@@ -303,8 +307,10 @@ def avaliar_casos(
             if caso.so_ficticia and not planilha_ficticia:
                 execucoes.append(Execucao(repeticao, "pulado", [], []))
                 continue
-            observados = executar(caso, PlanilhaContada(lambda _params: payload))
-            criterios = avaliar(caso, observados, Contexto(payload, caso.semana), llm=llm)
+            # Caso com cenário próprio roda (e é conferido) sobre a semana dele.
+            do_caso = payload if caso.cenario is None else payload_da_semana(caso.cenario)
+            observados = executar(caso, PlanilhaContada(partial(_sempre, do_caso)))
+            criterios = avaliar(caso, observados, Contexto(do_caso, caso.semana), llm=llm)
             execucoes.append(
                 Execucao(repeticao, status_do_caso(caso, criterios), criterios, observados)
             )

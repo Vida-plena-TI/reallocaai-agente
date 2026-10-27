@@ -83,6 +83,47 @@ AGENDA: dict[str, dict[str, str]] = {
     },
 }
 
+#: Cenários próprios de alguns casos (campo `cenario` do YAML), com as mesmas
+#: salas e profissionais; a `AGENDA` acima continua sendo a semana padrão.
+#:
+#: `poucas_vagas` (c09): quarta e quinta das 10h às 12h com fono livre e TO e
+#: psicologia lotadas. Fora da janela, a TO tem 1 vaga na quarta (14:00) e 4
+#: na quinta (07:00, 07:30, 08:30, 09:00); a psicologia, nenhuma nos dois dias.
+#: Segunda e terça (não pedidas) têm TO e psicologia livres, inclusive dentro
+#: da janela: mais perto dela que qualquer vaga da quarta ou da quinta.
+CENARIOS: dict[str, dict[str, dict[str, str]]] = {
+    "poucas_vagas": {
+        "Segunda": {
+            "Sala 1": "AABBCCDDEE FFGGAABBCC",
+            "Sala 2": "......AABB ..........",
+            "Sala 3": "AA..BB.... ..........",
+        },
+        "Terça": {
+            "Sala 1": "AABBCCDDEE FFGGAABBCC",
+            "Sala 2": "AABBCC..DD ..........",
+            "Sala 3": "AABBCC.... ..........",
+        },
+        "Quarta": {
+            "Sala 1": "AABBCC.DDE FFGGAABBCC",
+            "Sala 2": "AABBCCDDEE FF.GGAABBC",
+            "Sala 3": "AABBCCDDEE FFGGAABBCC",
+        },
+        "Quinta": {
+            "Sala 1": "AABBCCD.EE FFGGAABBCC",
+            "Sala 2": "..A..BCCDD AABBCCDDEE",
+            "Sala 3": "AABBCCDDEE FFGGAABBCC",
+        },
+        "Sexta": {
+            "Sala 1": "AABBCCDDEE FFGGAABBCC",
+            "Sala 2": "AABBCCDDEE FFGGAABBCC",
+            "Sala 3": "AABBCCDDEE FFGGAABBCC",
+        },
+        "Sábado": {
+            "Sala 1": "AABBCCDDEE FFGGAABBCC",
+        },
+    },
+}
+
 #: Letra -> parte fictícia do nome do paciente.
 _NOMES = {
     "A": "Alfa",
@@ -111,9 +152,9 @@ def _texto(marca: str, sala: str) -> str:
     return _celula_do_paciente(marca, sala)
 
 
-def valores_da_aba(dia: str) -> list[list[str]]:
+def valores_da_aba(dia: str, semana: dict[str, dict[str, str]] = AGENDA) -> list[list[str]]:
     """Texto das células da aba `dia` ("Segunda", ..., "Sábado"), linha a linha."""
-    agenda = AGENDA[dia]
+    agenda = semana[dia]
     salas = list(agenda)
     linhas: list[list[str]] = []
     for metade, horas in enumerate((HORAS_DA_MANHA, HORAS_DA_TARDE)):
@@ -142,9 +183,11 @@ def _payload_da_aba(titulo: str, valores: list[list[str]]) -> dict[str, Any]:
     return {"properties": {"title": titulo}, "merges": [], "data": [{"rowData": linhas}]}
 
 
-def payload_da_semana() -> dict[str, Any]:
-    """O que `fetch_sheet_metadata` devolveria para a planilha fictícia inteira."""
-    return {"sheets": [_payload_da_aba(dia, valores_da_aba(dia)) for dia in AGENDA]}
+def payload_da_semana(cenario: str | None = None) -> dict[str, Any]:
+    """O que `fetch_sheet_metadata` devolveria para a planilha fictícia inteira
+    (a semana padrão, ou a de um dos `CENARIOS`)."""
+    semana = AGENDA if cenario is None else CENARIOS[cenario]
+    return {"sheets": [_payload_da_aba(dia, valores_da_aba(dia, semana)) for dia in semana]}
 
 
 class PlanilhaContada:

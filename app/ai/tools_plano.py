@@ -2,11 +2,12 @@
 
 Responde "toda quarta e quinta, das 10h às 12h, fono, psicomotricidade,
 psicologia e TO, 30 min cada": para cada dia, um horário por especialidade
-dentro da janela, sem sobreposição e sem exigir sessões seguidas (isso é
-`buscar_encaixe`). O que não coube vem com até três alternativas fora da
-janela. A conta é de `app.engine.planejamento`; aqui ficam a leitura (uma
-fotografia da semana, uma chamada à planilha), a resolução de nomes pelo
-catálogo e o texto/bloco.
+dentro da janela, sem sobreposição e, por padrão, sem exigir sessões seguidas
+(numa data só, isso é `buscar_encaixe`). O que não coube vem com até três alternativas fora da
+janela, só nos dias pedidos. Com `seguidas`, o plano de cada dia é a maior
+sequência de sessões uma logo após a outra. A conta é de
+`app.engine.planejamento`; aqui ficam a leitura (uma fotografia da semana, uma
+chamada à planilha), a resolução de nomes pelo catálogo e o texto/bloco.
 
 A recorrência é a grade semanal, sem datas: a tool nunca itera por data e
 nunca afirma ter verificado datas do calendário.
@@ -90,6 +91,13 @@ class ArgsPlanejarSemana(BaseModel):
     evitar_salas: list[str] | None = Field(
         default=None, description="Salas a evitar ('Sala 3' ou '3'), quando o pedido citar."
     )
+    seguidas: bool = Field(
+        default=False,
+        description=(
+            "true quando pedirem sessões seguidas, uma logo após a outra: em cada dia, a "
+            "maior sequência que cabe na janela e quem fica de fora."
+        ),
+    )
 
 
 def _resolver_preferidos(
@@ -129,6 +137,7 @@ def executar_plano(
     duracao_minutos: int = DURACAO_SLOT_MINUTOS,
     profissionais_preferidos: list[str] | None = None,
     evitar_salas: list[str] | None = None,
+    seguidas: bool = False,
 ) -> tuple[str, dict[str, Any] | None]:
     """Texto e bloco (já em JSON) de `planejar_semana`. Uma leitura da semana de hoje."""
     inicio = hora_inicio or HORARIO_ABERTURA
@@ -168,14 +177,16 @@ def executar_plano(
             for especialidade in especialidades
         ),
         salas_evitadas=salas_evitadas,
+        seguidas=seguidas,
     )
     plano = planejar_semana(foto, pedido)
 
     dias_texto = blocos_gerais.enumerar(
         [DIAS_DA_SEMANA[d.weekday()].split("-")[0] for d in pedido.dias]
     )
+    tipo = "Plano semanal com sessões seguidas" if seguidas else "Plano semanal"
     titulo = (
-        f"Plano semanal: {dias_texto}, das {inicio:%H:%M} às {fim:%H:%M} "
+        f"{tipo}: {dias_texto}, das {inicio:%H:%M} às {fim:%H:%M} "
         f"(sessões de {duracao_em_slots * DURACAO_SLOT_MINUTOS} min)"
     )
     avisos = [blocos_gerais.AVISO_PLANO_GRADE]
@@ -230,16 +241,20 @@ def criar_tool_planejar_semana(
         duracao_minutos: int = DURACAO_SLOT_MINUTOS,
         profissionais_preferidos: list[str] | None = None,
         evitar_salas: list[str] | None = None,
+        seguidas: bool = False,
     ) -> tuple[str, dict[str, Any] | None]:
         """Plano de um paciente: UMA sessão por especialidade em cada dia pedido, dentro da
-        janela, sem sobreposição entre elas e SEM exigir que sejam seguidas.
+        janela, sem sobreposição entre elas e, por padrão, SEM exigir que sejam seguidas.
 
         Use para "semanalmente, quartas e quintas, fono, psicomotricidade, psicologia e TO,
         das 10h às 12h, 30 min" e para pedidos de várias especialidades num dia que não
         precisam ser em sequência. UMA chamada cobre todos os dias: nunca chame por data.
-        Diz o que não coube, com até 3 alternativas fora da janela. A recorrência é a grade
-        semanal (sem datas): nunca diga que datas do calendário foram verificadas.
-        Sessões seguidas, uma logo após a outra -> `buscar_encaixe`.
+        Diz o que não coube, com até 3 alternativas fora da janela nos dias pedidos, e
+        quantas sessões ficaram seguidas. A recorrência é a grade semanal (sem datas):
+        nunca cite datas nem diga que datas do calendário foram verificadas.
+        Sessões seguidas num pedido recorrente ou de vários dias ("e se forem seguidas?")
+        -> seguidas=true: a maior sequência de cada dia e quem fica de fora.
+        Sessões seguidas numa data só -> `buscar_encaixe`.
         """
         try:
             return executar_plano(
@@ -252,6 +267,7 @@ def criar_tool_planejar_semana(
                 duracao_minutos=duracao_minutos,
                 profissionais_preferidos=profissionais_preferidos,
                 evitar_salas=evitar_salas,
+                seguidas=seguidas,
             )
         except Exception as erro:
             # Só o tipo: a mensagem pode repetir dados da planilha.

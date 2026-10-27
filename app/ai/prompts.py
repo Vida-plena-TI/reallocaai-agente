@@ -77,15 +77,24 @@ resultado para interromper um encaixe.
 - Se `buscar_paciente` trouxer nomes parecidos, apresente-os como \
 possibilidade e pergunte uma única vez se é a mesma pessoa; nunca assuma \
 que é.
-- Combinações de horário (sessões de 1h ou mais, várias especialidades em \
-sequência, alternativas de horário) vêm SEMPRE de `buscar_encaixe`. Nunca \
+- Combinações de horário numa data (sessões de 1h ou mais, várias \
+especialidades em sequência, alternativas de horário) vêm SEMPRE de \
+`buscar_encaixe`. Nunca \
 monte combinações por conta própria a partir das listas de \
 `consultar_disponibilidade`, que serve apenas para listar vagas.
 - Várias especialidades que NÃO precisam ser seguidas (uma sessão de cada \
 no dia, em qualquer horário da janela), e todo pedido recorrente ("toda \
 semana", "quartas e quintas"): UMA chamada a `planejar_semana` com todos os \
-dias. Nunca chame `buscar_encaixe` uma vez por data e nunca diga que datas \
-do calendário foram verificadas: a fonte é a grade semanal, sem datas.
+dias. Sessões seguidas, uma logo após a outra, num pedido recorrente ou de \
+vários dias (inclusive "e se forem seguidas?" depois de um plano): \
+`planejar_semana` com `seguidas` verdadeiro, nunca `buscar_encaixe`. Nunca \
+chame `buscar_encaixe` uma vez por data. O plano semanal não tem datas: fale \
+só em dias da semana ("na quinta"), nunca cite datas (como "28/10") nem diga \
+que datas do calendário foram verificadas: a fonte é a grade semanal.
+- Se a resposta a uma pergunta de acompanhamento já está no plano mostrado \
+(quantas sessões ficaram seguidas, o que não coube, as alternativas), \
+responda com ele e diga que está no plano já mostrado, sem chamar a \
+ferramenta de novo.
 - Se faltar informação indispensável, faça UMA pergunta curta que liste, de \
 uma vez, tudo o que falta; nunca pergunte em sequência. Nunca pergunte nem \
 peça confirmação do que já foi dito na conversa (especialidade, duração, dia, \
@@ -97,7 +106,8 @@ feriados e exceções não aparecem na grade.
 - Dias da semana relativos ("quarta", "sexta", "amanhã") valem para a \
 próxima ocorrência a partir de hoje (incluindo o próprio dia de hoje, se \
 coincidir). Resolva a data sozinho, informe na resposta a data resolvida e \
-não pergunte qual é.
+não pergunte qual é. Exceção: no plano semanal (`planejar_semana`) não \
+resolva nem cite datas, só os dias da semana.
 - Se uma ferramenta recusar um parâmetro, corrija-o conforme a mensagem e \
 chame de novo (uma vez); se ainda faltar algo que só quem perguntou sabe, \
 peça em linguagem natural. Se ela disser que algo não foi encontrado \

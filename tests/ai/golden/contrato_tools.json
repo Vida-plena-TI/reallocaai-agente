@@ -823,7 +823,7 @@
      "type": "string"
     }
    },
-   "description": "Plano de um paciente: UMA sessão por especialidade em cada dia pedido, dentro da\njanela, sem sobreposição entre elas e SEM exigir que sejam seguidas.\n\nUse para \"semanalmente, quartas e quintas, fono, psicomotricidade, psicologia e TO,\ndas 10h às 12h, 30 min\" e para pedidos de várias especialidades num dia que não\nprecisam ser em sequência. UMA chamada cobre todos os dias: nunca chame por data.\nDiz o que não coube, com até 3 alternativas fora da janela. A recorrência é a grade\nsemanal (sem datas): nunca diga que datas do calendário foram verificadas.\nSessões seguidas, uma logo após a outra -> `buscar_encaixe`.",
+   "description": "Plano de um paciente: UMA sessão por especialidade em cada dia pedido, dentro da\njanela, sem sobreposição entre elas e, por padrão, SEM exigir que sejam seguidas.\n\nUse para \"semanalmente, quartas e quintas, fono, psicomotricidade, psicologia e TO,\ndas 10h às 12h, 30 min\" e para pedidos de várias especialidades num dia que não\nprecisam ser em sequência. UMA chamada cobre todos os dias: nunca chame por data.\nDiz o que não coube, com até 3 alternativas fora da janela nos dias pedidos, e\nquantas sessões ficaram seguidas. A recorrência é a grade semanal (sem datas):\nnunca cite datas nem diga que datas do calendário foram verificadas.\nSessões seguidas num pedido recorrente ou de vários dias (\"e se forem seguidas?\")\n-> seguidas=true: a maior sequência de cada dia e quem fica de fora.\nSessões seguidas numa data só -> `buscar_encaixe`.",
    "properties": {
     "dias_semana": {
      "description": "Dias da semana do plano ('quartas e quintas' -> quarta, quinta).",
@@ -910,6 +910,12 @@
      "default": null,
      "description": "Profissionais preferidas, com o nome como foi dito (apelido vale): têm prioridade na especialidade delas, sem ser exigência. Só quando o pedido citar.",
      "title": "Profissionais Preferidos"
+    },
+    "seguidas": {
+     "default": false,
+     "description": "true quando pedirem sessões seguidas, uma logo após a outra: em cada dia, a maior sequência que cabe na janela e quem fica de fora.",
+     "title": "Seguidas",
+     "type": "boolean"
     }
    },
    "required": [
@@ -919,7 +925,7 @@
    "title": "planejar_semana",
    "type": "object"
   },
-  "descricao": "Plano de um paciente: UMA sessão por especialidade em cada dia pedido, dentro da\njanela, sem sobreposição entre elas e SEM exigir que sejam seguidas.\n\nUse para \"semanalmente, quartas e quintas, fono, psicomotricidade, psicologia e TO,\ndas 10h às 12h, 30 min\" e para pedidos de várias especialidades num dia que não\nprecisam ser em sequência. UMA chamada cobre todos os dias: nunca chame por data.\nDiz o que não coube, com até 3 alternativas fora da janela. A recorrência é a grade\nsemanal (sem datas): nunca diga que datas do calendário foram verificadas.\nSessões seguidas, uma logo após a outra -> `buscar_encaixe`.",
+  "descricao": "Plano de um paciente: UMA sessão por especialidade em cada dia pedido, dentro da\njanela, sem sobreposição entre elas e, por padrão, SEM exigir que sejam seguidas.\n\nUse para \"semanalmente, quartas e quintas, fono, psicomotricidade, psicologia e TO,\ndas 10h às 12h, 30 min\" e para pedidos de várias especialidades num dia que não\nprecisam ser em sequência. UMA chamada cobre todos os dias: nunca chame por data.\nDiz o que não coube, com até 3 alternativas fora da janela nos dias pedidos, e\nquantas sessões ficaram seguidas. A recorrência é a grade semanal (sem datas):\nnunca cite datas nem diga que datas do calendário foram verificadas.\nSessões seguidas num pedido recorrente ou de vários dias (\"e se forem seguidas?\")\n-> seguidas=true: a maior sequência de cada dia e quem fica de fora.\nSessões seguidas numa data só -> `buscar_encaixe`.",
   "formato_resposta": "content_and_artifact"
  },
  "sugerir_realocacao": {

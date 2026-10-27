@@ -18,6 +18,7 @@ from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, Literal
 
@@ -25,6 +26,7 @@ import yaml
 
 from scripts.avaliar_prompt_renderiza import contar_frases
 from tests.casos_reais import oraculo
+from tests.casos_reais.planilha import CENARIOS
 
 CAMINHO_DOS_CASOS = Path(__file__).resolve().parent / "casos.yaml"
 
@@ -85,6 +87,8 @@ class Caso:
     criterios: tuple[Criterio, ...]
     xfail: str | None = None
     so_ficticia: bool = False
+    #: Semana própria do caso (`planilha.CENARIOS`); `None` = a semana padrão.
+    cenario: str | None = None
 
     @property
     def semana(self) -> dict[str, date]:
@@ -158,6 +162,7 @@ def _caso(bruto: Mapping[str, Any]) -> Caso:
         "criterios",
         "xfail",
         "so_ficticia",
+        "cenario",
     }
     if desconhecidos:
         raise ValueError(f"{bruto.get('id')}: campos desconhecidos {sorted(desconhecidos)}")
@@ -182,6 +187,9 @@ def _caso(bruto: Mapping[str, Any]) -> Caso:
         if criterio.turno is not None and not 1 <= criterio.turno <= len(turnos):
             raise ValueError(f"{bruto['id']}: turno {criterio.turno} não existe")
         criterios.append(criterio)
+    cenario = str(bruto["cenario"]) if bruto.get("cenario") else None
+    if cenario is not None and cenario not in CENARIOS:
+        raise ValueError(f"{bruto['id']}: cenário desconhecido {cenario!r}")
     hoje = bruto["hoje"]
     return Caso(
         id=str(bruto["id"]),
@@ -190,7 +198,9 @@ def _caso(bruto: Mapping[str, Any]) -> Caso:
         turnos=turnos,
         criterios=tuple(criterios),
         xfail=" ".join(str(bruto["xfail"]).split()) if bruto.get("xfail") else None,
-        so_ficticia=bool(bruto.get("so_ficticia", False)),
+        # Cenário próprio só existe na planilha fictícia.
+        so_ficticia=bool(bruto.get("so_ficticia", False)) or cenario is not None,
+        cenario=cenario,
     )
 
 
@@ -235,6 +245,8 @@ def intervalos(turno: TurnoObservado) -> list[tuple[time, time]]:
 #: (`planejar_semana`); repetidos aqui para o critério não depender de `app`.
 RELATORIO_PLANO = "plano_semanal"
 SITUACAO_PLANO = "Plano"
+SITUACAO_NAO_COUBE = "Não coube"
+SITUACAO_ALTERNATIVA = "Alternativa"
 
 
 @dataclass(frozen=True)
@@ -258,20 +270,32 @@ def linhas_do_plano(turnos: Sequence[TurnoObservado], situacao: str) -> list[dic
     ]
 
 
-def sessoes_do_plano(turnos: Sequence[TurnoObservado]) -> list[SessaoDoPlano] | None:
-    """As sessões "Plano" da tabela; `None` quando o turno não trouxe plano."""
-    if not any(
+def _tem_plano(turnos: Sequence[TurnoObservado]) -> bool:
+    return any(
         bloco.get("dados", {}).get("relatorio") == RELATORIO_PLANO
         for turno in turnos
         for bloco in turno.blocos
-    ):
+    )
+
+
+def _dia_da_linha(linha: Mapping[str, Any]) -> str:
+    """`quinta-feira` -> `quinta`; `sábado` -> `sabado` (como em `DIAS`)."""
+    return _normalizar(str(linha["dia"])).split("-")[0]
+
+
+def sessoes_do_plano(
+    turnos: Sequence[TurnoObservado], situacao: str = SITUACAO_PLANO
+) -> list[SessaoDoPlano] | None:
+    """As sessões da tabela com essa `situacao` ("Plano" ou "Alternativa"); `None`
+    quando o turno não trouxe plano."""
+    if not _tem_plano(turnos):
         return None
     sessoes: list[SessaoDoPlano] = []
-    for linha in linhas_do_plano(turnos, SITUACAO_PLANO):
+    for linha in linhas_do_plano(turnos, situacao):
         inicio, _, fim = str(linha["horario"]).partition(" às ")
         sessoes.append(
             SessaoDoPlano(
-                dia=_normalizar(str(linha["dia"])).split("-")[0],
+                dia=_dia_da_linha(linha),
                 inicio=_hora(inicio),
                 fim=_hora(fim),
                 sala=str(linha["sala"]),
@@ -433,8 +457,9 @@ def _meias_horas(inicio: time, fim: time) -> list[time]:
 def _plano_em_vagas_reais(
     c: Criterio, turnos: Sequence[TurnoObservado], ctx: Contexto
 ) -> ResultadoCriterio:
-    """Cada slot de cada sessão "Plano" é uma célula vazia da grade crua (oráculo)."""
-    plano = sessoes_do_plano(turnos)
+    """Cada slot de cada sessão "Plano" (ou da `situacao` pedida, como "Alternativa")
+    é uma célula vazia da grade crua (oráculo)."""
+    plano = sessoes_do_plano(turnos, c.params.get("situacao", SITUACAO_PLANO))
     if not plano:
         return _resultado(c, False, "sem sessões de plano")
     livres = {
@@ -597,6 +622,123 @@ def _estado_profissional(
     return _resultado(c, ok, detalhe)
 
 
+def _linhas_de_todos_os_planos(turnos: Sequence[TurnoObservado]) -> list[dict[str, Any]]:
+    return [
+        linha
+        for turno in turnos
+        for bloco in turno.blocos
+        if bloco.get("dados", {}).get("relatorio") == RELATORIO_PLANO
+        for linha in bloco["dados"]["linhas"]
+    ]
+
+
+@_sobre_a_saida
+def _alternativas_nos_dias_pedidos(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    alternativas = linhas_do_plano(turnos, SITUACAO_ALTERNATIVA)
+    if not _tem_plano(turnos):
+        return _resultado(c, False, "sem plano")
+    fora = sorted({_dia_da_linha(a) for a in alternativas} - set(c.params["dias"]))
+    return _resultado(
+        c, not fora, f"{len(alternativas)} alternativa(s); fora dos dias pedidos: {fora}"
+    )
+
+
+@_sobre_a_saida
+def _alternativas_sem_repeticao(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    if not _tem_plano(turnos):
+        return _resultado(c, False, "sem plano")
+    chaves = Counter(
+        (_dia_da_linha(a), str(a["especialidade"]), str(a["horario"]), str(a["sala"]))
+        for a in linhas_do_plano(turnos, SITUACAO_ALTERNATIVA)
+    )
+    repetidas = [f"{d} {h} {s}" for (d, _e, h, s), n in sorted(chaves.items()) if n > 1]
+    return _resultado(c, not repetidas, f"repetidas: {repetidas[:5]}" if repetidas else "")
+
+
+@_sobre_a_saida
+def _alternativa_no_grupo_do_dia(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    """Toda "Alternativa" vem logo depois do "Não coube" (ou de outra "Alternativa")
+    da mesma especialidade, e o `dia` dela é o do grupo."""
+    if not _tem_plano(turnos):
+        return _resultado(c, False, "sem plano")
+    grupo: Mapping[str, Any] | None = None
+    erradas: list[str] = []
+    for linha in _linhas_de_todos_os_planos(turnos):
+        situacao = linha.get("situacao")
+        if situacao == SITUACAO_NAO_COUBE:
+            grupo = linha
+        elif situacao == SITUACAO_ALTERNATIVA:
+            if grupo is None or (_dia_da_linha(linha), linha["especialidade"]) != (
+                _dia_da_linha(grupo),
+                grupo["especialidade"],
+            ):
+                erradas.append(f"{_dia_da_linha(linha)} {linha['horario']}")
+        else:
+            grupo = None
+    return _resultado(c, not erradas, f"fora do grupo: {erradas[:5]}" if erradas else "")
+
+
+@_sobre_a_saida
+def _texto_contem(c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto) -> ResultadoCriterio:
+    texto = _normalizar(" ".join(turno.visivel for turno in turnos))
+    faltam = [frase for frase in c.params["frases"] if _normalizar(frase) not in texto]
+    return _resultado(c, not faltam, f"faltam: {faltam}" if faltam else "")
+
+
+_DATA = re.compile(r"(?<![\d:])\d{1,2}/\d{1,2}(?![\d:])|\d{4}-\d{2}-\d{2}")
+
+
+@_sobre_a_saida
+def _sem_datas(c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto) -> ResultadoCriterio:
+    """Nem o texto nem o plano citam datas (`28/10`, `2026-10-28`): é grade semanal."""
+    no_texto = sum(len(_DATA.findall(turno.visivel)) for turno in turnos)
+    nos_planos = sum(len(_DATA.findall(str(linha))) for linha in _linhas_de_todos_os_planos(turnos))
+    return _resultado(
+        c, no_texto + nos_planos == 0, f"datas: {no_texto} no texto, {nos_planos} no plano"
+    )
+
+
+@_sobre_a_saida
+def _sequencia_maxima(
+    c: Criterio, turnos: Sequence[TurnoObservado], ctx: Contexto
+) -> ResultadoCriterio:
+    """Em cada dia, as sessões "Plano" são seguidas e são tantas quanto a maior
+    sequência que o oráculo acha na grade crua."""
+    plano = sessoes_do_plano(turnos)
+    if plano is None:
+        return _resultado(c, False, "sem plano")
+    inicio, fim = _hora(c.params["inicio"]), _hora(c.params["fim"])
+    problemas: list[str] = []
+    contagens: list[str] = []
+    for dia in c.params["dias"]:
+        sessoes = sorted((s for s in plano if s.dia == dia), key=lambda s: s.inicio)
+        esperado = oraculo.maior_sequencia(
+            ctx.payload, ctx.semana[dia], c.params["especialidades"], inicio, fim
+        )
+        contagens.append(f"{dia} {len(sessoes)}/{esperado}")
+        if len(sessoes) != esperado:
+            problemas.append(f"{dia}: {len(sessoes)} no plano, {esperado} no oráculo")
+        if any(a.fim != b.inicio for a, b in pairwise(sessoes)):
+            problemas.append(f"{dia}: sessões não seguidas")
+    return _resultado(c, not problemas, "; ".join(problemas or contagens))
+
+
+def _tools_chamadas(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    """As tools chamadas no turno: todas as `tools` e nenhuma de `nunca`."""
+    chamadas = [tool for turno in turnos for tool in turno.tools]
+    faltam = [t for t in c.params.get("tools", []) if t not in chamadas]
+    proibidas = [t for t in c.params.get("nunca", []) if t in chamadas]
+    return _resultado(c, not faltam and not proibidas, f"chamadas: {chamadas}")
+
+
 CRITERIOS: dict[
     str, Callable[[Criterio, Sequence[TurnoObservado], Contexto], ResultadoCriterio]
 ] = {
@@ -615,6 +757,13 @@ CRITERIOS: dict[
     "max_segundos": _max_segundos,
     "vagas_iguais_ao_oraculo": _vagas_iguais_ao_oraculo,
     "estado_profissional": _estado_profissional,
+    "alternativas_nos_dias_pedidos": _alternativas_nos_dias_pedidos,
+    "alternativas_sem_repeticao": _alternativas_sem_repeticao,
+    "alternativa_no_grupo_do_dia": _alternativa_no_grupo_do_dia,
+    "texto_contem": _texto_contem,
+    "sem_datas": _sem_datas,
+    "sequencia_maxima": _sequencia_maxima,
+    "tools_chamadas": _tools_chamadas,
 }
 
 

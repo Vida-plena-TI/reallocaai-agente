@@ -6,6 +6,8 @@
 #   hoje              data "hoje" fixa da conversa (AAAA-MM-DD)
 #   so_ficticia       true quando o caso depende dos nomes da semana fictícia
 #                     (tests/casos_reais/planilha.py); pulado com --planilha-id
+#   cenario           semana própria do caso (planilha.CENARIOS), no lugar da
+#                     semana padrão; implica so_ficticia
 #   xfail             motivo de o caso ainda falhar; o pytest marca xfail
 #                     estrito (passar sem tirar a marca também é erro)
 #   turnos            perguntas em sequência, na mesma conversa; `chamada` é
@@ -105,6 +107,7 @@
     - {tipo: max_segundos, maximo: 20}
     - tipo: frase_proibida
       frases: ["bloco contínuo de 120 minutos", "cada data foi verificada"]
+    - {tipo: sem_datas}
 
 - id: c05
   descricao: >-
@@ -211,3 +214,86 @@
         - "Eu só sugiro horários: quem marca é a equipe, na planilha."
   criterios:
     - {tipo: vocabulario_proibido}
+
+- id: c09
+  descricao: >-
+    Plano semanal com poucas vagas no mesmo dia: alternativas só nos dias
+    pedidos, sem repetir, no grupo do dia em que acontecem
+  hoje: 2026-09-28
+  # TO e psicologia lotadas das 10h às 12h na quarta e na quinta, com poucas
+  # vagas fora da janela nesses dias e muitas na segunda e na terça.
+  cenario: poucas_vagas
+  turnos:
+    - pergunta: >-
+        toda quarta e quinta, das 10h às 12h, fono, TO e psicologia, 30
+        minutos cada
+      chamada:
+        tool: planejar_semana
+        args:
+          dias_semana: [quarta, quinta]
+          especialidades: [fonoaudiologia, terapia_ocupacional, psicologia]
+          hora_inicio: "10:00"
+          hora_fim: "12:00"
+          duracao_minutos: 30
+  criterios:
+    - {tipo: tools_chamadas, tools: [planejar_semana], nunca: [buscar_encaixe]}
+    - {tipo: sem_sobreposicao_no_dia}
+    - {tipo: vagas_dentro_da_janela, inicio: "10:00", fim: "12:00"}
+    - {tipo: plano_em_vagas_reais}
+    - {tipo: plano_em_vagas_reais, situacao: Alternativa}
+    - {tipo: nao_coube_com_alternativas, especialidade: Terapia Ocupacional}
+    - {tipo: alternativas_nos_dias_pedidos, dias: [quarta, quinta]}
+    - {tipo: alternativas_sem_repeticao}
+    - {tipo: alternativa_no_grupo_do_dia}
+    # Faltaram alternativas nos dias pedidos: oferece os outros dias, sem
+    # pô-los na tabela.
+    - {tipo: texto_contem, frases: ["outros dias"]}
+    - {tipo: sem_datas}
+    - {tipo: max_chamadas_planilha, maximo: 1}
+    - {tipo: max_segundos, maximo: 20}
+
+- id: c10
+  descricao: >-
+    "E se eu preferir sessões seguidas?" depois do plano semanal: a maior
+    sequência de cada dia, quem fica de fora e a oferta de ampliar a janela
+  hoje: 2026-09-28
+  turnos:
+    - pergunta: >-
+        monta pra mim um plano na quarta e na quinta, das 10h às 12h, com
+        fono, psicomotricidade, psicologia e terapia ocupacional, 30 minutos
+        cada
+      chamada:
+        tool: planejar_semana
+        args:
+          dias_semana: [quarta, quinta]
+          especialidades: [fonoaudiologia, psicomotricidade, psicologia, terapia_ocupacional]
+          hora_inicio: "10:00"
+          hora_fim: "12:00"
+          duracao_minutos: 30
+    - pergunta: e se eu preferir sessões seguidas?
+      chamada:
+        tool: planejar_semana
+        args:
+          dias_semana: [quarta, quinta]
+          especialidades: [fonoaudiologia, psicomotricidade, psicologia, terapia_ocupacional]
+          hora_inicio: "10:00"
+          hora_fim: "12:00"
+          duracao_minutos: 30
+          seguidas: true
+  criterios:
+    # O plano comum já diz quantas ficaram seguidas.
+    - {tipo: texto_contem, frases: ["seguidas"], turno: 1}
+    - {tipo: tools_chamadas, tools: [planejar_semana], nunca: [buscar_encaixe], turno: 2}
+    - tipo: sequencia_maxima
+      turno: 2
+      dias: [quarta, quinta]
+      especialidades: [Fono, Psicomotricidade, Psicologia, TO]
+      inicio: "10:00"
+      fim: "12:00"
+    - {tipo: plano_em_vagas_reais, turno: 2}
+    - {tipo: vagas_dentro_da_janela, inicio: "10:00", fim: "12:00", turno: 2}
+    - {tipo: texto_contem, frases: ["seguidas", "ampliar"], turno: 2}
+    - {tipo: sem_datas}
+    - {tipo: max_chamadas_planilha, maximo: 1}
+    - tipo: frase_proibida
+      frases: ["não há horários seguidos para as 4", "não há horários SEGUIDOS para as 4"]

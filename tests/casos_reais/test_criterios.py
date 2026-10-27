@@ -37,7 +37,8 @@ def _rodar(tipo: str, turno: TurnoObservado, **params: object) -> ResultadoCrite
 
 def test_casos_do_yaml_carregam() -> None:
     casos = carregar_casos()
-    assert [caso.id for caso in casos] == [f"c0{n}" for n in range(1, 9)]
+    assert [caso.id for caso in casos] == [f"c{n:02d}" for n in range(1, 11)]
+    assert {caso.id: caso.cenario for caso in casos if caso.cenario} == {"c09": "poucas_vagas"}
     assert {caso.id for caso in casos if caso.xfail} == {"c06"}
 
 
@@ -49,6 +50,17 @@ def test_criterio_desconhecido_e_recusado(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="inventado"):
+        carregar_casos(arquivo)
+
+
+def test_cenario_desconhecido_e_recusado(tmp_path: Path) -> None:
+    arquivo = tmp_path / "casos.yaml"
+    arquivo.write_text(
+        "- {id: x, descricao: d, hoje: 2026-09-28, cenario: inventado,"
+        " turnos: [{pergunta: p}], criterios: []}",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="cenário desconhecido"):
         carregar_casos(arquivo)
 
 
@@ -203,3 +215,94 @@ def test_vocabulario_vale_para_todos_os_casos_no_llm() -> None:
 def test_status_do_caso(xfail: str | None, oks: list[bool | None], esperado: str) -> None:
     caso = Caso("x", "d", date(2026, 9, 28), (), (), xfail=xfail)
     assert status_do_caso(caso, [ResultadoCriterio("t", ok) for ok in oks]) == esperado
+
+
+def test_alternativas_fora_dos_dias_pedidos_repetidas_e_fora_do_grupo() -> None:
+    """O defeito que c09 cobre: alternativas de segunda num plano de quarta e
+    quinta, as mesmas em dois grupos e sob o "Não coube" de outro dia."""
+    certo = _bloco_do_plano(
+        ("quarta-feira", "Não coube", "Terapia Ocupacional", "—", "—"),
+        ("quarta-feira", "Alternativa", "Terapia Ocupacional", "14:00 às 14:30", "Sala 2"),
+        ("quinta-feira", "Plano", "Fonoaudiologia", "10:30 às 11:00", "Sala 1"),
+        ("quinta-feira", "Não coube", "Terapia Ocupacional", "—", "—"),
+        ("quinta-feira", "Alternativa", "Terapia Ocupacional", "09:00 às 09:30", "Sala 2"),
+    )
+    errado = _bloco_do_plano(
+        ("quarta-feira", "Não coube", "Psicologia", "—", "—"),
+        ("segunda-feira", "Alternativa", "Psicologia", "10:00 às 10:30", "Sala 3"),
+        ("quinta-feira", "Não coube", "Psicologia", "—", "—"),
+        ("segunda-feira", "Alternativa", "Psicologia", "10:00 às 10:30", "Sala 3"),
+    )
+    bom = TurnoObservado(textos_das_tools=["Plano."], blocos=[certo])
+    ruim = TurnoObservado(textos_das_tools=["Plano."], blocos=[errado])
+
+    for tipo, params in (
+        ("alternativas_nos_dias_pedidos", {"dias": ["quarta", "quinta"]}),
+        ("alternativas_sem_repeticao", {}),
+        ("alternativa_no_grupo_do_dia", {}),
+    ):
+        assert _rodar(tipo, bom, **params).ok, tipo
+        assert _rodar(tipo, ruim, **params).ok is False, tipo
+    assert _rodar("alternativas_sem_repeticao", TurnoObservado()).ok is False
+
+
+def test_texto_contem_e_sem_datas() -> None:
+    turno = TurnoObservado(textos_das_tools=["Na quinta, 3 SEGUIDAS das 10:00 às 11:30."])
+    com_data = TurnoObservado(textos_das_tools=["Na quinta (29/10), 3 seguidas."])
+    com_data_iso = TurnoObservado(blocos=[_bloco_do_plano(("2026-10-29", "Plano", "", "", ""))])
+
+    assert _rodar("texto_contem", turno, frases=["seguidas", "quinta"]).ok
+    assert _rodar("texto_contem", turno, frases=["ampliar"]).ok is False
+    assert _rodar("sem_datas", turno).ok
+    assert _rodar("sem_datas", com_data).ok is False
+    assert _rodar("sem_datas", com_data_iso).ok is False
+
+
+def test_sequencia_maxima_contra_o_oraculo() -> None:
+    """Quarta fictícia, 10h às 12h: fono, psicomotricidade e psicologia seguidas (3)."""
+    quatro = ["Fono", "Psicomotricidade", "Psicologia", "TO"]
+    params = {"dias": ["quarta"], "especialidades": quatro, "inicio": "10:00", "fim": "12:00"}
+    seguidas = _bloco_do_plano(
+        ("quarta-feira", "Plano", "Fonoaudiologia", "10:00 às 10:30", "Sala 5"),
+        ("quarta-feira", "Plano", "Psicomotricidade", "10:30 às 11:00", "Sala 4"),
+        ("quarta-feira", "Plano", "Psicologia", "11:00 às 11:30", "Sala 3"),
+    )
+    com_buraco = _bloco_do_plano(
+        ("quarta-feira", "Plano", "Fonoaudiologia", "10:00 às 10:30", "Sala 5"),
+        ("quarta-feira", "Plano", "Psicomotricidade", "10:30 às 11:00", "Sala 4"),
+        ("quarta-feira", "Plano", "Psicologia", "11:30 às 12:00", "Sala 3"),
+    )
+    curta = _bloco_do_plano(
+        ("quarta-feira", "Plano", "Fonoaudiologia", "10:00 às 10:30", "Sala 5"),
+        ("quarta-feira", "Plano", "Psicomotricidade", "10:30 às 11:00", "Sala 4"),
+    )
+
+    assert _rodar("sequencia_maxima", TurnoObservado(blocos=[seguidas]), **params).ok
+    resultado = _rodar("sequencia_maxima", TurnoObservado(blocos=[com_buraco]), **params)
+    assert resultado.ok is False and "não seguidas" in resultado.detalhe
+    resultado = _rodar("sequencia_maxima", TurnoObservado(blocos=[curta]), **params)
+    assert resultado.ok is False and "2 no plano, 3 no oráculo" in resultado.detalhe
+
+
+def test_tools_chamadas() -> None:
+    turno = TurnoObservado(tools=["planejar_semana"])
+    params = {"tools": ["planejar_semana"], "nunca": ["buscar_encaixe"]}
+
+    assert _rodar("tools_chamadas", turno, **params).ok
+    assert _rodar("tools_chamadas", TurnoObservado(tools=["buscar_encaixe"]), **params).ok is False
+
+
+def test_alternativas_em_vagas_reais() -> None:
+    """Quarta fictícia: Sala 2 (TO) livre às 09:30, ocupada às 10:00."""
+    real = _bloco_do_plano(
+        ("quarta-feira", "Alternativa", "Terapia Ocupacional", "09:30 às 10:00", "Sala 2"),
+    )
+    falsa = _bloco_do_plano(
+        ("quarta-feira", "Alternativa", "Terapia Ocupacional", "10:00 às 10:30", "Sala 2"),
+    )
+
+    assert _rodar("plano_em_vagas_reais", TurnoObservado(blocos=[real]), situacao="Alternativa").ok
+    resultado = _rodar(
+        "plano_em_vagas_reais", TurnoObservado(blocos=[falsa]), situacao="Alternativa"
+    )
+    assert resultado.ok is False

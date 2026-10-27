@@ -61,3 +61,11 @@ def test_perguntas_agrupadas_e_padroes_declarados(prompt: str) -> None:
     assert "duração de 30 minutos; qualquer profissional" in prompt
     assert "não pergunte por quantas semanas" in prompt
     assert "feriados e exceções não aparecem na grade" in prompt
+
+
+@pytest.mark.parametrize("prompt", VARIANTES)
+def test_plano_semanal_sem_datas_e_seguidas_no_planejar_semana(prompt: str) -> None:
+    assert "`planejar_semana` com `seguidas` verdadeiro, nunca `buscar_encaixe`" in prompt
+    assert "O plano semanal não tem datas" in prompt
+    assert "Exceção: no plano semanal (`planejar_semana`) não" in prompt
+    assert "sem chamar a ferramenta de novo" in prompt
