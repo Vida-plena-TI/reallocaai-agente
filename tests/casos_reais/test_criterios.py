@@ -37,8 +37,11 @@ def _rodar(tipo: str, turno: TurnoObservado, **params: object) -> ResultadoCrite
 
 def test_casos_do_yaml_carregam() -> None:
     casos = carregar_casos()
-    assert [caso.id for caso in casos] == [f"c{n:02d}" for n in range(1, 11)]
-    assert {caso.id: caso.cenario for caso in casos if caso.cenario} == {"c09": "poucas_vagas"}
+    assert [caso.id for caso in casos] == [f"c{n:02d}" for n in range(1, 12)]
+    assert {caso.id: caso.cenario for caso in casos if caso.cenario} == {
+        "c09": "poucas_vagas",
+        "c11": "planos_por_cor",
+    }
     assert {caso.id for caso in casos if caso.xfail} == {"c06"}
 
 
@@ -306,3 +309,82 @@ def test_alternativas_em_vagas_reais() -> None:
         "plano_em_vagas_reais", TurnoObservado(blocos=[falsa]), situacao="Alternativa"
     )
     assert resultado.ok is False
+
+
+CONTEXTO_PLANOS = Contexto(payload_da_semana("planos_por_cor"), CASO.semana)
+
+
+def _bloco_por_plano(
+    *linhas: tuple[str, str, int], avisos: tuple[str, ...] = ()
+) -> dict[str, object]:
+    return {
+        "tipo": "tabela_generica",
+        "avisos": list(avisos),
+        "dados": {
+            "relatorio": "pacientes_por_plano",
+            "linhas": [
+                {"plano": plano, "paciente": paciente, "atendimentos_semana": atendimentos}
+                for plano, paciente, atendimentos in linhas
+            ],
+        },
+    }
+
+
+#: O que o cenário `planos_por_cor` deve dar (nomes fictícios).
+LINHAS_PLANOS = (
+    ("SulAmérica", "Paciente Ficticio Azul", 3),
+    ("SulAmérica", "Paciente Ficticio Obs", 1),
+    ("Klini", "Paciente Ficticio Azul", 1),
+    ("Klini", "Paciente Ficticio Vermelho", 2),
+    ("Particulares", "Paciente Ficticio Lilas", 1),
+    ("Care Plus", "Paciente Ficticio Laranja", 2),
+    ("Unimed", "Paciente Ficticio Musgo", 1),
+    ("Unimed", "Paciente Ficticio Verde", 2),
+)
+AVISOS_PLANOS = (
+    "1 nome com cor não reconhecida foi ignorado.",
+    "1 paciente aparece com cores de mais de um plano na semana e está em cada um deles.",
+)
+
+
+def _rodar_planos(tipo: str, turno: TurnoObservado) -> ResultadoCriterio:
+    return CRITERIOS[tipo](Criterio(tipo, {}), [turno], CONTEXTO_PLANOS)
+
+
+def test_pacientes_por_plano_igual_ao_oraculo() -> None:
+    certo = _bloco_por_plano(*LINHAS_PLANOS, avisos=AVISOS_PLANOS)
+    a_mais = _bloco_por_plano(*LINHAS_PLANOS[:-1], ("Unimed", "Paciente Ficticio Verde", 3))
+    sem_aviso = _bloco_por_plano(*LINHAS_PLANOS, avisos=AVISOS_PLANOS[:1])
+    fora_de_ordem = _bloco_por_plano(*reversed(LINHAS_PLANOS), avisos=AVISOS_PLANOS)
+    com_total = _bloco_por_plano(*LINHAS_PLANOS, ("Unimed", "Total", 3), avisos=AVISOS_PLANOS)
+
+    assert _rodar_planos("pacientes_por_plano_igual_ao_oraculo", TurnoObservado(blocos=[certo])).ok
+    for errado, motivo in (
+        (a_mais, "atendimentos"),
+        (sem_aviso, "mais de um plano"),
+        (fora_de_ordem, "ordem"),
+        (com_total, "atendimentos"),
+    ):
+        resultado = _rodar_planos(
+            "pacientes_por_plano_igual_ao_oraculo", TurnoObservado(blocos=[errado])
+        )
+        assert resultado.ok is False and motivo in resultado.detalhe
+        # O detalhe vai para o JSON da régua: só contagens.
+        assert "Ficticio" not in resultado.detalhe
+
+
+def test_sem_nomes_de_paciente_no_content_nem_na_resposta() -> None:
+    bloco = _bloco_por_plano(*LINHAS_PLANOS)
+    limpo = TurnoObservado(textos_das_tools=["SulAmérica: 2 pacientes."], blocos=[bloco])
+    no_content = TurnoObservado(textos_das_tools=["Inclui paciente ficticio AZUL."], blocos=[bloco])
+    na_resposta = TurnoObservado(
+        textos_das_tools=["SulAmérica: 2 pacientes."],
+        blocos=[bloco],
+        resposta="Um deles é Paciente Fictício Obs.",
+    )
+
+    assert _rodar_planos("sem_nomes_de_paciente", limpo).ok
+    for turno in (no_content, na_resposta):
+        resultado = _rodar_planos("sem_nomes_de_paciente", turno)
+        assert resultado.ok is False and resultado.detalhe == "1 nome(s) de paciente no texto"
+    assert _rodar_planos("sem_nomes_de_paciente", TurnoObservado()).ok is False

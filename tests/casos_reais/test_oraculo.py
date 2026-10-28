@@ -130,3 +130,23 @@ def test_cenario_poucas_vagas_conferido_a_mao() -> None:
     assert "10:00" in _horas(oraculo.vagas(payload, TERCA), 2)
     # A semana padrão não mudou.
     assert payload_da_semana() == payload_da_semana(None)
+
+
+def test_cenario_planos_por_cor_conferido_a_mao() -> None:
+    """c11: ver `planilha.PECAS_DOS_CENARIOS` (preto fora, magenta não reconhecida,
+    Azul em azul e em vermelho, observação preta fora do nome)."""
+    esperado = oraculo.pacientes_por_plano(payload_da_semana("planos_por_cor"), SEMANA)
+
+    assert esperado.atendimentos == {
+        "SulAmérica": {"paciente ficticio azul": 3, "paciente ficticio obs": 1},
+        "Klini": {"paciente ficticio azul": 1, "paciente ficticio vermelho": 2},
+        "Particulares": {"paciente ficticio lilas": 1},
+        "Care Plus": {"paciente ficticio laranja": 2},
+        "Unimed": {"paciente ficticio verde": 2, "paciente ficticio musgo": 1},
+    }
+    assert esperado.nomes_nao_reconhecidos == 1
+    assert esperado.pacientes_em_mais_de_um_plano == 1
+    # A semana padrão é toda azul: nenhum aviso numérico.
+    padrao = oraculo.pacientes_por_plano(payload_da_semana(), SEMANA)
+    assert set(padrao.atendimentos) == {"SulAmérica"}
+    assert padrao.nomes_nao_reconhecidos == padrao.pacientes_em_mais_de_um_plano == 0

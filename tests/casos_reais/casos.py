@@ -739,6 +739,104 @@ def _tools_chamadas(
     return _resultado(c, not faltam and not proibidas, f"chamadas: {chamadas}")
 
 
+def _blocos_pacientes_por_plano(turnos: Sequence[TurnoObservado]) -> list[dict[str, Any]]:
+    return [
+        bloco
+        for turno in turnos
+        for bloco in turno.blocos
+        if bloco.get("dados", {}).get("relatorio") == "pacientes_por_plano"
+    ]
+
+
+def _problemas_do_bloco(bloco: Mapping[str, Any], esperado: oraculo.PacientesPorPlano) -> list[str]:
+    linhas = bloco["dados"]["linhas"]
+    do_motor = Counter(
+        {
+            (linha["plano"], oraculo.nome_normalizado(str(linha["paciente"]))): int(
+                linha["atendimentos_semana"]
+            )
+            for linha in linhas
+        }
+    )
+    do_oraculo = Counter(
+        {
+            (plano, nome): atendimentos
+            for plano, por_nome in esperado.atendimentos.items()
+            for nome, atendimentos in por_nome.items()
+        }
+    )
+    problemas: list[str] = []
+    if len(do_motor) != len(linhas) or do_motor != do_oraculo:
+        problemas.append(
+            f"atendimentos: motor {do_motor.total()} em {len(linhas)} linha(s), "
+            f"oráculo {do_oraculo.total()} em {len(do_oraculo)}"
+        )
+    avisos = " ".join(bloco["avisos"])
+    for quantidade, trecho in (
+        (esperado.nomes_nao_reconhecidos, "cor não reconhecida"),
+        (esperado.pacientes_em_mais_de_um_plano, "mais de um plano"),
+    ):
+        presente = trecho in avisos
+        if presente != (quantidade > 0) or (quantidade and f"{quantidade} " not in avisos):
+            problemas.append(f"aviso '{trecho}': esperado {quantidade}")
+    planos = [linha["plano"] for linha in linhas]
+    if planos != sorted(planos, key=_ORDEM_DOS_PLANOS.index):
+        problemas.append("linhas fora da ordem dos planos")
+    if any(_normalizar(str(linha["paciente"])) == "total" for linha in linhas):
+        problemas.append("linha de total no meio da lista")
+    return problemas
+
+
+@_sobre_a_saida
+def _pacientes_por_plano_igual_ao_oraculo(
+    c: Criterio, turnos: Sequence[TurnoObservado], ctx: Contexto
+) -> ResultadoCriterio:
+    """Em cada bloco, linhas (plano, paciente, atendimentos) e avisos numéricos iguais
+    ao que o oráculo conta na grade crua. O detalhe só traz contagens, nunca nomes."""
+    blocos = _blocos_pacientes_por_plano(turnos)
+    if not blocos:
+        return _resultado(c, False, "sem bloco pacientes_por_plano")
+    esperado = oraculo.pacientes_por_plano(ctx.payload, list(ctx.semana.values()))
+    problemas = [
+        f"bloco {indice}: {problema}"
+        for indice, bloco in enumerate(blocos, start=1)
+        for problema in _problemas_do_bloco(bloco, esperado)
+    ]
+    linhas = sum(len(bloco["dados"]["linhas"]) for bloco in blocos)
+    detalhe = f"{len(blocos)} bloco(s), {linhas} linha(s)"
+    return _resultado(c, not problemas, "; ".join(problemas) or detalhe)
+
+
+#: Ordem dos planos no relatório.
+_ORDEM_DOS_PLANOS = ["SulAmérica", "Klini", "Particulares", "Care Plus", "Unimed"]
+
+
+@_sobre_a_saida
+def _sem_nomes_de_paciente(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    """Nenhum nome do bloco `pacientes_por_plano` no texto das tools (o que o modelo
+    lê) nem na resposta. O detalhe só traz a contagem."""
+    blocos = _blocos_pacientes_por_plano(turnos)
+    if not blocos:
+        return _resultado(c, False, "sem bloco pacientes_por_plano")
+    nomes = {
+        _normalizar(str(linha["paciente"]))
+        for bloco in blocos
+        for linha in bloco["dados"]["linhas"]
+    }
+    textos = _normalizar(
+        " ".join(
+            [
+                *(t for turno in turnos for t in turno.textos_das_tools),
+                *(turno.resposta or "" for turno in turnos),
+            ]
+        )
+    )
+    citados = sum(1 for nome in nomes if re.search(rf"(?<!\w){re.escape(nome)}(?!\w)", textos))
+    return _resultado(c, citados == 0, f"{citados} nome(s) de paciente no texto")
+
+
 CRITERIOS: dict[
     str, Callable[[Criterio, Sequence[TurnoObservado], Contexto], ResultadoCriterio]
 ] = {
@@ -764,6 +862,8 @@ CRITERIOS: dict[
     "sem_datas": _sem_datas,
     "sequencia_maxima": _sequencia_maxima,
     "tools_chamadas": _tools_chamadas,
+    "pacientes_por_plano_igual_ao_oraculo": _pacientes_por_plano_igual_ao_oraculo,
+    "sem_nomes_de_paciente": _sem_nomes_de_paciente,
 }
 
 
