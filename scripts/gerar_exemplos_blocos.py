@@ -1,8 +1,10 @@
 """Gera `docs/exemplos-blocos/`: um JSON de cada variante de bloco e o JSON Schema.
 
 Os exemplos saem das tools reais rodando sobre as agendas fictícias dos testes
-(`tests/support/relatorios.py` e, para `gerar_relatorio`,
-`tests/support/agenda_clinica.py`) — nenhum dado da planilha, nenhum nome real.
+(`tests/support/relatorios.py`; para `gerar_relatorio`,
+`tests/support/agenda_clinica.py`; para `pacientes_por_plano`, a semana
+colorida `planos_por_cor` de `tests/casos_reais/planilha.py`) — nenhum dado da
+planilha, nenhum nome real.
 `tests/ai/test_exemplos_blocos.py` falha se os arquivos versionados ficarem
 desatualizados em relação ao contrato.
 
@@ -13,7 +15,7 @@ Uso:
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # Executado direto (`python scripts/...`), o `sys.path[0]` é `scripts/`: a raiz
 # do projeto precisa entrar no path para `import app` e `import tests`.
@@ -21,6 +23,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
+import gspread  # noqa: E402
+from tests.casos_reais.planilha import PlanilhaContada, payload_da_semana  # noqa: E402
 from tests.support.agenda_clinica import fonte_clinica  # noqa: E402
 from tests.support.agenda_semanal import SEGUNDA, SEXTA  # noqa: E402
 from tests.support.relatorios import fonte_relatorios  # noqa: E402
@@ -28,6 +32,7 @@ from tests.support.relatorios import fonte_relatorios  # noqa: E402
 from app.ai.relatorios import BlocoRelatorio  # noqa: E402
 from app.ai.tools import criar_tools  # noqa: E402
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource  # noqa: E402
+from app.data_sources.google_sheets import GoogleSheetsDataSource  # noqa: E402
 
 DIRETORIO = _PROJECT_ROOT / "docs" / "exemplos-blocos"
 
@@ -74,6 +79,8 @@ VARIANTES_PLANO: dict[str, dict[str, Any]] = {
         "hora_fim": "12:00",
     },
 }
+#: `pacientes_por_plano` (sem argumentos) sobre a semana colorida fictícia.
+ARQUIVO_PACIENTES_POR_PLANO = "tabela_generica_pacientes_por_plano.json"
 ARQUIVO_SCHEMA = "bloco_relatorio.schema.json"
 
 
@@ -98,6 +105,16 @@ def gerar_exemplos() -> dict[str, str]:
     chamadas += [
         (arquivo, gerais, "planejar_semana", args) for arquivo, args in VARIANTES_PLANO.items()
     ]
+    planilha = PlanilhaContada(lambda _params: payload_da_semana("planos_por_cor"))
+    coloridas = {
+        t.name: t
+        for t in criar_tools(
+            GoogleSheetsDataSource(cast(gspread.Spreadsheet, planilha)),
+            SemHistoricoContinuidadeDataSource(),
+            SEGUNDA,
+        )
+    }
+    chamadas.append((ARQUIVO_PACIENTES_POR_PLANO, coloridas, "pacientes_por_plano", {}))
     arquivos: dict[str, str] = {}
     for arquivo, disponiveis, nome, args in chamadas:
         mensagem = disponiveis[nome].invoke(

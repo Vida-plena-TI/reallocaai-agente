@@ -2,7 +2,8 @@
 
 Para o time do front/backend do chatbot. Descreve os blocos que saem de `gerar_relatorio` (tool
 do agente) e de `POST /relatorios/gerar`: `disponibilidade`, `convenio`, `agenda_paciente`,
-`qualidade_agenda` e `tabela_generica`.
+`qualidade_agenda` e `tabela_generica`. O plano semanal (`planejar_semana`) e os pacientes por
+plano (`pacientes_por_plano`) saem só pelo chat, também como `tabela_generica`.
 
 A fonte da verdade é o schema
 [`exemplos-blocos/bloco_relatorio.schema.json`](exemplos-blocos/bloco_relatorio.schema.json),
@@ -37,7 +38,7 @@ objetos do contrato.
 | `versao` | integer (`1`) | não (default `1`) | Versão do contrato; sempre sai `1`. |
 | `tipo` | string (enum) | sim | Um dos tipos do schema; igual a `dados.tipo`. |
 | `titulo` | string | sim | Pronto para exibir. |
-| `periodo` | `{inicio: date, fim: date}` \| `null` | sim | Inclusive. Sempre presente (nunca omitido). `null` só no plano semanal (`tabela_generica` com `relatorio: "plano_semanal"`), cuja fonte é a grade semanal, sem datas; todos os outros blocos trazem `{inicio, fim}`. |
+| `periodo` | `{inicio: date, fim: date}` \| `null` | sim | Inclusive. Sempre presente (nunca omitido). `null` só nos relatórios da grade semanal, sem datas: o plano semanal e os pacientes por plano (`tabela_generica` com `relatorio: "plano_semanal"` ou `"pacientes_por_plano"`); todos os outros blocos trazem `{inicio, fim}`. |
 | `meta` | number \| null | sim | Ver regras gerais. |
 | `parcial` | boolean | sim | `true` exatamente quando `dias_nao_lidos` não é vazia. |
 | `dias_nao_lidos` | list[date] | sim | Ordenada, sem repetição. |
@@ -110,6 +111,17 @@ exibir), `sessoes`, `pacientes_distintos`, `slots_ocupados`, `aguardando_autoriz
 Tabelas: **Por convênio** (`rotulo`, `sessoes`, `pacientes_distintos`, `slots_ocupados`,
 `aguardando_autorizacao`) e **Aguardando autorização** (`data`, `dia_semana`, `profissional`,
 `sessoes`).
+
+**Pendência conhecida (não muda neste momento):** este relatório lê a cor de outro jeito que os
+pacientes por plano (`pacientes_por_plano`), e os números dos dois podem divergir:
+
+- a cor é a da **célula inteira**, por hex exato (`CORES_CONVENIO`), sem olhar a cor de cada
+  trecho do texto. Na planilha de out/2026, 3 células têm o nome noutra cor (uma delas é uma
+  sessão em grupo com dois planos);
+- o **laranja** (Care Plus) não está no mapa e sai como `nao_informado`;
+- cada paciente tem **um convênio por dia** (o primeiro conhecido), mesmo que apareça em cores
+  diferentes;
+- o **preto** é "aguardando autorização" aqui; em `pacientes_por_plano`, nome preto fica fora.
 
 ## `agenda_paciente`
 
@@ -207,9 +219,58 @@ sem "Alternativa". Colunas e valores de `situacao` são os mesmos.
 `resumo`: um item por dia (`"3 de 4"`, formato `texto`) e `"Não couberam"` (`inteiro`). Tabela de exportação: **Plano** (mesmas colunas e linhas). `avisos` sempre traz
 que a recorrência usa a grade semanal e não vê feriados nem exceções.
 
+### Pacientes por plano (`relatorio: "pacientes_por_plano"`)
+
+Vem da tool `pacientes_por_plano` (só pelo chat; **não** existe em `POST /relatorios/gerar`).
+Relatório gerencial: quantos pacientes e atendimentos cada plano de saúde tem na grade semanal
+vigente, com a lista de nomes. Usa o mesmo tipo `tabela_generica`, sem tipo novo de bloco.
+
+> **Atenção: este bloco contém nomes de pacientes** (coluna `paciente`). Os nomes nunca vão
+> para o modelo da OpenAI nem para log: só para o bloco. O time do chatbot precisa revisar como
+> o bloco sai na tela, no Excel e no PDF antes de liberar a exportação dele.
+
+`titulo`: `"Pacientes por plano de saúde (grade semanal vigente)"` (sem nomes). **`periodo` é
+`null`** (a fonte é a grade semanal, sem datas). `meta` é `null`, `dimensoes` e `metricas` vêm
+vazias, `total` é `{}` e `linhas_omitidas` é `0`. Exemplo (nomes fictícios) em
+[`exemplos-blocos/tabela_generica_pacientes_por_plano.json`](exemplos-blocos/tabela_generica_pacientes_por_plano.json).
+
+| Coluna | Formato | Valores |
+| --- | --- | --- |
+| `plano` | `texto` | `"SulAmérica"`, `"Klini"`, `"Particulares"`, `"Care Plus"` ou `"Unimed"` |
+| `paciente` | `texto` | Nome do paciente como na planilha (só o trecho colorido) |
+| `atendimentos_semana` | `inteiro` | Sessões da semana com o nome na cor desse plano |
+
+Uma linha por paciente e plano, agrupadas na ordem dos planos acima e em ordem alfabética dentro
+de cada plano. **Não há linha de total no meio da lista**: os totais ficam no `resumo` (um item
+por plano, `valor` = pacientes, `exibicao` = `"2 pacientes, 4 atendimentos"`, e o item
+`"Pacientes com plano"`, com os pacientes distintos) e na tabela de exportação **Resumo por
+plano** (`plano`, `pacientes`, `atendimentos_semana`, uma linha por plano, inclusive os sem
+paciente). A outra tabela de exportação é **Pacientes** (mesmas colunas e linhas de `dados`).
+
+Regras:
+
+- O plano vem da **cor do texto** do nome (não do fundo), por faixa de matiz
+  (`PLANO_POR_COR` em `app/domain/constants.py`): azul SulAmérica, vermelho Klini, lilás
+  Particulares, laranja Care Plus, verde Unimed. Uma célula com dois nomes de cores diferentes
+  conta cada nome no seu plano.
+- **Preto** (texto padrão e tons muito escuros) fica **fora** da lista e das contagens. Não há
+  categoria "sem plano".
+- Nome colorido com observação preta (`Nome (falta)`): vale o trecho do nome; a observação sai.
+- Cor que não é preta nem de plano: ignorada, com o aviso `"N nomes com cor não reconhecida
+  foram ignorados."` só quando N > 0 (sem nomes).
+- Paciente com cores de mais de um plano na semana: aparece em cada plano, com o aviso
+  `"N pacientes aparecem com cores de mais de um plano…"` (só a contagem).
+- Paciente = nome normalizado (sem acento, caixa nem pontuação): homônimos se fundem e grafias
+  diferentes viram dois. Atendimento = sessão (horários seguidos contam uma vez).
+
+`avisos` sempre traz: que cobre só a grade semanal vigente (não todos os pacientes), a
+identificação só pelo nome, que nome preto fica fora, `"Atendimentos contados apenas com cor de
+plano…"` e que faturamento, guias, valores e cadastro ficam fora do RealocAI.
+
 ## Histórico de mudanças (versão 1)
 
 | Data | Mudança | Compatibilidade |
 | --- | --- | --- |
+| 2026-10-28 | Novo valor de `relatorio` em `tabela_generica`: `"pacientes_por_plano"` (tool `pacientes_por_plano`, só pelo chat), com `periodo` `null`. **O bloco contém nomes de pacientes.** Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual. Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |
 | 2026-10-27 | Plano semanal: alternativas só nos dias pedidos, sem repetição, sempre no grupo do dia em que acontecem (antes podiam vir de dias não pedidos, repetidas em cada grupo, com `dia` diferente do grupo); e o modo `seguidas` (mesmo formato). Nenhuma coluna nem valor de `situacao` mudou. | Compatível: `versao` continua `1`, formato igual. Só muda quais linhas vêm e a ordem dentro do grupo de cada dia. |
 | 2026-10-27 | `periodo` passou a aceitar `null` (o campo continua obrigatório e sempre presente). Só o plano semanal (`relatorio: "plano_semanal"`) envia `null`; nenhum outro tipo de bloco mudou. O schema (`bloco_relatorio.schema.json`) aceita `null` em qualquer tipo, por ser um envelope único. | Compatível: `versao` continua `1`. Quem guarda cópia do schema precisa atualizá-la, e quem exibe ou exporta o plano deve tratar `periodo` nulo (sem linha de período). |

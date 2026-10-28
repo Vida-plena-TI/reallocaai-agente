@@ -1,0 +1,234 @@
+{
+  "versao": 1,
+  "tipo": "tabela_generica",
+  "titulo": "Pacientes por plano de saúde (grade semanal vigente)",
+  "periodo": null,
+  "meta": null,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Relatório gerencial da grade semanal vigente: cobre só pacientes com sessão na grade desta semana, não todos os pacientes da clínica.",
+    "O paciente é identificado só pelo nome: homônimos aparecem como um só e grafias diferentes do mesmo nome aparecem como dois.",
+    "O plano vem da cor do texto do nome; nomes em preto não entram na lista nem nas contagens.",
+    "Atendimentos contados apenas com cor de plano: o mesmo paciente em preto em outro horário não entra na contagem.",
+    "Faturamento, guias, valores e cadastro ficam fora do RealocAI.",
+    "1 nome com cor não reconhecida foi ignorado.",
+    "1 paciente aparece com cores de mais de um plano na semana e está em cada um deles."
+  ],
+  "resumo": [
+    {
+      "rotulo": "SulAmérica",
+      "valor": 2,
+      "formato": "inteiro",
+      "exibicao": "2 pacientes, 4 atendimentos"
+    },
+    {
+      "rotulo": "Klini",
+      "valor": 2,
+      "formato": "inteiro",
+      "exibicao": "2 pacientes, 3 atendimentos"
+    },
+    {
+      "rotulo": "Particulares",
+      "valor": 1,
+      "formato": "inteiro",
+      "exibicao": "1 paciente, 1 atendimento"
+    },
+    {
+      "rotulo": "Care Plus",
+      "valor": 1,
+      "formato": "inteiro",
+      "exibicao": "1 paciente, 2 atendimentos"
+    },
+    {
+      "rotulo": "Unimed",
+      "valor": 2,
+      "formato": "inteiro",
+      "exibicao": "2 pacientes, 3 atendimentos"
+    },
+    {
+      "rotulo": "Pacientes com plano",
+      "valor": 7,
+      "formato": "inteiro",
+      "exibicao": "7"
+    }
+  ],
+  "dados": {
+    "tipo": "tabela_generica",
+    "relatorio": "pacientes_por_plano",
+    "dimensoes": [],
+    "metricas": [],
+    "colunas": [
+      {
+        "chave": "plano",
+        "rotulo": "Plano",
+        "formato": "texto"
+      },
+      {
+        "chave": "paciente",
+        "rotulo": "Paciente",
+        "formato": "texto"
+      },
+      {
+        "chave": "atendimentos_semana",
+        "rotulo": "Atendimentos na semana",
+        "formato": "inteiro"
+      }
+    ],
+    "linhas": [
+      {
+        "plano": "SulAmérica",
+        "paciente": "Paciente Ficticio Azul",
+        "atendimentos_semana": 3
+      },
+      {
+        "plano": "SulAmérica",
+        "paciente": "Paciente Ficticio Obs",
+        "atendimentos_semana": 1
+      },
+      {
+        "plano": "Klini",
+        "paciente": "Paciente Ficticio Azul",
+        "atendimentos_semana": 1
+      },
+      {
+        "plano": "Klini",
+        "paciente": "Paciente Ficticio Vermelho",
+        "atendimentos_semana": 2
+      },
+      {
+        "plano": "Particulares",
+        "paciente": "Paciente Ficticio Lilas",
+        "atendimentos_semana": 1
+      },
+      {
+        "plano": "Care Plus",
+        "paciente": "Paciente Ficticio Laranja",
+        "atendimentos_semana": 2
+      },
+      {
+        "plano": "Unimed",
+        "paciente": "Paciente Ficticio Musgo",
+        "atendimentos_semana": 1
+      },
+      {
+        "plano": "Unimed",
+        "paciente": "Paciente Ficticio Verde",
+        "atendimentos_semana": 2
+      }
+    ],
+    "total": {},
+    "linhas_omitidas": 0
+  },
+  "tabelas": [
+    {
+      "nome": "Pacientes",
+      "colunas": [
+        {
+          "chave": "plano",
+          "rotulo": "Plano",
+          "formato": "texto"
+        },
+        {
+          "chave": "paciente",
+          "rotulo": "Paciente",
+          "formato": "texto"
+        },
+        {
+          "chave": "atendimentos_semana",
+          "rotulo": "Atendimentos na semana",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "plano": "SulAmérica",
+          "paciente": "Paciente Ficticio Azul",
+          "atendimentos_semana": 3
+        },
+        {
+          "plano": "SulAmérica",
+          "paciente": "Paciente Ficticio Obs",
+          "atendimentos_semana": 1
+        },
+        {
+          "plano": "Klini",
+          "paciente": "Paciente Ficticio Azul",
+          "atendimentos_semana": 1
+        },
+        {
+          "plano": "Klini",
+          "paciente": "Paciente Ficticio Vermelho",
+          "atendimentos_semana": 2
+        },
+        {
+          "plano": "Particulares",
+          "paciente": "Paciente Ficticio Lilas",
+          "atendimentos_semana": 1
+        },
+        {
+          "plano": "Care Plus",
+          "paciente": "Paciente Ficticio Laranja",
+          "atendimentos_semana": 2
+        },
+        {
+          "plano": "Unimed",
+          "paciente": "Paciente Ficticio Musgo",
+          "atendimentos_semana": 1
+        },
+        {
+          "plano": "Unimed",
+          "paciente": "Paciente Ficticio Verde",
+          "atendimentos_semana": 2
+        }
+      ]
+    },
+    {
+      "nome": "Resumo por plano",
+      "colunas": [
+        {
+          "chave": "plano",
+          "rotulo": "Plano",
+          "formato": "texto"
+        },
+        {
+          "chave": "pacientes",
+          "rotulo": "Pacientes",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "atendimentos_semana",
+          "rotulo": "Atendimentos na semana",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "plano": "SulAmérica",
+          "pacientes": 2,
+          "atendimentos_semana": 4
+        },
+        {
+          "plano": "Klini",
+          "pacientes": 2,
+          "atendimentos_semana": 3
+        },
+        {
+          "plano": "Particulares",
+          "pacientes": 1,
+          "atendimentos_semana": 1
+        },
+        {
+          "plano": "Care Plus",
+          "pacientes": 1,
+          "atendimentos_semana": 2
+        },
+        {
+          "plano": "Unimed",
+          "pacientes": 2,
+          "atendimentos_semana": 3
+        }
+      ]
+    }
+  ]
+}
