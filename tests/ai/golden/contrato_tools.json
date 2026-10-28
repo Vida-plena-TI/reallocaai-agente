@@ -798,6 +798,16 @@
   "descricao": "Relatório de QUALQUER período (um dia, a semana, segunda a sexta) numa chamada só.\n\nUse para: vagas/horários livres de mais de um dia ou com recorte (profissional,\nespecialidade, sala, manhã/tarde) -> vagas_livres; onde cabe 1 h ou 1 h 30 ->\njanelas_continuas; ranking_ocupacao; comparativo_dias; convenios e autorizações\npendentes; qualidade_agenda (buracos); salas_ociosas; capacidade_especialidade;\nagenda_paciente (só com o nome pedido pelo usuário); ou qualquer cruzamento ->\npersonalizado com dimensoes e metricas. Janela de horário (\"das 10h às 12h\") ->\nhora_inicio/hora_fim, não periodo_do_dia. Os números já vêm calculados: não recalcule.\nUMA chamada cobre o período inteiro: nunca chame uma vez por dia.",
   "formato_resposta": "content_and_artifact"
  },
+ "pacientes_por_plano": {
+  "argumentos": {
+   "description": "Relatório gerencial de pacientes por plano de saúde (SulAmérica, Klini, Particulares, Care Plus, Unimed), lido pela cor do texto do nome na grade semanal vigente: quantos pacientes e atendimentos na semana cada plano tem, com a lista de nomes na tela.\n\nUse para 'quantos pacientes de cada plano/convênio', 'pacientes da SulAmérica', 'lista de pacientes por plano'. Você recebe só as contagens: NUNCA escreva nomes de pacientes na resposta. Cobre só quem tem sessão na grade desta semana (sem datas). Sessões por convênio e autorizações pendentes -> gerar_relatorio (convenios).",
+   "properties": {},
+   "title": "pacientes_por_plano",
+   "type": "object"
+  },
+  "descricao": "Relatório gerencial de pacientes por plano de saúde (SulAmérica, Klini, Particulares, Care Plus, Unimed), lido pela cor do texto do nome na grade semanal vigente: quantos pacientes e atendimentos na semana cada plano tem, com a lista de nomes na tela.\n\nUse para 'quantos pacientes de cada plano/convênio', 'pacientes da SulAmérica', 'lista de pacientes por plano'. Você recebe só as contagens: NUNCA escreva nomes de pacientes na resposta. Cobre só quem tem sessão na grade desta semana (sem datas). Sessões por convênio e autorizações pendentes -> gerar_relatorio (convenios).",
+  "formato_resposta": "content_and_artifact"
+ },
  "planejar_semana": {
   "argumentos": {
    "$defs": {
