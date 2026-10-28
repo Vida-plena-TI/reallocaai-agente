@@ -22,10 +22,12 @@ from app.domain.constants import (
 from app.domain.entities import (
     Atendimento,
     ItemSolicitacao,
+    NomeColorido,
     Paciente,
     Profissional,
     Sala,
     SolicitacaoAtendimento,
+    TrechoColorido,
 )
 from app.domain.enums import Convenio, Especialidade
 from app.domain.especialidade_texto import PADROES_ESPECIALIDADE, reconhecer_especialidade
@@ -39,7 +41,7 @@ from app.domain.exceptions import (
     SlotInvalidoError,
     SlotNaPausaError,
 )
-from app.domain.fonte_agenda import EntradaGrade, ScheduleDataSource
+from app.domain.fonte_agenda import EntradaGrade, FonteNomesColoridos, ScheduleDataSource
 from app.domain.normalizacao import normalizar_id
 from app.domain.semana import dias_da_semana_de
 from app.domain.slot import Slot
@@ -70,7 +72,9 @@ __all__ = [
     "Convenio",
     "EntradaGrade",
     "Especialidade",
+    "FonteNomesColoridos",
     "ItemSolicitacao",
+    "NomeColorido",
     "Paciente",
     "Profissional",
     "RealocAIDomainError",
@@ -82,6 +86,7 @@ __all__ = [
     "SlotInvalidoError",
     "SlotNaPausaError",
     "SolicitacaoAtendimento",
+    "TrechoColorido",
     "dias_da_semana_de",
     "normalizar_id",
     "reconhecer_especialidade",

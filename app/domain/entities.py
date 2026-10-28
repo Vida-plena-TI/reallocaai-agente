@@ -118,6 +118,32 @@ class Atendimento(BaseModel):
         return len(self.slots) * DURACAO_SLOT_MINUTOS
 
 
+class TrechoColorido(BaseModel):
+    """Pedaço contínuo do texto de uma célula com a mesma cor de fonte."""
+
+    model_config = ConfigDict(frozen=True)
+
+    texto: str = Field(min_length=1)
+    #: `#RRGGBB` como a planilha devolveu, sem interpretação.
+    cor: str = Field(pattern=r"^#[0-9A-F]{6}$")
+
+
+class NomeColorido(BaseModel):
+    """Um nome de paciente de um atendimento, com a cor de cada trecho do texto.
+
+    É o dado cru para ler o plano de saúde pela cor: a fonte só separa o nome
+    (o trecho da célula entre barras) e informa a cor de cada pedaço; quem
+    decide o que é nome, observação ou plano é o domínio (`ler_nome_colorido`).
+    O mesmo nome aparece uma vez por atendimento para cada combinação distinta
+    de cores com que foi escrito nas células da sessão.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    atendimento_id: str = Field(min_length=1)
+    trechos: tuple[TrechoColorido, ...] = Field(min_length=1)
+
+
 class ItemSolicitacao(BaseModel):
     """Uma especialidade pedida e quantos slots ela precisa ocupar.
 

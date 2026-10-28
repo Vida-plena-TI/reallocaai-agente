@@ -11,11 +11,11 @@ projeto quer manter.
 """
 
 from datetime import date
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.domain.entities import Atendimento, Paciente, Profissional, Sala
+from app.domain.entities import Atendimento, NomeColorido, Paciente, Profissional, Sala
 from app.domain.enums import Especialidade
 from app.domain.slot import Slot
 
@@ -66,4 +66,17 @@ class ScheduleDataSource(Protocol):
         """Todos os pacientes que aparecem em algum `Atendimento` do dia, com o
         convênio já resolvido quando disponível.
         """
+        ...
+
+
+@runtime_checkable
+class FonteNomesColoridos(Protocol):
+    """Fonte que também informa a cor de fonte de cada nome de paciente.
+
+    Separado de `ScheduleDataSource` de propósito: só a planilha tem cor, e as
+    tools que não dependem dela continuam aceitando qualquer fonte.
+    """
+
+    def listar_nomes_coloridos(self, dia: date) -> list[NomeColorido]:
+        """Nomes de paciente do dia, um por atendimento e combinação de cores."""
         ...

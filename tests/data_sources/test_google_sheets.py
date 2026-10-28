@@ -138,11 +138,12 @@ def test_valores_e_cores_so_registra_cor_de_celula_com_texto() -> None:
         cores={"B3": "#0000FF"},
     )
 
-    valores, cores = _valores_e_cores(payload_da_aba("Segunda", aba, []))
+    valores, cores, trechos = _valores_e_cores(payload_da_aba("Segunda", aba, []))
 
     assert valores[2] == ["09:00", "Paciente Um"]
     assert cores["B3"] == "#0000FF"
     assert "A1" not in cores
+    assert trechos == {}
 
 
 @pytest.mark.parametrize(

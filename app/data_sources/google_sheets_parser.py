@@ -1,10 +1,11 @@
 """Parser da planilha da agenda: dados crus da aba de um dia -> entidades do domínio.
 
 Este módulo é **puro**: ele não conhece gspread, credencial nem rede. Recebe o
-que a API do Sheets já devolveu (textos das células, intervalos mesclados e cor
-da fonte) e devolve `DadosAgendaDoDia`. É o que torna o parsing testável sem
-tocar na planilha de produção — `GoogleSheetsDataSource` é só a casca que busca
-os dados crus e chama `parse_worksheet_data`.
+que a API do Sheets já devolveu (textos das células, intervalos mesclados, cor
+da fonte e cor de cada trecho do texto) e devolve `DadosAgendaDoDia`. É o que
+torna o parsing testável sem tocar na planilha de produção —
+`GoogleSheetsDataSource` é só a casca que busca os dados crus e chama
+`parse_worksheet_data`.
 
 A planilha é preenchida à mão e cada aba é um dia da semana com dois blocos
 (manhã e tarde). Um bloco começa numa linha de cabeçalho de salas, seguida da
@@ -40,11 +41,13 @@ from app.domain import (
     Convenio,
     EntradaGrade,
     Especialidade,
+    NomeColorido,
     Paciente,
     Profissional,
     Sala,
     Slot,
     SlotInvalidoError,
+    TrechoColorido,
     normalizar_id,
 )
 
@@ -60,6 +63,12 @@ NOMES_DE_ABA_POR_DIA_DA_SEMANA: Final[dict[int, str]] = {
     4: "Sexta",
     5: "Sábado",
 }
+
+#: Cor de fonte padrão do Sheets: célula sem cor informada tem texto preto.
+COR_DE_FONTE_PADRAO: Final[str] = "#000000"
+
+#: Cor no formato que a fonte entrega (`#0000FF`).
+_PADRAO_HEX: Final[re.Pattern[str]] = re.compile(r"#[0-9A-F]{6}")
 
 #: A coluna A é o eixo de horários do bloco, nunca uma sala.
 _COLUNA_DOS_HORARIOS: Final[int] = 0
@@ -91,6 +100,7 @@ class DadosAgendaDoDia(BaseModel):
     pacientes: list[Paciente] = Field(default_factory=list)
     grade: list[EntradaGrade] = Field(default_factory=list)
     atendimentos: list[Atendimento] = Field(default_factory=list)
+    nomes_coloridos: list[NomeColorido] = Field(default_factory=list)
 
 
 def nome_da_aba(dia: date) -> str | None:
@@ -116,6 +126,7 @@ def parse_worksheet_data(
     raw_values: Sequence[Sequence[str]],
     merges: Sequence[str] = (),
     font_colors: Mapping[str, str] | None = None,
+    font_runs: Mapping[str, Sequence[tuple[int, str]]] | None = None,
 ) -> DadosAgendaDoDia:
     """Traduz a aba de um dia em entidades do domínio.
 
@@ -124,6 +135,13 @@ def parse_worksheet_data(
     (`H2:I2`) e `font_colors` a cor da fonte por célula (`{"B6": "#0000FF"}`) —
     é ela que codifica o convênio. Célula sem cor informada fica com o convênio
     desconhecido, sem virar aviso.
+
+    `font_runs` traz, por célula, os trechos do texto com cor própria
+    (`{"B6": [(0, "#FF0000"), (7, "#0000FF")]}`), na forma do `textFormatRuns`
+    da API: índice inicial em unidades UTF-16 do texto **bruto** (antes de
+    juntar linhas e espaços) e a cor já resolvida (trecho sem cor herda a da
+    célula). É dela que sai a cor de cada nome em `nomes_coloridos`; o convênio
+    de `pacientes` continua vindo só de `font_colors`.
 
     Nada aqui levanta exceção por dado torto: domingo devolve o resultado vazio
     e cada inconsistência de preenchimento vira log.
@@ -134,6 +152,7 @@ def parse_worksheet_data(
         return DadosAgendaDoDia()
 
     cores = font_colors if font_colors is not None else {}
+    trechos = font_runs if font_runs is not None else {}
     blocos = _detectar_blocos(raw_values)
     if not blocos:
         logger.warning(
@@ -248,6 +267,7 @@ def parse_worksheet_data(
                 dia=dia,
                 raw_values=raw_values,
                 cores=cores,
+                trechos=trechos,
                 coluna=coluna,
                 posto=posto,
                 profissional=profissional,
@@ -433,6 +453,9 @@ class _Sessao:
     slots: list[Slot]
     primeira_celula: str
     aguardando_autorizacao: bool
+    #: Cada nome com as cores dos seus trechos, sem repetição e na ordem em que
+    #: apareceu nas células da sessão.
+    nomes_coloridos: dict[tuple[TrechoColorido, ...], None] = field(default_factory=dict)
 
     def aceita(self, pacientes: Sequence[str], slot: Slot) -> bool:
         """Diz se o slot é a continuação direta desta sessão."""
@@ -448,6 +471,7 @@ class _Coletor:
     pacientes: dict[str, Paciente] = field(default_factory=dict)
     grade: list[EntradaGrade] = field(default_factory=list)
     atendimentos: list[Atendimento] = field(default_factory=list)
+    nomes_coloridos: list[NomeColorido] = field(default_factory=list)
 
     def registrar_sala(self, sala: Sala) -> None:
         """Guarda a sala mantendo a maior capacidade vista entre os blocos."""
@@ -481,6 +505,7 @@ class _Coletor:
                 self.grade, key=lambda item: (item.slot, item.sala_id, item.profissional_id)
             ),
             atendimentos=sorted(self.atendimentos, key=lambda item: (item.slots[0], item.id)),
+            nomes_coloridos=list(self.nomes_coloridos),
         )
 
 
@@ -489,6 +514,7 @@ def _extrair_coluna(
     dia: date,
     raw_values: Sequence[Sequence[str]],
     cores: Mapping[str, str],
+    trechos: Mapping[str, Sequence[tuple[int, str]]],
     coluna: int,
     posto: _Posto,
     profissional: Profissional,
@@ -500,11 +526,17 @@ def _extrair_coluna(
 
     def encerrar(sessao: _Sessao | None) -> None:
         if sessao is not None:
-            coletor.atendimentos.append(_montar_atendimento(dia, sessao, posto, profissional))
+            atendimento = _montar_atendimento(dia, sessao, posto, profissional)
+            coletor.atendimentos.append(atendimento)
+            coletor.nomes_coloridos.extend(
+                NomeColorido(atendimento_id=atendimento.id, trechos=nome)
+                for nome in sessao.nomes_coloridos
+            )
 
     for linha, slot in linhas_de_slot:
         endereco = _endereco_a1(linha, coluna)
-        texto = _achatar(_celula(raw_values, linha, coluna))
+        bruto = _celula(raw_values, linha, coluna)
+        texto = _achatar(bruto)
 
         # `FECHADO` é o único caso em que a janela não existe: célula vazia é
         # profissional disponível e continua fazendo parte da grade.
@@ -530,6 +562,9 @@ def _extrair_coluna(
             continue
 
         convenio, aguardando = _resolver_convenio(cores.get(endereco), endereco)
+        coloridos = _nomes_coloridos(
+            bruto, cores.get(endereco, COR_DE_FONTE_PADRAO), trechos.get(endereco, ())
+        )
         identificadores = [normalizar_id(nome) for nome in nomes]
         for identificador, nome in zip(identificadores, nomes, strict=True):
             coletor.registrar_paciente(identificador, nome, convenio)
@@ -537,6 +572,7 @@ def _extrair_coluna(
         if sessao is not None and sessao.aceita(identificadores, slot):
             sessao.slots.append(slot)
             sessao.aguardando_autorizacao = sessao.aguardando_autorizacao or aguardando
+            sessao.nomes_coloridos.update(dict.fromkeys(coloridos))
             continue
 
         encerrar(sessao)
@@ -545,6 +581,7 @@ def _extrair_coluna(
             slots=[slot],
             primeira_celula=endereco,
             aguardando_autorizacao=aguardando,
+            nomes_coloridos=dict.fromkeys(coloridos),
         )
 
     encerrar(sessao)
@@ -831,6 +868,75 @@ def _nomes_de_paciente(texto: str, endereco: str) -> list[str]:
         if any(caractere.isalpha() for caractere in nome):
             nomes.append(nome)
     return nomes
+
+
+def _nomes_coloridos(
+    bruto: str, cor_da_celula: str, trechos: Sequence[tuple[int, str]]
+) -> list[tuple[TrechoColorido, ...]]:
+    """Os nomes da célula (separados por barra), cada um com a cor de seus trechos.
+
+    A cor é aplicada letra a letra sobre o texto **bruto**, porque os índices
+    de `trechos` apontam para ele; só depois linhas e espaços são juntados como
+    em `_achatar`, levando a cor de cada letra junto. Os espaços que sobram
+    ficam com a cor da célula. Trecho sem letra nenhuma não é nome, como em
+    `_nomes_de_paciente`.
+    """
+    cor_da_celula = _hex_valido(cor_da_celula)
+    cores = [cor_da_celula] * len(bruto)
+    ordenados = sorted(trechos)
+    for indice, (inicio, cor) in enumerate(ordenados):
+        comeco = _indice_python(bruto, inicio)
+        fim = (
+            _indice_python(bruto, ordenados[indice + 1][0])
+            if indice + 1 < len(ordenados)
+            else len(bruto)
+        )
+        cores[comeco:fim] = [_hex_valido(cor)] * max(fim - comeco, 0)
+
+    caracteres: list[tuple[str, str]] = []
+    for palavra in re.finditer(r"\S+", bruto):
+        if caracteres:
+            caracteres.append((" ", cor_da_celula))
+        caracteres.extend(zip(palavra.group(), cores[palavra.start() : palavra.end()], strict=True))
+
+    segmentos: list[list[tuple[str, str]]] = [[]]
+    for caractere, cor in caracteres:
+        if caractere == "/":
+            segmentos.append([])
+        else:
+            segmentos[-1].append((caractere, cor))
+
+    nomes: list[tuple[TrechoColorido, ...]] = []
+    for segmento in segmentos:
+        if not any(caractere.isalpha() for caractere, _ in segmento):
+            continue
+        agrupados: list[TrechoColorido] = []
+        for caractere, cor in segmento:
+            if agrupados and agrupados[-1].cor == cor:
+                agrupados[-1] = TrechoColorido(texto=agrupados[-1].texto + caractere, cor=cor)
+            else:
+                agrupados.append(TrechoColorido(texto=caractere, cor=cor))
+        nomes.append(tuple(agrupados))
+    return nomes
+
+
+def _hex_valido(cor: str) -> str:
+    """`#RRGGBB` em maiúsculas; o que não estiver nesse formato vira a cor padrão."""
+    normalizada = cor.strip().upper()
+    return normalizada if _PADRAO_HEX.fullmatch(normalizada) else COR_DE_FONTE_PADRAO
+
+
+def _indice_python(texto: str, indice_utf16: int) -> int:
+    """Converte um índice em unidades UTF-16 (o da API do Sheets) em índice de `str`.
+
+    Só difere quando o texto tem caractere fora do plano básico (emoji).
+    """
+    unidades = 0
+    for indice, caractere in enumerate(texto):
+        if unidades >= indice_utf16:
+            return indice
+        unidades += 2 if ord(caractere) > 0xFFFF else 1
+    return len(texto)
 
 
 def _resolver_convenio(cor: str | None, endereco: str) -> tuple[Convenio | None, bool]:
