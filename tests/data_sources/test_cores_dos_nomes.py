@@ -47,15 +47,15 @@ def test_sem_trechos_o_nome_tem_a_cor_da_celula() -> None:
 
 
 def test_trechos_aplicados_no_texto_bruto_antes_de_juntar_espacos() -> None:
-    # "Ana  Souza\n(falta)": o "(" está no índice 11 do texto bruto, mas no 10
+    # "Ana  Ficticia\n(falta)": o "(" está no índice 14 do texto bruto, mas no 13
     # do texto achatado. Aplicar depois de achatar pintaria o espaço de preto.
-    bruto = "Ana  Souza\n(falta)"
+    bruto = "Ana  Ficticia\n(falta)"
     dados = parse_worksheet_data(
-        SEGUNDA, _aba(bruto), [], {"B3": AZUL}, {"B3": [(0, AZUL), (11, PRETO)]}
+        SEGUNDA, _aba(bruto), [], {"B3": AZUL}, {"B3": [(0, AZUL), (14, PRETO)]}
     )
 
     assert [_trechos(n) for n in dados.nomes_coloridos] == [
-        [("Ana Souza ", AZUL), ("(falta)", PRETO)]
+        [("Ana Ficticia ", AZUL), ("(falta)", PRETO)]
     ]
 
 

@@ -85,40 +85,40 @@ def test_incluir_um_plano_e_acrescentar_uma_linha(monkeypatch: pytest.MonkeyPatc
 
 
 def test_nome_colorido_com_observacao_preta_vale_o_trecho_do_nome() -> None:
-    leitura = ler_nome_colorido(_nome(("Ana Souza ", "#0000FF"), ("(falta)", "#000000")))
+    leitura = ler_nome_colorido(_nome(("Ana Ficticia ", "#0000FF"), ("(falta)", "#000000")))
 
-    assert leitura.nome == "Ana Souza"
+    assert leitura.nome == "Ana Ficticia"
     assert leitura.plano == "SulAmérica"
     assert not leitura.preto
 
 
 def test_observacao_preta_no_meio_nao_cola_as_palavras() -> None:
     leitura = ler_nome_colorido(
-        _nome(("Ana", "#FF0000"), (" repos ", "#000000"), ("Souza", "#FF0000"))
+        _nome(("Ana", "#FF0000"), (" repos ", "#000000"), ("Ficticia", "#FF0000"))
     )
 
-    assert leitura.nome == "Ana Souza"
+    assert leitura.nome == "Ana Ficticia"
     assert leitura.plano == "Klini"
 
 
 def test_todo_preto_e_ignorado() -> None:
-    leitura = ler_nome_colorido(_nome(("Ana Souza", "#000000")))
+    leitura = ler_nome_colorido(_nome(("Ana Ficticia", "#000000")))
 
     assert leitura.preto and leitura.plano is None
 
 
 def test_cor_nao_reconhecida_nao_e_preto_nem_plano() -> None:
-    leitura = ler_nome_colorido(_nome(("Ana Souza", "#FF00FF")))
+    leitura = ler_nome_colorido(_nome(("Ana Ficticia", "#FF00FF")))
 
     assert not leitura.preto and leitura.plano is None
 
 
 def test_duas_cores_no_mesmo_nome_vale_a_de_mais_letras() -> None:
     # Caso real: as letras em verde e um parêntese solto em lilás.
-    leitura = ler_nome_colorido(_nome(("Ana Souza", "#38761D"), (")", "#9900FF")))
+    leitura = ler_nome_colorido(_nome(("Ana Ficticia", "#38761D"), (")", "#9900FF")))
 
     assert leitura.plano == "Unimed"
-    assert leitura.nome == "Ana Souza"
+    assert leitura.nome == "Ana Ficticia"
 
 
 def test_empate_de_letras_fica_com_a_primeira_cor() -> None:
