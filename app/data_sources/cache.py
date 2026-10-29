@@ -11,7 +11,16 @@ from collections.abc import Callable
 from datetime import date
 from typing import TypeVar, cast
 
-from app.domain import Atendimento, EntradaGrade, Paciente, Profissional, Sala, ScheduleDataSource
+from app.domain import (
+    Atendimento,
+    EntradaGrade,
+    FonteNomesColoridos,
+    NomeColorido,
+    Paciente,
+    Profissional,
+    Sala,
+    ScheduleDataSource,
+)
 
 _T = TypeVar("_T")
 
@@ -51,6 +60,16 @@ class CacheadoScheduleDataSource:
     def listar_pacientes(self, dia: date) -> list[Paciente]:
         """Todos os pacientes que aparecem em algum `Atendimento` do dia."""
         return self._cacheado("listar_pacientes", dia, self._fonte.listar_pacientes)
+
+    def listar_nomes_coloridos(self, dia: date) -> list[NomeColorido]:
+        """Nomes de paciente do dia com a cor de cada trecho.
+
+        Só existe quando `fonte` lê cor (`FonteNomesColoridos`); senão levanta
+        `TypeError`, para não fingir uma agenda sem nenhum nome colorido.
+        """
+        if not isinstance(self._fonte, FonteNomesColoridos):
+            raise TypeError("A fonte da agenda não informa a cor dos nomes.")
+        return self._cacheado("listar_nomes_coloridos", dia, self._fonte.listar_nomes_coloridos)
 
     def _cacheado(self, nome_do_metodo: str, dia: date, buscar: Callable[[date], _T]) -> _T:
         """Devolve o valor em cache para `(nome_do_metodo, dia)`, se ainda válido.

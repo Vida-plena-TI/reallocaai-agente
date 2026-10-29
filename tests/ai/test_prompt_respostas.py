@@ -69,3 +69,16 @@ def test_plano_semanal_sem_datas_e_seguidas_no_planejar_semana(prompt: str) -> N
     assert "O plano semanal não tem datas" in prompt
     assert "Exceção: no plano semanal (`planejar_semana`) não" in prompt
     assert "sem chamar a ferramenta de novo" in prompt
+
+
+@pytest.mark.parametrize("prompt", VARIANTES)
+def test_pacientes_por_plano_so_com_contagens_e_sem_nomes(prompt: str) -> None:
+    regra = " ".join(
+        prompt[prompt.index("- Pacientes por plano de saúde") :].split("\n- ")[0].split()
+    )
+
+    assert "`pacientes_por_plano`" in regra
+    assert "grade semanal vigente" in regra and "não cite datas" in regra
+    assert "1 a 3 frases" in regra
+    assert "NUNCA escreve nomes de pacientes nem repete a lista" in regra
+    assert "preto fica fora" in regra

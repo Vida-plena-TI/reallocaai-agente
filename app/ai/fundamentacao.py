@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 
+from app.ai.blocos_gerais import nomes_de_pacientes_no_bloco
 from app.ai.relatorios import BlocoRelatorio
 from app.domain.constants import (
     FIM_PAUSA,
@@ -275,6 +276,35 @@ def registrar_nova_geracao(problemas: Problemas) -> None:
             "Vocabulário proibido forçou nova geração (total: %d).",
             CONTADORES.novas_geracoes_por_vocabulario,
         )
+
+
+def nomes_de_paciente_na_resposta(resposta: str, blocos: Sequence[BlocoRelatorio]) -> int:
+    """Quantos nomes de paciente de um bloco `pacientes_por_plano` a resposta repete.
+
+    Esses nomes só vão para a tela: o modelo nunca os recebe, então citá-los é
+    sempre erro (ou eco do histórico). Compara o nome inteiro, palavra a
+    palavra, sem acento nem caixa. Devolve só a contagem, para o log.
+    """
+    resposta_normalizada = _normalizar(resposta)
+    nomes = {
+        _normalizar(nome)
+        for bloco in blocos
+        for nome in nomes_de_pacientes_no_bloco(bloco)
+        if any(caractere.isalpha() for caractere in nome)
+    }
+    return sum(
+        1 for nome in nomes if re.search(rf"(?<!\w){re.escape(nome)}(?!\w)", resposta_normalizada)
+    )
+
+
+def registrar_nome_de_paciente(quantidade: int) -> None:
+    CONTADORES.resumos_deterministicos += 1
+    logger.warning(
+        "Fundamentação: a resposta repetiu %d nome(s) de paciente do relatório; resumo "
+        "determinístico (total: %d).",
+        quantidade,
+        CONTADORES.resumos_deterministicos,
+    )
 
 
 def registrar_resumo_deterministico(problemas: Problemas) -> None:

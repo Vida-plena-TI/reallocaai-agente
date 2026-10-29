@@ -16,16 +16,20 @@ from app.domain.constants import (
     MAPA_SALA_FALLBACK,
     MAPA_SALA_FIXA_PROFISSIONAL,
     META_OCUPACAO_POR_SALA,
+    PLANO_POR_COR,
     PROFISSIONAIS_APELIDOS,
     PROFISSIONAIS_IGNORAR,
+    FaixaDePlano,
 )
 from app.domain.entities import (
     Atendimento,
     ItemSolicitacao,
+    NomeColorido,
     Paciente,
     Profissional,
     Sala,
     SolicitacaoAtendimento,
+    TrechoColorido,
 )
 from app.domain.enums import Convenio, Especialidade
 from app.domain.especialidade_texto import PADROES_ESPECIALIDADE, reconhecer_especialidade
@@ -39,8 +43,9 @@ from app.domain.exceptions import (
     SlotInvalidoError,
     SlotNaPausaError,
 )
-from app.domain.fonte_agenda import EntradaGrade, ScheduleDataSource
+from app.domain.fonte_agenda import EntradaGrade, FonteNomesColoridos, ScheduleDataSource
 from app.domain.normalizacao import normalizar_id
+from app.domain.plano_por_cor import LeituraDeNome, e_preto, ler_nome_colorido, plano_da_cor
 from app.domain.semana import dias_da_semana_de
 from app.domain.slot import Slot
 
@@ -61,6 +66,7 @@ __all__ = [
     "MAPA_SALA_FIXA_PROFISSIONAL",
     "META_OCUPACAO_POR_SALA",
     "PADROES_ESPECIALIDADE",
+    "PLANO_POR_COR",
     "PROFISSIONAIS_APELIDOS",
     "PROFISSIONAIS_IGNORAR",
     "Atendimento",
@@ -70,7 +76,11 @@ __all__ = [
     "Convenio",
     "EntradaGrade",
     "Especialidade",
+    "FaixaDePlano",
+    "FonteNomesColoridos",
     "ItemSolicitacao",
+    "LeituraDeNome",
+    "NomeColorido",
     "Paciente",
     "Profissional",
     "RealocAIDomainError",
@@ -82,7 +92,11 @@ __all__ = [
     "SlotInvalidoError",
     "SlotNaPausaError",
     "SolicitacaoAtendimento",
+    "TrechoColorido",
     "dias_da_semana_de",
+    "e_preto",
+    "ler_nome_colorido",
     "normalizar_id",
+    "plano_da_cor",
     "reconhecer_especialidade",
 ]

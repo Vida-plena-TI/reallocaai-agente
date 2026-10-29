@@ -51,7 +51,7 @@ def test_ha_exemplo_de_cada_tipo_de_bloco() -> None:
     }
 
 
-def test_so_o_plano_semanal_tem_periodo_nulo() -> None:
+def test_so_os_relatorios_da_grade_semanal_tem_periodo_nulo() -> None:
     import json
 
     for arquivo, conteudo in gerar_exemplos().items():
@@ -59,7 +59,10 @@ def test_so_o_plano_semanal_tem_periodo_nulo() -> None:
             continue
         bloco = json.loads(conteudo)
         assert "periodo" in bloco, arquivo
-        if arquivo == "tabela_generica_plano_semanal.json":
+        if arquivo in (
+            "tabela_generica_plano_semanal.json",
+            "tabela_generica_pacientes_por_plano.json",
+        ):
             assert bloco["periodo"] is None
         else:
             assert set(bloco["periodo"]) == {"inicio", "fim"}, arquivo
@@ -73,3 +76,16 @@ def test_schema_exige_periodo_e_aceita_null() -> None:
     assert schema["properties"]["periodo"] == {
         "anyOf": [{"$ref": "#/$defs/PeriodoRelatorio"}, {"type": "null"}]
     }
+
+
+def test_exemplo_de_pacientes_por_plano_so_tem_nomes_ficticios() -> None:
+    """O bloco leva nomes de pacientes por definição: no exemplo, só os fictícios
+    do cenário `planos_por_cor`, e nenhum dos pretos ou de cor não reconhecida."""
+    import json
+
+    bloco = json.loads(gerar_exemplos()["tabela_generica_pacientes_por_plano.json"])
+    nomes = {linha["paciente"] for linha in bloco["dados"]["linhas"]}
+
+    assert nomes and all(nome.startswith("Paciente Ficticio ") for nome in nomes)
+    assert not nomes & {"Paciente Ficticio Preto", "Paciente Ficticio Magenta"}
+    assert bloco["dados"]["relatorio"] == "pacientes_por_plano"

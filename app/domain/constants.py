@@ -7,7 +7,7 @@ entidades.
 """
 
 from datetime import time
-from typing import Final
+from typing import Final, NamedTuple
 
 from app.domain.enums import Convenio, Especialidade
 
@@ -51,6 +51,59 @@ CORES_CONVENIO: Final[dict[str, Convenio]] = {
 #: confirmação do responsável (plano ou família) — por isso o convênio ainda não
 #: está identificado na célula.
 COR_AGUARDANDO_AUTORIZACAO: Final[str] = "#000000"
+
+
+class FaixaDePlano(NamedTuple):
+    """Faixa de matiz (graus HSV, de 0 a 360) da cor de texto de um plano de saúde.
+
+    Inclusiva nas duas pontas. `inicio > fim` dá a volta no zero (o vermelho
+    fica dos dois lados: 345 a 360 e 0 a 15).
+    """
+
+    rotulo: str
+    inicio: float
+    fim: float
+
+
+#: Plano de saúde de cada faixa de matiz da COR DO TEXTO do nome do paciente,
+#: para o relatório de pacientes por plano. A ordem aqui é a ordem do relatório;
+#: incluir ou remover um plano é incluir ou remover uma linha.
+#:
+#: Calibração (planilha real, out/2026, 879 células de paciente, só contagens):
+#: cada plano usa um único tom e a folga até a borda da faixa é de pelo menos
+#: 15°. Azul e lilás ficam a 36° um do outro, vermelho e laranja também; por
+#: isso as faixas são estreitas e o resto do círculo (magenta ~300°, ciano
+#: ~180°, amarelo ~60°) cai como cor não reconhecida, de propósito.
+#:
+#: Diferente de `CORES_CONVENIO` (hex exato, cor da célula inteira, usado pelo
+#: relatório de convênios): este mapa só vale para `pacientes_por_plano`.
+PLANO_POR_COR: Final[tuple[FaixaDePlano, ...]] = (
+    # Azul #0000FF (H 240): 396 células.
+    FaixaDePlano("SulAmérica", 200, 250),
+    # Vermelho #FF0000 (H 0): 219 células. Pega também o #CC0000.
+    FaixaDePlano("Klini", 345, 15),
+    # Lilás #9900FF (H 276): 49 células.
+    FaixaDePlano("Particulares", 260, 295),
+    # Laranja #FF9900 (H 36): 6 células.
+    FaixaDePlano("Care Plus", 20, 50),
+    # Verdes #274E13 (H 100) e #38761D (H 102): 188 células. Confirmado pela
+    # clínica: verde é Unimed.
+    FaixaDePlano("Unimed", 80, 160),
+)
+
+#: Saturação mínima (0 a 1) para uma cor entrar em alguma faixa de plano: abaixo
+#: disso é cinza, e cinza não é plano (vira cor não reconhecida).
+SATURACAO_MINIMA_PLANO: Final[float] = 0.35
+
+#: "Preto" no relatório de pacientes por plano: o texto padrão e os tons muito
+#: escuros, que a clínica decidiu ignorar. É preto o que tem brilho (V do HSV)
+#: abaixo de `BRILHO_MAXIMO_PRETO`, ou abaixo de `BRILHO_MAXIMO_CINZA_ESCURO`
+#: com saturação abaixo de `SATURACAO_MAXIMA_CINZA_ESCURO` (cinza-escuro).
+#: Na planilha real só aparece #000000; o verde escuro #274E13 (V 0,31, S 0,76)
+#: fica de fora das duas regras e continua sendo Unimed.
+BRILHO_MAXIMO_PRETO: Final[float] = 0.15
+BRILHO_MAXIMO_CINZA_ESCURO: Final[float] = 0.30
+SATURACAO_MAXIMA_CINZA_ESCURO: Final[float] = 0.25
 
 #: Estagiários que dividem a coluna com o profissional responsável (`Aline/Raíssa`).
 #: Eles não são profissionais alocáveis: a comparação é sempre feita com o nome

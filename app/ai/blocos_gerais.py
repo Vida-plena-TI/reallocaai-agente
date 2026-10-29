@@ -46,6 +46,7 @@ from app.domain import Especialidade
 from app.domain.constants import DURACAO_SLOT_MINUTOS
 from app.domain.formatacao import chave_natural, chave_texto, formatar_razao, rotulo_enum
 from app.engine.fotografia import FotografiaPeriodo
+from app.engine.pacientes_por_plano import PacientesPorPlano
 from app.engine.planejamento import PlanoDia, PlanoSemanal, SessaoPlano, maior_sequencia
 from app.engine.relatorio_generico import (
     Dimensao,
@@ -1121,3 +1122,160 @@ def plano_semanal(
         com_periodo=False,
     )
     return "\n".join(texto), bloco
+
+
+# --- pacientes por plano ----------------------------------------------------
+
+#: Identificador estável do relatório de pacientes por plano em `tabela_generica`.
+RELATORIO_PACIENTES_POR_PLANO: Final[str] = "pacientes_por_plano"
+
+#: Uma linha por paciente, agrupadas por plano (na ordem de `PLANO_POR_COR`).
+#: Os totais ficam só na tabela de resumo, nunca no meio da lista.
+COLUNAS_PACIENTES_POR_PLANO: Final[list[tuple[str, str, Formato]]] = [
+    ("plano", "Plano", "texto"),
+    ("paciente", "Paciente", "texto"),
+    ("atendimentos_semana", "Atendimentos na semana", "inteiro"),
+]
+COLUNAS_RESUMO_POR_PLANO: Final[list[tuple[str, str, Formato]]] = [
+    ("plano", "Plano", "texto"),
+    ("pacientes", "Pacientes", "inteiro"),
+    ("atendimentos_semana", "Atendimentos na semana", "inteiro"),
+]
+
+TITULO_PACIENTES_POR_PLANO: Final[str] = "Pacientes por plano de saúde (grade semanal vigente)"
+
+#: Limites do relatório, sempre presentes nos avisos.
+AVISOS_PACIENTES_POR_PLANO: Final[tuple[str, ...]] = (
+    "Relatório gerencial da grade semanal vigente: cobre só pacientes com sessão na grade "
+    "desta semana, não todos os pacientes da clínica.",
+    "O paciente é identificado só pelo nome: homônimos aparecem como um só e grafias "
+    "diferentes do mesmo nome aparecem como dois.",
+    "O plano vem da cor do texto do nome; nomes em preto não entram na lista nem nas contagens.",
+    "Atendimentos contados apenas com cor de plano: o mesmo paciente em preto em outro horário "
+    "não entra na contagem.",
+    "Faturamento, guias, valores e cadastro ficam fora do RealocAI.",
+)
+
+
+def avisos_pacientes_por_plano(resultado: PacientesPorPlano) -> list[str]:
+    """Os avisos fixos e os numéricos (sem nomes), só quando a contagem passa de zero."""
+    avisos = list(AVISOS_PACIENTES_POR_PLANO)
+    if resultado.nomes_nao_reconhecidos:
+        n = resultado.nomes_nao_reconhecidos
+        avisos.append(
+            f"{n} nome com cor não reconhecida foi ignorado."
+            if n == 1
+            else f"{n} nomes com cor não reconhecida foram ignorados."
+        )
+    if resultado.pacientes_em_mais_de_um_plano:
+        n = resultado.pacientes_em_mais_de_um_plano
+        avisos.append(
+            f"{n} paciente aparece com cores de mais de um plano na semana e está em cada um deles."
+            if n == 1
+            else f"{n} pacientes aparecem com cores de mais de um plano na semana e estão em "
+            "cada um deles."
+        )
+    return avisos
+
+
+def pacientes_por_plano(
+    resultado: PacientesPorPlano, avisos: list[str], dias_nao_lidos: list[date]
+) -> tuple[str, BlocoRelatorio]:
+    """Texto para o modelo (SÓ contagens) e bloco com a lista de nomes (só para a tela).
+
+    Os nomes de pacientes vão apenas nas linhas do bloco: nem o texto, nem o
+    título, nem o resumo os citam, porque o texto é o que o modelo lê e o
+    resumo é o que o resumo determinístico repete.
+    """
+    linhas: list[dict[str, ValorSimples]] = [
+        {"plano": grupo.plano, "paciente": p.nome, "atendimentos_semana": p.atendimentos}
+        for grupo in resultado.grupos
+        for p in grupo.pacientes
+    ]
+    totais: list[dict[str, ValorSimples]] = [
+        {
+            "plano": grupo.plano,
+            "pacientes": len(grupo.pacientes),
+            "atendimentos_semana": grupo.atendimentos,
+        }
+        for grupo in resultado.grupos
+    ]
+
+    texto = [
+        f"{TITULO_PACIENTES_POR_PLANO}: {_n(resultado.pacientes, 'paciente', 'pacientes')} "
+        "com plano."
+    ]
+    if dias_nao_lidos:
+        nao_lidos = ", ".join(_dia_curto(dia) for dia in dias_nao_lidos)
+        texto.append(f"Não foi possível ler: {nao_lidos}; os números são parciais.")
+    texto.extend(
+        f"- {grupo.plano}: {_n(len(grupo.pacientes), 'paciente', 'pacientes')}, "
+        f"{_n(grupo.atendimentos, 'atendimento', 'atendimentos')} na semana."
+        for grupo in resultado.grupos
+    )
+    texto.extend(avisos)
+    texto.append(
+        "A lista com os nomes está só no relatório da tela: não escreva nomes de pacientes "
+        "na resposta."
+    )
+
+    resumo = [
+        ItemResumo(
+            rotulo=grupo.plano,
+            valor=len(grupo.pacientes),
+            formato="inteiro",
+            exibicao=(
+                f"{_n(len(grupo.pacientes), 'paciente', 'pacientes')}, "
+                f"{_n(grupo.atendimentos, 'atendimento', 'atendimentos')}"
+            ),
+        )
+        for grupo in resultado.grupos
+    ]
+    resumo.append(
+        ItemResumo(
+            rotulo="Pacientes com plano",
+            valor=resultado.pacientes,
+            formato="inteiro",
+            exibicao=str(resultado.pacientes),
+        )
+    )
+    bloco = BlocoRelatorio.model_validate(
+        {
+            "tipo": "tabela_generica",
+            "titulo": TITULO_PACIENTES_POR_PLANO,
+            # A fonte é a grade semanal, sem datas: o bloco não inventa período.
+            "periodo": None,
+            "meta": None,
+            "parcial": bool(dias_nao_lidos),
+            "dias_nao_lidos": sorted(set(dias_nao_lidos)),
+            "avisos": avisos,
+            "resumo": resumo,
+            "dados": DadosTabelaGenerica(
+                relatorio=RELATORIO_PACIENTES_POR_PLANO,
+                dimensoes=[],
+                metricas=[],
+                colunas=[
+                    ColunaTabela(chave=c, rotulo=r, formato=f)
+                    for c, r, f in COLUNAS_PACIENTES_POR_PLANO
+                ],
+                linhas=linhas,
+                total={},
+                linhas_omitidas=0,
+            ),
+            "tabelas": [
+                tabela("Pacientes", COLUNAS_PACIENTES_POR_PLANO, linhas),
+                tabela("Resumo por plano", COLUNAS_RESUMO_POR_PLANO, totais),
+            ],
+        }
+    )
+    return "\n".join(texto), bloco
+
+
+def nomes_de_pacientes_no_bloco(bloco: BlocoRelatorio) -> list[str]:
+    """Nomes de paciente que um bloco de `pacientes_por_plano` leva (para a proteção do texto)."""
+    dados = bloco.dados
+    if not isinstance(dados, DadosTabelaGenerica) or dados.relatorio != (
+        RELATORIO_PACIENTES_POR_PLANO
+    ):
+        return []
+    return [str(linha["paciente"]) for linha in dados.linhas if linha.get("paciente")]

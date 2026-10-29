@@ -278,3 +278,11 @@ def test_catalogo_com_data_invalida_devolve_422(cliente: TestClient) -> None:
 
     assert resposta.status_code == 422
     assert "ontem" not in resposta.text
+
+
+def test_pacientes_por_plano_nao_e_exposto_na_api(cliente: TestClient) -> None:
+    """Decisão da clínica: o relatório com nomes por plano sai só pelo chat."""
+    resposta = _gerar(cliente, {"relatorio": "pacientes_por_plano"})
+
+    assert resposta.status_code == 422
+    assert "pacientes_por_plano" not in RELATORIOS

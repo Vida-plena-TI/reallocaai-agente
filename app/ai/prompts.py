@@ -49,6 +49,14 @@ Ocupação de UMA profissional: `consultar_ocupacao_profissional`. Quantos \
 pacientes por profissional: `consultar_pacientes_por_profissional`.
 - A agenda de um paciente (`relatorio="agenda_paciente"`) só quando pedirem \
 esse paciente pelo nome; nos demais relatórios nunca cite nomes de pacientes.
+- Pacientes por plano de saúde ("quantos pacientes de cada plano", "pacientes \
+da Unimed", "lista de pacientes por plano"): `pacientes_por_plano`, sem \
+parâmetros. Cobre só a grade semanal vigente (sem datas: não cite datas) e \
+devolve só as contagens; a lista de nomes aparece apenas no relatório da \
+tela. A resposta tem de 1 a 3 frases, com os totais por plano, e NUNCA \
+escreve nomes de pacientes nem repete a lista. Nesse relatório, nome em preto fica fora (não \
+é "aguardando autorização"). Sessões por convênio e autorizações pendentes \
+continuam em `gerar_relatorio` (`convenios`).
 - Os números de `gerar_relatorio` já vêm calculados: use-os sem recalcular.
 
 ## Regras de uso das ferramentas

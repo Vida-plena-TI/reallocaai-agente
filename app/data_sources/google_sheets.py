@@ -3,7 +3,7 @@
 Esta é a casca fina do parsing: aqui só acontece autenticação, uma chamada à API
 e a tradução do payload do Sheets para as estruturas simples que
 `parse_worksheet_data` espera. Toda a interpretação da planilha — blocos, salas,
-profissionais, sessões, convênio por cor — vive no parser, que é puro e testado
+profissionais, sessões, convênio por cor, cor de cada nome — vive no parser, que é puro e testado
 sem rede.
 """
 
@@ -29,6 +29,7 @@ from app.data_sources.google_sheets_parser import (
 from app.domain import (
     Atendimento,
     EntradaGrade,
+    NomeColorido,
     Paciente,
     Profissional,
     Sala,
@@ -45,10 +46,20 @@ _RAIZ_DO_PROJETO: Final[Path] = Path(__file__).resolve().parent.parent.parent
 
 #: Sem recortar os campos, `includeGridData` traz a planilha inteira com toda a
 #: formatação. O parser só precisa do texto e da cor da fonte de cada célula,
-#: mais os intervalos mesclados de cada aba.
+#: da cor de cada trecho do texto (`textFormatRuns`: um nome azul e outro
+#: vermelho na mesma célula) e dos intervalos mesclados de cada aba.
+#:
+#: A cor é a digitada (`userEnteredFormat`), não a exibida (`effectiveFormat`):
+#: medido na planilha real (out/2026), pedir `effectiveFormat` levava a leitura
+#: de ~1,4 s para ~7 s e a resposta de ~2 MB para ~20 MB, porque a API o
+#: calcula para toda célula da grade, inclusive as vazias. As duas só divergem
+#: com formatação condicional, que a planilha não usa; `conditionalFormats`
+#: (pequeno, no nível da aba) vem junto só para avisar se isso mudar.
 _CAMPOS_DA_GRADE: Final[str] = (
-    "sheets(properties.title,merges,"
-    "data.rowData.values(formattedValue,userEnteredFormat.textFormat.foregroundColor))"
+    "sheets(properties.title,merges,conditionalFormats.booleanRule.format.textFormat,"
+    "data.rowData.values(formattedValue,"
+    "userEnteredFormat.textFormat(foregroundColor,foregroundColorStyle),"
+    "textFormatRuns(startIndex,format(foregroundColor,foregroundColorStyle))))"
 )
 
 #: Cor de fonte padrão do Sheets: célula sem `foregroundColor` no payload não
@@ -147,6 +158,10 @@ class GoogleSheetsDataSource:
         """Pacientes que aparecem na agenda do dia, com o convênio que a cor indicou."""
         return self._dados_do_dia(dia).pacientes
 
+    def listar_nomes_coloridos(self, dia: date) -> list[NomeColorido]:
+        """Nomes de paciente do dia com a cor de cada trecho (ver `FonteNomesColoridos`)."""
+        return self._dados_do_dia(dia).nomes_coloridos
+
     def _em_cache(self, dia: date) -> DadosAgendaDoDia | None:
         em_cache = self._cache.get(dia)
         if em_cache is None:
@@ -182,6 +197,7 @@ class GoogleSheetsDataSource:
             params={"includeGridData": "true", "fields": _CAMPOS_DA_GRADE}
         ).get("sheets", [])
         titulos = [str(aba.get("properties", {}).get("title", "")) for aba in abas]
+        _avisar_formatacao_condicional(abas, titulos)
 
         pedido = DadosAgendaDoDia()
         for outro_dia in dias_da_semana_de(dia):
@@ -222,19 +238,45 @@ class GoogleSheetsDataSource:
             return DadosAgendaDoDia()
 
         aba = abas[titulos.index(titulo)]
-        valores, cores = _valores_e_cores(aba)
+        valores, cores, trechos = _valores_e_cores(aba)
         merges = [_intervalo_para_a1(merge) for merge in aba.get("merges", [])]
-        return parse_worksheet_data(dia, valores, merges, cores)
+        return parse_worksheet_data(dia, valores, merges, cores, trechos)
 
 
-def _valores_e_cores(aba: Mapping[str, Any]) -> tuple[list[list[str]], dict[str, str]]:
-    """Separa o payload da aba em texto por célula e cor de fonte por endereço A1.
+def _avisar_formatacao_condicional(
+    abas: Sequence[Mapping[str, Any]], titulos: Sequence[str]
+) -> None:
+    """Avisa (só a contagem) quando alguma aba tem regra condicional de cor de texto.
 
-    Só as células com texto entram no mapa de cores: as vazias não têm convênio
-    a informar.
+    Com ela, a cor exibida pode não ser a digitada que o parser lê.
+    """
+    for aba, titulo in zip(abas, titulos, strict=True):
+        regras = [
+            regra
+            for regra in aba.get("conditionalFormats", [])
+            if regra.get("booleanRule", {}).get("format", {}).get("textFormat")
+        ]
+        if regras:
+            logger.warning(
+                "Aba %r tem %d regra(s) de formatação condicional na cor do texto: "
+                "a cor lida é a digitada e pode não ser a exibida.",
+                titulo,
+                len(regras),
+            )
+
+
+def _valores_e_cores(
+    aba: Mapping[str, Any],
+) -> tuple[list[list[str]], dict[str, str], dict[str, list[tuple[int, str]]]]:
+    """Separa o payload da aba em texto por célula, cor de fonte e cor por trecho.
+
+    Só as células com texto entram nos mapas de cores: as vazias não têm
+    convênio a informar. Os trechos (`textFormatRuns`) só aparecem nas células
+    com mais de uma formatação; trecho sem cor herda a da célula.
     """
     valores: list[list[str]] = []
     cores: dict[str, str] = {}
+    trechos: dict[str, list[tuple[int, str]]] = {}
     grades: Sequence[Mapping[str, Any]] = aba.get("data", [])
     for grade in grades:
         linhas: Sequence[Mapping[str, Any]] = grade.get("rowData", [])
@@ -247,19 +289,37 @@ def _valores_e_cores(aba: Mapping[str, Any]) -> tuple[list[list[str]], dict[str,
                 if texto.strip():
                     endereco = f"{rotulo_da_coluna(indice_da_coluna)}{indice_da_linha + 1}"
                     cores[endereco] = _cor_da_fonte(celula)
+                    runs: Sequence[Mapping[str, Any]] = celula.get("textFormatRuns", [])
+                    if runs:
+                        trechos[endereco] = [
+                            (
+                                int(run.get("startIndex", 0)),
+                                _cor_do_formato(run.get("format", {})) or cores[endereco],
+                            )
+                            for run in runs
+                        ]
             valores.append(textos)
-    return valores, cores
+    return valores, cores, trechos
 
 
 def _cor_da_fonte(celula: Mapping[str, Any]) -> str:
-    """Converte o `foregroundColor` da célula (canais de 0 a 1) em `#RRGGBB`.
-
-    A API omite os canais iguais a zero, então um dicionário vazio já é preto.
-    """
+    """Cor de fonte da célula inteira em `#RRGGBB`; sem cor informada, preto."""
     formato: Mapping[str, Any] = celula.get("userEnteredFormat", {}).get("textFormat", {})
-    if "foregroundColor" not in formato:
-        return _COR_DE_FONTE_PADRAO
-    cor: Mapping[str, Any] = formato["foregroundColor"]
+    return _cor_do_formato(formato) or _COR_DE_FONTE_PADRAO
+
+
+def _cor_do_formato(formato: Mapping[str, Any]) -> str | None:
+    """Converte a cor de um `TextFormat` (canais de 0 a 1) em `#RRGGBB`.
+
+    Vale o `foregroundColor`; sem ele, o `rgbColor` de `foregroundColorStyle`.
+    Cor de tema (sem RGB no payload) conta como não informada. A API omite os
+    canais iguais a zero, então um dicionário vazio já é preto.
+    """
+    cor: Mapping[str, Any] | None = formato.get("foregroundColor")
+    if cor is None:
+        cor = formato.get("foregroundColorStyle", {}).get("rgbColor")
+    if cor is None:
+        return None
     canais = tuple(round(float(cor.get(nome, 0.0)) * 255) for nome in ("red", "green", "blue"))
     return "#{:02X}{:02X}{:02X}".format(*canais)
 

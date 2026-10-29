@@ -297,3 +297,41 @@
     - {tipo: max_chamadas_planilha, maximo: 1}
     - tipo: frase_proibida
       frases: ["não há horários seguidos para as 4", "não há horários SEGUIDOS para as 4"]
+
+- id: c11
+  descricao: >-
+    Pacientes por plano de saúde pela cor do texto: contagem igual à da grade
+    crua, preto fora, avisos só numéricos e nenhum nome fora do bloco
+  hoje: 2026-09-28
+  # As 5 cores de plano, preto, uma cor não reconhecida, nome azul com
+  # observação preta, sessão em grupo com duas cores, um paciente com duas
+  # cores e um homônimo (planilha.PECAS_DOS_CENARIOS).
+  cenario: planos_por_cor
+  turnos:
+    - pergunta: quantos pacientes temos de cada plano de saúde?
+      chamada:
+        tool: pacientes_por_plano
+        args: {}
+    # O modelo roteirizado cita um nome: a resposta tem de virar o resumo
+    # determinístico, sem nomes.
+    - pergunta: e quais são os pacientes da SulAmérica?
+      chamada:
+        tool: pacientes_por_plano
+        args: {}
+      respostas_simuladas:
+        - "A SulAmérica tem 2 pacientes, entre eles Paciente Ficticio Azul."
+  criterios:
+    - {tipo: tools_chamadas, tools: [pacientes_por_plano]}
+    - {tipo: bloco_presente, bloco: tabela_generica}
+    - {tipo: pacientes_por_plano_igual_ao_oraculo}
+    - {tipo: sem_nomes_de_paciente}
+    - tipo: texto_contem
+      turno: 1
+      frases:
+        - "SulAmérica: 2 pacientes, 4 atendimentos"
+        - "Unimed: 2 pacientes, 3 atendimentos"
+        - "atendimentos contados apenas com cor de plano"
+        - "1 nome com cor não reconhecida foi ignorado"
+    - {tipo: frase_proibida, frases: ["Paciente Ficticio"]}
+    - {tipo: sem_datas}
+    - {tipo: max_chamadas_planilha, maximo: 1}

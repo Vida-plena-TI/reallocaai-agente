@@ -106,6 +106,9 @@ Relatórios prontos:
 Os parâmetros que não se aplicam a um relatório pronto (por exemplo, `metricas` em `convenios`)
 são ignorados, e uma observação vai no `texto`.
 
+`pacientes_por_plano` **não** é um valor aceito aqui (devolve `422`): esse relatório existe só
+pelo chat. Ver [Só pelo chat](#só-pelo-chat-pacientes-por-plano).
+
 Resposta `200`:
 
 ```json
@@ -169,3 +172,24 @@ Agenda de um paciente (nome fictício):
 | `405` | `GET /relatorios/gerar`. |
 | `422` | Schema inválido (lista `{loc, msg, type}`, sem o valor) ou parâmetro sem sentido (frase). |
 | `502` | Nenhum dia do período pôde ser lido. Sem detalhe do erro interno. |
+
+## Só pelo chat: pacientes por plano
+
+O relatório de pacientes por plano de saúde **não é exposto nesta API** (nem em
+`POST /relatorios/gerar`, nem em rota própria). Ele sai só pela tool `pacientes_por_plano` do
+agente (`POST /agenda/chat`), como um bloco `tabela_generica` com `relatorio:
+"pacientes_por_plano"` e `periodo: null` (formato em
+[`contrato-blocos-novos.md`](contrato-blocos-novos.md#pacientes-por-plano-relatorio-pacientes_por_plano)).
+
+- **O bloco contém nomes de pacientes.** O texto que o modelo lê e o texto da resposta só têm
+  contagens; os nomes vão só no bloco. A exibição e a exportação (Excel e PDF) desse bloco
+  precisam de revisão do time do chatbot antes de serem liberadas.
+- Escopo: relatório gerencial da **grade semanal vigente** (só quem tem sessão na grade desta
+  semana, não todos os pacientes). O plano vem da cor do texto do nome; nome em preto fica fora.
+  O paciente é identificado só pelo nome (homônimos se fundem, grafias diferentes viram dois).
+  Faturamento, guias, valores e cadastro ficam fora do RealocAI.
+- **Diferença em relação a `convenios`** (pendência registrada, sem mudança por ora): o
+  relatório `convenios` usa a cor da célula inteira por hex exato, mostra o laranja (Care Plus)
+  como `nao_informado`, guarda um convênio por paciente por dia e trata o preto como "aguardando
+  autorização". Os números dos dois relatórios podem divergir; detalhes no
+  [contrato](contrato-blocos-novos.md#convenio).

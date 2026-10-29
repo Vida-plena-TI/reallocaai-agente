@@ -34,6 +34,8 @@ from pydantic import ValidationError
 
 from app.ai.catalogo import catalogo_ou_nada
 from app.ai.fundamentacao import (
+    nomes_de_paciente_na_resposta,
+    registrar_nome_de_paciente,
     registrar_nova_geracao,
     registrar_resumo_deterministico,
     resumo_deterministico,
@@ -198,7 +200,8 @@ def perguntar_com_mensagens(
     Antes de devolver, a resposta passa pela verificação de fundamentação
     (`app.ai.fundamentacao`): se algo não bater, UMA nova geração com o aviso
     do erro (o aviso nunca entra no histórico); se ainda não bater, um resumo
-    determinístico do relatório.
+    determinístico do relatório. Resposta que repete nome de paciente de um
+    relatório vai direto para o resumo determinístico.
     """
     profissionais = agente.profissionais
     entrada = list(historico_mensagens)
@@ -216,6 +219,15 @@ def perguntar_com_mensagens(
     mensagens: list[BaseMessage] = _sem(resultado["messages"], contexto)
     resposta = _extrair_texto_da_resposta(mensagens[-1])
     blocos = extrair_blocos_do_turno(mensagens)
+    # Nome de paciente na resposta não ganha nova geração: o aviso teria de
+    # citar o nome para o modelo. Vai direto para o resumo, que não tem nomes.
+    if repetidos := nomes_de_paciente_na_resposta(resposta, blocos):
+        registrar_nome_de_paciente(repetidos)
+        return (
+            resumo_deterministico(blocos, mensagens[len(historico_mensagens) :]),
+            mensagens,
+            blocos,
+        )
     problemas = verificar(
         resposta,
         mensagens[len(historico_mensagens) :],
@@ -232,6 +244,9 @@ def perguntar_com_mensagens(
     resposta = _extrair_texto_da_resposta(refeito[-1])
     blocos = extrair_blocos_do_turno(refeito) or blocos
     turno = refeito[len(historico_mensagens) :]
+    if repetidos := nomes_de_paciente_na_resposta(resposta, blocos):
+        registrar_nome_de_paciente(repetidos)
+        return resumo_deterministico(blocos, turno), refeito, blocos
     problemas = verificar(
         resposta, turno, historico_mensagens, profissionais, com_tela=agente.com_tela
     )
