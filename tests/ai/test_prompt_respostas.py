@@ -82,3 +82,22 @@ def test_pacientes_por_plano_so_com_contagens_e_sem_nomes(prompt: str) -> None:
     assert "1 a 3 frases" in regra
     assert "NUNCA escreve nomes de pacientes nem repete a lista" in regra
     assert "preto fica fora" in regra
+
+
+@pytest.mark.parametrize("prompt", VARIANTES)
+def test_nomes_por_profissional_so_com_contagens_e_sem_nomes(prompt: str) -> None:
+    regra = " ".join(prompt[prompt.index("- NOMES (ou a lista)") :].split("\n- ")[0].split())
+
+    assert "`listar_pacientes_por_profissional`" in regra
+    assert "Só QUANTOS pacientes continua em `consultar_pacientes_por_profissional`" in regra
+    assert "grade semanal vigente" in regra and "não cite datas" in regra
+    assert "NUNCA escreve nomes de pacientes nem repete a lista" in regra
+
+
+@pytest.mark.parametrize("prompt", VARIANTES)
+def test_relatorio_de_contagem_traz_as_quantidades_e_nao_os_nomes(prompt: str) -> None:
+    regra = " ".join(prompt[prompt.index("- Os relatórios de contagem") :].split("\n- ")[0].split())
+
+    assert "trazem as quantidades, não nomes de pacientes" in regra
+    assert 'NUNCA diga que a tela ou o relatório "traz os nomes"' in regra
+    assert "a menos que nesta mesma rodada" in regra
