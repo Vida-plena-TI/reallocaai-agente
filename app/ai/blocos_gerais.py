@@ -19,6 +19,9 @@ from typing import Final
 from app.ai.relatorios import (
     COLUNAS_DATA,
     DIAS_DA_SEMANA,
+    RELATORIO_PACIENTES_POR_PLANO,
+    RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES,
+    RELATORIOS_COM_NOMES_DE_PACIENTES,
     AguardandoProfissionalDia,
     BlocoRelatorio,
     ColunaTabela,
@@ -39,6 +42,7 @@ from app.ai.relatorios import (
     QualidadeProfissional,
     QualidadeProfissionalDiaRelatorio,
     SessaoAgendaPaciente,
+    UnidadeGrupo,
     VagasDiaPeriodo,
     ValorSimples,
     tabela,
@@ -215,8 +219,13 @@ def _bloco(
     tabelas: list[object],
     *,
     com_periodo: bool = True,
+    contem_dados_pacientes: bool = False,
 ) -> BlocoRelatorio:
-    """Envelope comum. `com_periodo=False` só no plano semanal: `periodo` vai null."""
+    """Envelope comum. `com_periodo=False` só no plano semanal: `periodo` vai null.
+
+    `contem_dados_pacientes` só no bloco que traz nomes de pacientes (o modelo
+    recusa o bloco se o valor não bater com o tipo e o relatório).
+    """
     return BlocoRelatorio.model_validate(
         {
             "tipo": tipo,
@@ -229,6 +238,7 @@ def _bloco(
             "resumo": resumo,
             "dados": dados,
             "tabelas": tabelas,
+            **({"contem_dados_pacientes": True} if contem_dados_pacientes else {}),
         }
     )
 
@@ -916,6 +926,7 @@ def agenda_paciente(
                 ],
             ),
         ],
+        contem_dados_pacientes=True,
     )
     texto = _cabecalho_texto(titulo, foto)
     if convenio_rotulo:
@@ -1128,9 +1139,6 @@ def plano_semanal(
 
 # --- pacientes por plano ----------------------------------------------------
 
-#: Identificador estável do relatório de pacientes por plano em `tabela_generica`.
-RELATORIO_PACIENTES_POR_PLANO: Final[str] = "pacientes_por_plano"
-
 #: Uma linha por paciente, agrupadas por plano (na ordem de `PLANO_POR_COR`).
 #: Os totais ficam só na tabela de resumo, nunca no meio da lista.
 COLUNAS_PACIENTES_POR_PLANO: Final[list[tuple[str, str, Formato]]] = [
@@ -1252,6 +1260,7 @@ def pacientes_por_plano(
             "dias_nao_lidos": sorted(set(dias_nao_lidos)),
             "avisos": avisos,
             "resumo": resumo,
+            "contem_dados_pacientes": True,
             "dados": DadosTabelaGenerica(
                 relatorio=RELATORIO_PACIENTES_POR_PLANO,
                 dimensoes=[],
@@ -1275,9 +1284,6 @@ def pacientes_por_plano(
 
 # --- pacientes por profissional, com os nomes --------------------------------
 
-#: Identificador estável do relatório de nomes de pacientes por profissional.
-RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES: Final[str] = "pacientes_por_profissional_nomes"
-
 #: Uma linha por (profissional, paciente), agrupadas por especialidade e
 #: profissional. Os totais ficam só na tabela de resumo, nunca no meio da lista.
 COLUNAS_PACIENTES_POR_PROFISSIONAL_NOMES: Final[list[tuple[str, str, Formato]]] = [
@@ -1287,6 +1293,8 @@ COLUNAS_PACIENTES_POR_PROFISSIONAL_NOMES: Final[list[tuple[str, str, Formato]]] 
     ("dias", "Dias", "texto"),
     ("atendimentos_semana", "Atendimentos na semana", "inteiro"),
 ]
+#: Colunas que formam o título de cada grupo na exibição (dica `agrupar_por`).
+AGRUPAR_PACIENTES_POR_PROFISSIONAL: Final[tuple[str, ...]] = ("especialidade", "profissional")
 COLUNAS_RESUMO_POR_PROFISSIONAL: Final[list[tuple[str, str, Formato]]] = [
     ("especialidade", "Especialidade", "texto"),
     ("profissional", "Profissional", "texto"),
@@ -1413,6 +1421,7 @@ def pacientes_por_profissional_nomes(
             "dias_nao_lidos": sorted(set(dias_nao_lidos)),
             "avisos": avisos,
             "resumo": resumo,
+            "contem_dados_pacientes": True,
             "dados": DadosTabelaGenerica(
                 relatorio=RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES,
                 dimensoes=[],
@@ -1424,6 +1433,10 @@ def pacientes_por_profissional_nomes(
                 linhas=linhas,
                 total={},
                 linhas_omitidas=0,
+                # As linhas já saem contíguas por especialidade e profissional
+                # (ordem do motor): o front agrupa as consecutivas.
+                agrupar_por=list(AGRUPAR_PACIENTES_POR_PROFISSIONAL),
+                unidade_grupo=UnidadeGrupo(singular="paciente", plural="pacientes"),
             ),
             "tabelas": [
                 tabela("Pacientes", COLUNAS_PACIENTES_POR_PROFISSIONAL_NOMES, linhas),
@@ -1434,12 +1447,6 @@ def pacientes_por_profissional_nomes(
         }
     )
     return "\n".join(texto), bloco
-
-
-#: Relatórios cujo bloco leva nomes de pacientes (só para a tela).
-RELATORIOS_COM_NOMES_DE_PACIENTES: Final[frozenset[str]] = frozenset(
-    {RELATORIO_PACIENTES_POR_PLANO, RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES}
-)
 
 
 def nomes_de_pacientes_no_bloco(bloco: BlocoRelatorio) -> list[str]:
