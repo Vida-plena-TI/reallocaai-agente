@@ -327,3 +327,55 @@ def pacientes_por_plano(payload: Mapping[str, Any], dias: Sequence[date]) -> Pac
 def nome_normalizado(texto: str) -> str:
     """A mesma normalização de nomes do oráculo, para comparar com o motor."""
     return " ".join(re.findall(r"[a-z0-9]+", _normalizar(texto)))
+
+
+#: Abreviação do dia por `date.weekday()`, como na coluna "dias" do relatório.
+_DIAS_CURTOS = ("Seg", "Ter", "Qua", "Qui", "Sex", "Sáb")
+
+
+@dataclass(frozen=True)
+class PacienteDoProfissional:
+    #: Dias da semana com sessão, em ordem ("Seg, Qua").
+    dias: str
+    atendimentos: int
+
+
+def pacientes_por_profissional(
+    payload: Mapping[str, Any], dias: Sequence[date]
+) -> dict[str, dict[str, PacienteDoProfissional]]:
+    """profissional (`Bia`) -> nome normalizado do paciente -> dias e sessões.
+
+    Célula ocupada = texto sob um profissional no expediente; cada nome
+    separado por `/` é um paciente (sessão em grupo conta para cada um);
+    sessão = a mesma sala com o mesmo texto em meias horas seguidas.
+    """
+    sessoes: dict[str, dict[str, set[tuple[date, int, time]]]] = {}
+    for dia in dias:
+        anterior: dict[int, tuple[time, str, time]] = {}
+        for celula in sorted(_celulas(payload, dia), key=lambda c: (c.sala, c.hora)):
+            if not celula.texto:
+                continue
+            ultimo = anterior.get(celula.sala)
+            seguida = (
+                ultimo is not None
+                and ultimo[1] == celula.texto
+                and (datetime.combine(dia, ultimo[2]) + timedelta(minutes=30)).time() == celula.hora
+            )
+            inicio = ultimo[0] if seguida and ultimo is not None else celula.hora
+            anterior[celula.sala] = (inicio, celula.texto, celula.hora)
+            for nome in celula.texto.split("/"):
+                normalizado = nome_normalizado(nome)
+                if normalizado:
+                    sessoes.setdefault(celula.profissional, {}).setdefault(normalizado, set()).add(
+                        (dia, celula.sala, inicio)
+                    )
+    return {
+        profissional: {
+            nome: PacienteDoProfissional(
+                dias=", ".join(_DIAS_CURTOS[d.weekday()] for d in sorted({s[0] for s in conjunto})),
+                atendimentos=len(conjunto),
+            )
+            for nome, conjunto in por_nome.items()
+        }
+        for profissional, por_nome in sessoes.items()
+    }

@@ -106,8 +106,10 @@ Relatórios prontos:
 Os parâmetros que não se aplicam a um relatório pronto (por exemplo, `metricas` em `convenios`)
 são ignorados, e uma observação vai no `texto`.
 
-`pacientes_por_plano` **não** é um valor aceito aqui (devolve `422`): esse relatório existe só
-pelo chat. Ver [Só pelo chat](#só-pelo-chat-pacientes-por-plano).
+`pacientes_por_plano` e `pacientes_por_profissional_nomes` **não** são valores aceitos aqui
+(devolvem `422`): esses relatórios existem só pelo chat. Ver
+[Só pelo chat: pacientes por plano](#só-pelo-chat-pacientes-por-plano) e
+[Só pelo chat: nomes de pacientes por profissional](#só-pelo-chat-nomes-de-pacientes-por-profissional).
 
 Resposta `200`:
 
@@ -193,3 +195,24 @@ agente (`POST /agenda/chat`), como um bloco `tabela_generica` com `relatorio:
   como `nao_informado`, guarda um convênio por paciente por dia e trata o preto como "aguardando
   autorização". Os números dos dois relatórios podem divergir; detalhes no
   [contrato](contrato-blocos-novos.md#convenio).
+
+## Só pelo chat: nomes de pacientes por profissional
+
+A lista de NOMES dos pacientes de cada profissional **não é exposta nesta API** (nem em
+`POST /relatorios/gerar`, que devolve `422` para `relatorio: "pacientes_por_profissional_nomes"`,
+nem em rota própria). Ela sai só pela tool `listar_pacientes_por_profissional` do agente
+(`POST /agenda/chat`), como um bloco `tabela_generica` com `relatorio:
+"pacientes_por_profissional_nomes"` e `periodo: null` (formato em
+[`contrato-blocos-novos.md`](contrato-blocos-novos.md#pacientes-por-profissional-com-os-nomes-relatorio-pacientes_por_profissional_nomes)).
+
+- **O bloco contém nomes de pacientes.** O texto que o modelo lê e o texto da resposta só têm
+  contagens; os nomes vão só no bloco. Deve entrar na restrição ao grupo de coordenação, como
+  `pacientes_por_plano`, e a exibição e a exportação (Excel e PDF) desse bloco precisam de
+  revisão do time do chatbot antes de serem liberadas.
+- Escopo: relatório gerencial da **grade semanal vigente**, sem limite de linhas (todos os
+  profissionais e todos os pacientes com sessão na grade; filtros opcionais por profissional,
+  especialidade e dias da semana). O paciente é identificado só pelo nome (homônimos se fundem,
+  grafias diferentes viram dois) e quem é atendido por mais de uma profissional aparece em cada
+  uma.
+- O relatório de contagem (`pacientes_por_profissional`, tool
+  `consultar_pacientes_por_profissional`) continua igual e só traz quantidades.

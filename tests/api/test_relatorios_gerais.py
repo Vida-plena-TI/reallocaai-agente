@@ -286,3 +286,11 @@ def test_pacientes_por_plano_nao_e_exposto_na_api(cliente: TestClient) -> None:
 
     assert resposta.status_code == 422
     assert "pacientes_por_plano" not in RELATORIOS
+
+
+def test_pacientes_por_profissional_nomes_nao_e_exposto_na_api(cliente: TestClient) -> None:
+    """Decisão da clínica: o relatório com nomes por profissional sai só pelo chat."""
+    resposta = _gerar(cliente, {"relatorio": "pacientes_por_profissional_nomes"})
+
+    assert resposta.status_code == 422
+    assert "pacientes_por_profissional_nomes" not in RELATORIOS

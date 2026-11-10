@@ -150,3 +150,29 @@ def test_cenario_planos_por_cor_conferido_a_mao() -> None:
     padrao = oraculo.pacientes_por_plano(payload_da_semana(), SEMANA)
     assert set(padrao.atendimentos) == {"SulAmérica"}
     assert padrao.nomes_nao_reconhecidos == padrao.pacientes_em_mais_de_um_plano == 0
+
+
+def test_pacientes_por_profissional_conferidos_a_mao() -> None:
+    """Cenário `nomes_por_profissional`: homônimo fundido, grupo e duas profissionais."""
+    contagem = oraculo.pacientes_por_profissional(
+        payload_da_semana("nomes_por_profissional"), SEMANA
+    )
+
+    resumo = {
+        profissional: {nome: (p.dias, p.atendimentos) for nome, p in por_nome.items()}
+        for profissional, por_nome in contagem.items()
+    }
+    assert resumo == {
+        "Bia": {
+            "paciente ficticio ametista": ("Seg, Ter, Qua", 3),
+            "paciente ficticio basalto": ("Seg", 1),
+            "paciente ficticio omega": ("Seg, Qua", 2),
+        },
+        "Assizely": {
+            "paciente ficticio basalto": ("Seg, Qua", 2),
+            "paciente ficticio esmeralda": ("Seg, Qua", 2),
+            "paciente ficticio feldspato": ("Seg", 1),
+        },
+        "Carol": {"paciente ficticio ametista": ("Seg", 1)},
+        "Elo": {"paciente ficticio feldspato": ("Ter", 1)},
+    }

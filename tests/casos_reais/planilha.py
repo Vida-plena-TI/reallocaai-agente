@@ -135,6 +135,23 @@ CENARIOS: dict[str, dict[str, dict[str, str]]] = {
             "Sala 4": "..EE...... ..........",
         },
     },
+    # `nomes_por_profissional` (c12): nomes de pacientes por profissional; o
+    # texto de cada letra está em `PECAS_DOS_CENARIOS`.
+    "nomes_por_profissional": {
+        "Segunda": {
+            "Sala 1": "AA..BB.... ..CC......",
+            "Sala 2": "EE..FF.... ..........",
+            "Sala 3": "..AA...... ..........",
+        },
+        "Terça": {
+            "Sala 1": "..AA...... ..........",
+            "Sala 5": "FF........ ..........",
+        },
+        "Quarta": {
+            "Sala 1": "DD........ ..AA......",
+            "Sala 2": "..EE...... ..........",
+        },
+    },
 }
 
 #: Cores de texto usadas nos cenários (as da planilha real).
@@ -165,6 +182,23 @@ PECAS_DOS_CENARIOS: dict[str, dict[str, tuple[tuple[str, str], ...]]] = {
         "J": (("Paciente Ficticio Azul", VERMELHO),),
         "K": (("Paciente Ficticio Vermelho / ", VERMELHO), ("Paciente Ficticio Laranja", LARANJA)),
         "L": (("Paciente Ficticio Lilas", PRETO),),
+    },
+    # `nomes_por_profissional` (c12), esperado:
+    # - Bia (Fono, Sala 1): Ametista (Seg, Ter, Qua; 3), Basalto (Seg; 1) e Omega
+    #   (Seg, Qua; 2: "Fictício Ômega" e "ficticio omega" são homônimos e se
+    #   fundem) -> 3 pacientes, 6 atendimentos;
+    # - Assizely (TO, Sala 2): Basalto e Esmeralda (Seg, Qua; 2, sessão em grupo E) e
+    #   Feldspato (Seg; 1) -> 3 pacientes, 3 atendimentos;
+    # - Carol (Psicologia, Sala 3): Ametista (Seg; 1);
+    # - Elo (Fono, Sala 5): Feldspato (Ter; 1).
+    # 5 pacientes distintos; Ametista, Basalto e Feldspato têm duas profissionais.
+    "nomes_por_profissional": {
+        "A": (("Paciente Ficticio Ametista", AZUL),),
+        "B": (("Paciente Ficticio Basalto", AZUL),),
+        "C": (("Paciente Fictício Ômega", AZUL),),
+        "D": (("paciente ficticio omega", AZUL),),
+        "E": (("Paciente Ficticio Esmeralda / Paciente Ficticio Basalto", AZUL),),
+        "F": (("Paciente Ficticio Feldspato", AZUL),),
     },
 }
 

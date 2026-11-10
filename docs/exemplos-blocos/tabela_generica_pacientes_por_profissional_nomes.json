@@ -1,0 +1,270 @@
+{
+  "versao": 1,
+  "tipo": "tabela_generica",
+  "titulo": "Pacientes por profissional (grade semanal vigente)",
+  "periodo": null,
+  "meta": null,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Relatório gerencial da grade semanal vigente: cobre só pacientes com sessão na grade desta semana, não todos os pacientes da clínica.",
+    "O paciente é identificado só pelo nome: homônimos aparecem como um só e grafias diferentes do mesmo nome aparecem como dois.",
+    "Paciente atendido por mais de uma profissional aparece na lista de cada uma.",
+    "Atendimentos = sessões na semana; numa sessão em grupo, a sessão conta para cada paciente.",
+    "3 pacientes são atendidos por mais de uma profissional e aparecem em cada uma."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Profissionais",
+      "valor": 4,
+      "formato": "inteiro",
+      "exibicao": "4"
+    },
+    {
+      "rotulo": "Pacientes distintos",
+      "valor": 5,
+      "formato": "inteiro",
+      "exibicao": "5"
+    },
+    {
+      "rotulo": "Com mais de uma profissional",
+      "valor": 3,
+      "formato": "inteiro",
+      "exibicao": "3"
+    }
+  ],
+  "dados": {
+    "tipo": "tabela_generica",
+    "relatorio": "pacientes_por_profissional_nomes",
+    "dimensoes": [],
+    "metricas": [],
+    "colunas": [
+      {
+        "chave": "especialidade",
+        "rotulo": "Especialidade",
+        "formato": "texto"
+      },
+      {
+        "chave": "profissional",
+        "rotulo": "Profissional",
+        "formato": "texto"
+      },
+      {
+        "chave": "paciente",
+        "rotulo": "Paciente",
+        "formato": "texto"
+      },
+      {
+        "chave": "dias",
+        "rotulo": "Dias",
+        "formato": "texto"
+      },
+      {
+        "chave": "atendimentos_semana",
+        "rotulo": "Atendimentos na semana",
+        "formato": "inteiro"
+      }
+    ],
+    "linhas": [
+      {
+        "especialidade": "Fonoaudiologia",
+        "profissional": "Bia",
+        "paciente": "Paciente Ficticio Ametista",
+        "dias": "Seg, Ter, Qua",
+        "atendimentos_semana": 3
+      },
+      {
+        "especialidade": "Fonoaudiologia",
+        "profissional": "Bia",
+        "paciente": "Paciente Ficticio Basalto",
+        "dias": "Seg",
+        "atendimentos_semana": 1
+      },
+      {
+        "especialidade": "Fonoaudiologia",
+        "profissional": "Bia",
+        "paciente": "Paciente Fictício Ômega",
+        "dias": "Seg, Qua",
+        "atendimentos_semana": 2
+      },
+      {
+        "especialidade": "Fonoaudiologia",
+        "profissional": "Elo",
+        "paciente": "Paciente Ficticio Feldspato",
+        "dias": "Ter",
+        "atendimentos_semana": 1
+      },
+      {
+        "especialidade": "Psicologia",
+        "profissional": "Carol",
+        "paciente": "Paciente Ficticio Ametista",
+        "dias": "Seg",
+        "atendimentos_semana": 1
+      },
+      {
+        "especialidade": "Terapia Ocupacional",
+        "profissional": "Assizely",
+        "paciente": "Paciente Ficticio Basalto",
+        "dias": "Seg, Qua",
+        "atendimentos_semana": 2
+      },
+      {
+        "especialidade": "Terapia Ocupacional",
+        "profissional": "Assizely",
+        "paciente": "Paciente Ficticio Esmeralda",
+        "dias": "Seg, Qua",
+        "atendimentos_semana": 2
+      },
+      {
+        "especialidade": "Terapia Ocupacional",
+        "profissional": "Assizely",
+        "paciente": "Paciente Ficticio Feldspato",
+        "dias": "Seg",
+        "atendimentos_semana": 1
+      }
+    ],
+    "total": {},
+    "linhas_omitidas": 0
+  },
+  "tabelas": [
+    {
+      "nome": "Pacientes",
+      "colunas": [
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "profissional",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "paciente",
+          "rotulo": "Paciente",
+          "formato": "texto"
+        },
+        {
+          "chave": "dias",
+          "rotulo": "Dias",
+          "formato": "texto"
+        },
+        {
+          "chave": "atendimentos_semana",
+          "rotulo": "Atendimentos na semana",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "especialidade": "Fonoaudiologia",
+          "profissional": "Bia",
+          "paciente": "Paciente Ficticio Ametista",
+          "dias": "Seg, Ter, Qua",
+          "atendimentos_semana": 3
+        },
+        {
+          "especialidade": "Fonoaudiologia",
+          "profissional": "Bia",
+          "paciente": "Paciente Ficticio Basalto",
+          "dias": "Seg",
+          "atendimentos_semana": 1
+        },
+        {
+          "especialidade": "Fonoaudiologia",
+          "profissional": "Bia",
+          "paciente": "Paciente Fictício Ômega",
+          "dias": "Seg, Qua",
+          "atendimentos_semana": 2
+        },
+        {
+          "especialidade": "Fonoaudiologia",
+          "profissional": "Elo",
+          "paciente": "Paciente Ficticio Feldspato",
+          "dias": "Ter",
+          "atendimentos_semana": 1
+        },
+        {
+          "especialidade": "Psicologia",
+          "profissional": "Carol",
+          "paciente": "Paciente Ficticio Ametista",
+          "dias": "Seg",
+          "atendimentos_semana": 1
+        },
+        {
+          "especialidade": "Terapia Ocupacional",
+          "profissional": "Assizely",
+          "paciente": "Paciente Ficticio Basalto",
+          "dias": "Seg, Qua",
+          "atendimentos_semana": 2
+        },
+        {
+          "especialidade": "Terapia Ocupacional",
+          "profissional": "Assizely",
+          "paciente": "Paciente Ficticio Esmeralda",
+          "dias": "Seg, Qua",
+          "atendimentos_semana": 2
+        },
+        {
+          "especialidade": "Terapia Ocupacional",
+          "profissional": "Assizely",
+          "paciente": "Paciente Ficticio Feldspato",
+          "dias": "Seg",
+          "atendimentos_semana": 1
+        }
+      ]
+    },
+    {
+      "nome": "Resumo por profissional",
+      "colunas": [
+        {
+          "chave": "especialidade",
+          "rotulo": "Especialidade",
+          "formato": "texto"
+        },
+        {
+          "chave": "profissional",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "pacientes",
+          "rotulo": "Pacientes distintos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "atendimentos_semana",
+          "rotulo": "Atendimentos na semana",
+          "formato": "inteiro"
+        }
+      ],
+      "linhas": [
+        {
+          "especialidade": "Fonoaudiologia",
+          "profissional": "Bia",
+          "pacientes": 3,
+          "atendimentos_semana": 6
+        },
+        {
+          "especialidade": "Fonoaudiologia",
+          "profissional": "Elo",
+          "pacientes": 1,
+          "atendimentos_semana": 1
+        },
+        {
+          "especialidade": "Psicologia",
+          "profissional": "Carol",
+          "pacientes": 1,
+          "atendimentos_semana": 1
+        },
+        {
+          "especialidade": "Terapia Ocupacional",
+          "profissional": "Assizely",
+          "pacientes": 3,
+          "atendimentos_semana": 3
+        }
+      ]
+    }
+  ]
+}

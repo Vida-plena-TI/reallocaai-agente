@@ -297,6 +297,17 @@ padrão é a semana de hoje, todas as profissionais, com o detalhe por dia.
   leitura falhe é sinalizado e os números ficam marcados como parciais. A resposta nunca traz
   nome de paciente, e no escopo `semana` termina com a mesma ressalva da grade semanal.
 
+### Nomes de pacientes por profissional (tool `listar_pacientes_por_profissional`)
+
+Responde "quais pacientes a Bia atende?" ou "lista de pacientes por profissional": para cada
+profissional, os pacientes com sessão na grade semanal vigente, os dias ("Seg, Qua") e os
+atendimentos, num bloco `tabela_generica` com `relatorio: "pacientes_por_profissional_nomes"` e
+`periodo: null`. Filtros opcionais: profissionais, especialidade e dias da semana. **Os nomes vão
+só no bloco** (para a tela): o texto que o modelo lê e a resposta só têm contagens, e a resposta
+que repetir um nome do bloco é trocada pelo resumo determinístico. Só pelo chat (`POST
+/relatorios/gerar` devolve `422`). Contrato em
+[`docs/contrato-blocos-novos.md`](docs/contrato-blocos-novos.md).
+
 ### Relatórios gerais (tools `gerar_relatorio` e `consultar_catalogo`)
 
 Em vez de uma tool fixa por relatório (e uma chamada por dia), o agente responde qualquer

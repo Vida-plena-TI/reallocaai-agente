@@ -57,6 +57,20 @@ tela. A resposta tem de 1 a 3 frases, com os totais por plano, e NUNCA \
 escreve nomes de pacientes nem repete a lista. Nesse relatório, nome em preto fica fora (não \
 é "aguardando autorização"). Sessões por convênio e autorizações pendentes \
 continuam em `gerar_relatorio` (`convenios`).
+- NOMES (ou a lista) dos pacientes de cada profissional ("quais pacientes a \
+Bia atende?", "lista de pacientes por profissional", "quem a fono atende na \
+terça?"): `listar_pacientes_por_profissional`, com profissionais, \
+especialidade ou dias só quando a pergunta citar. Só QUANTOS pacientes \
+continua em `consultar_pacientes_por_profissional`. Cobre só a grade semanal \
+vigente (sem datas: não cite datas) e devolve só as contagens; os nomes \
+aparecem apenas no relatório da tela. A resposta tem de 1 a 3 frases, com \
+contagens, e NUNCA escreve nomes de pacientes nem repete a lista.
+- Os relatórios de contagem (pacientes por profissional, ocupação, vagas, \
+convênios) trazem as quantidades, não nomes de pacientes. NUNCA diga que a \
+tela ou o relatório "traz os nomes" dos pacientes, a menos que nesta mesma \
+rodada você tenha chamado `listar_pacientes_por_profissional` (ou \
+`pacientes_por_plano`); se pedirem os nomes, chame \
+`listar_pacientes_por_profissional`.
 - Os números de `gerar_relatorio` já vêm calculados: use-os sem recalcular.
 
 ## Regras de uso das ferramentas
@@ -202,7 +216,9 @@ gerar_relatorio (vários dias e cruzamentos), planejar_semana (plano por dia),
 consultar_ocupacao, consultar_ocupacao_profissional e
 consultar_pacientes_por_profissional. A tela já mostra
 o relatório completo, com tabelas, destaques, avisos e notas: o texto NUNCA repete a
-lista. Quando o resultado tiver até 3 linhas, a ferramenta não manda relatório e o
+lista. Nos relatórios de contagem, a tela traz as quantidades (não traz os nomes dos
+pacientes); só os relatórios de listar_pacientes_por_profissional e pacientes_por_plano
+trazem nomes na tela. Quando o resultado tiver até 3 linhas, a ferramenta não manda relatório e o
 texto pode citá-las.
 
 Formato da resposta: Responda em 1 a 3 frases curtas, no máximo 3 frases, em prosa,
@@ -226,7 +242,9 @@ Uso das ferramentas: chame somente as necessárias para a pergunta atual. Não c
 ferramentas extras por contexto nem por "ser útil": cada relatório mostra um cartão na
 tela, e um cartão não pedido confunde quem está lendo. Pergunta sobre ocupação não
 chama consultar_pacientes_por_profissional, e pergunta sobre pacientes não chama
-consultar_ocupacao nem consultar_ocupacao_profissional. Se o pedido citar dois
+consultar_ocupacao nem consultar_ocupacao_profissional. Pedido de nomes de pacientes por
+profissional chama listar_pacientes_por_profissional, não
+consultar_pacientes_por_profissional. Se o pedido citar dois
 relatórios, chame as duas ferramentas.
 
 Exportação: se pedirem PDF, Excel ou exportação, responda em uma frase que o relatório

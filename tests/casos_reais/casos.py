@@ -811,15 +811,93 @@ def _pacientes_por_plano_igual_ao_oraculo(
 _ORDEM_DOS_PLANOS = ["SulAmérica", "Klini", "Particulares", "Care Plus", "Unimed"]
 
 
+#: Relatórios cujo bloco leva nomes de pacientes (só para a tela).
+_RELATORIOS_COM_NOMES = ("pacientes_por_plano", "pacientes_por_profissional_nomes")
+
+
+def _blocos_com_nomes(turnos: Sequence[TurnoObservado]) -> list[dict[str, Any]]:
+    return [
+        bloco
+        for turno in turnos
+        for bloco in turno.blocos
+        if bloco.get("dados", {}).get("relatorio") in _RELATORIOS_COM_NOMES
+    ]
+
+
+def _blocos_por_profissional(turnos: Sequence[TurnoObservado]) -> list[dict[str, Any]]:
+    return [
+        bloco
+        for bloco in _blocos_com_nomes(turnos)
+        if bloco["dados"]["relatorio"] == "pacientes_por_profissional_nomes"
+    ]
+
+
+@_sobre_a_saida
+def _pacientes_por_profissional_igual_ao_oraculo(
+    c: Criterio, turnos: Sequence[TurnoObservado], ctx: Contexto
+) -> ResultadoCriterio:
+    """Em cada bloco `pacientes_por_profissional_nomes`, linhas (profissional,
+    paciente, dias, atendimentos) iguais ao que o oráculo conta na grade crua,
+    com os filtros `profissionais` e `dias` do critério; o resumo por
+    profissional bate com as linhas e não há linha de total no meio da lista.
+    O detalhe só traz contagens, nunca nomes."""
+    blocos = _blocos_por_profissional(turnos)
+    if not blocos:
+        return _resultado(c, False, "sem bloco pacientes_por_profissional_nomes")
+    dias = [ctx.semana[d] for d in c.params.get("dias", DIAS)]
+    filtro = {_normalizar(p) for p in c.params.get("profissionais", [])}
+    esperado = Counter(
+        {
+            (_normalizar(profissional), nome, paciente.dias): paciente.atendimentos
+            for profissional, por_nome in oraculo.pacientes_por_profissional(
+                ctx.payload, dias
+            ).items()
+            if not filtro or _normalizar(profissional) in filtro
+            for nome, paciente in por_nome.items()
+        }
+    )
+    problemas: list[str] = []
+    for indice, bloco in enumerate(blocos, start=1):
+        linhas = bloco["dados"]["linhas"]
+        do_motor = Counter(
+            {
+                (
+                    _normalizar(str(linha["profissional"])),
+                    oraculo.nome_normalizado(str(linha["paciente"])),
+                    str(linha["dias"]),
+                ): int(linha["atendimentos_semana"])
+                for linha in linhas
+            }
+        )
+        if len(do_motor) != len(linhas) or do_motor != esperado:
+            problemas.append(
+                f"bloco {indice}: motor {do_motor.total()} atendimento(s) em {len(linhas)} "
+                f"linha(s), oráculo {esperado.total()} em {len(esperado)}"
+            )
+        if any(_normalizar(str(linha["paciente"])) == "total" for linha in linhas):
+            problemas.append(f"bloco {indice}: linha de total no meio da lista")
+        resumo = {
+            _normalizar(str(linha["profissional"])): int(linha["pacientes"])
+            for linha in bloco["tabelas"][1]["linhas"]
+        }
+        contados = Counter(_normalizar(str(linha["profissional"])) for linha in linhas)
+        if resumo != dict(contados):
+            problemas.append(f"bloco {indice}: resumo por profissional difere das linhas")
+    linhas_total = sum(len(bloco["dados"]["linhas"]) for bloco in blocos)
+    detalhe = f"{len(blocos)} bloco(s), {linhas_total} linha(s)"
+    return _resultado(c, not problemas, "; ".join(problemas) or detalhe)
+
+
 @_sobre_a_saida
 def _sem_nomes_de_paciente(
     c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
 ) -> ResultadoCriterio:
-    """Nenhum nome do bloco `pacientes_por_plano` no texto das tools (o que o modelo
-    lê) nem na resposta. O detalhe só traz a contagem."""
-    blocos = _blocos_pacientes_por_plano(turnos)
+    """Nenhum nome de um bloco com nomes (`pacientes_por_plano`,
+    `pacientes_por_profissional_nomes`) no texto das tools (o que o modelo lê) nem
+    na resposta. O detalhe só traz a contagem."""
+    blocos = _blocos_com_nomes(turnos)
     if not blocos:
-        return _resultado(c, False, "sem bloco pacientes_por_plano")
+        return _resultado(c, False, "sem bloco com nomes de pacientes")
     nomes = {
         _normalizar(str(linha["paciente"]))
         for bloco in blocos
@@ -864,6 +942,7 @@ CRITERIOS: dict[
     "tools_chamadas": _tools_chamadas,
     "pacientes_por_plano_igual_ao_oraculo": _pacientes_por_plano_igual_ao_oraculo,
     "sem_nomes_de_paciente": _sem_nomes_de_paciente,
+    "pacientes_por_profissional_igual_ao_oraculo": _pacientes_por_profissional_igual_ao_oraculo,
 }
 
 

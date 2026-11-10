@@ -3,8 +3,9 @@
 Os exemplos saem das tools reais rodando sobre as agendas fictícias dos testes
 (`tests/support/relatorios.py`; para `gerar_relatorio`,
 `tests/support/agenda_clinica.py`; para `pacientes_por_plano`, a semana
-colorida `planos_por_cor` de `tests/casos_reais/planilha.py`) — nenhum dado da
-planilha, nenhum nome real.
+colorida `planos_por_cor` de `tests/casos_reais/planilha.py`; para
+`listar_pacientes_por_profissional`, a semana `nomes_por_profissional` do mesmo
+arquivo) — nenhum dado da planilha, nenhum nome real.
 `tests/ai/test_exemplos_blocos.py` falha se os arquivos versionados ficarem
 desatualizados em relação ao contrato.
 
@@ -81,11 +82,26 @@ VARIANTES_PLANO: dict[str, dict[str, Any]] = {
 }
 #: `pacientes_por_plano` (sem argumentos) sobre a semana colorida fictícia.
 ARQUIVO_PACIENTES_POR_PLANO = "tabela_generica_pacientes_por_plano.json"
+#: `listar_pacientes_por_profissional` (sem argumentos) sobre `nomes_por_profissional`.
+ARQUIVO_PACIENTES_POR_PROFISSIONAL_NOMES = "tabela_generica_pacientes_por_profissional_nomes.json"
 ARQUIVO_SCHEMA = "bloco_relatorio.schema.json"
 
 
 def _serializar(conteudo: Any) -> str:
     return json.dumps(conteudo, ensure_ascii=False, indent=2) + "\n"
+
+
+def _tools_do_cenario(cenario: str) -> dict[str, Any]:
+    """As tools sobre um cenário fictício de `tests/casos_reais/planilha.py`."""
+    planilha = PlanilhaContada(lambda _params: payload_da_semana(cenario))
+    return {
+        t.name: t
+        for t in criar_tools(
+            GoogleSheetsDataSource(cast(gspread.Spreadsheet, planilha)),
+            SemHistoricoContinuidadeDataSource(),
+            SEGUNDA,
+        )
+    }
 
 
 def gerar_exemplos() -> dict[str, str]:
@@ -105,16 +121,22 @@ def gerar_exemplos() -> dict[str, str]:
     chamadas += [
         (arquivo, gerais, "planejar_semana", args) for arquivo, args in VARIANTES_PLANO.items()
     ]
-    planilha = PlanilhaContada(lambda _params: payload_da_semana("planos_por_cor"))
-    coloridas = {
-        t.name: t
-        for t in criar_tools(
-            GoogleSheetsDataSource(cast(gspread.Spreadsheet, planilha)),
-            SemHistoricoContinuidadeDataSource(),
-            SEGUNDA,
+    chamadas.append(
+        (
+            ARQUIVO_PACIENTES_POR_PLANO,
+            _tools_do_cenario("planos_por_cor"),
+            "pacientes_por_plano",
+            {},
         )
-    }
-    chamadas.append((ARQUIVO_PACIENTES_POR_PLANO, coloridas, "pacientes_por_plano", {}))
+    )
+    chamadas.append(
+        (
+            ARQUIVO_PACIENTES_POR_PROFISSIONAL_NOMES,
+            _tools_do_cenario("nomes_por_profissional"),
+            "listar_pacientes_por_profissional",
+            {},
+        )
+    )
     arquivos: dict[str, str] = {}
     for arquivo, disponiveis, nome, args in chamadas:
         mensagem = disponiveis[nome].invoke(
