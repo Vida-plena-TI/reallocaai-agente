@@ -339,8 +339,9 @@
 - id: c12
   descricao: >-
     Nomes de pacientes por profissional: linhas iguais à grade crua (homônimo
-    fundido, paciente com duas profissionais em cada uma, filtros), nenhum nome
-    fora do bloco e nunca "a tela traz os nomes" num relatório de contagem
+    fundido, paciente com duas profissionais em cada uma, filtros), contíguas e
+    em ordem para a exibição agrupada, nenhum nome fora do bloco e nunca "a tela
+    traz os nomes" num relatório de contagem
   hoje: 2026-09-28
   # Paciente com duas profissionais, sessão em grupo e um homônimo
   # ("Fictício Ômega" e "ficticio omega"): planilha.PECAS_DOS_CENARIOS.
