@@ -62,6 +62,7 @@ def test_so_os_relatorios_da_grade_semanal_tem_periodo_nulo() -> None:
         if arquivo in (
             "tabela_generica_plano_semanal.json",
             "tabela_generica_pacientes_por_plano.json",
+            "tabela_generica_pacientes_por_profissional_nomes.json",
         ):
             assert bloco["periodo"] is None
         else:
@@ -89,3 +90,15 @@ def test_exemplo_de_pacientes_por_plano_so_tem_nomes_ficticios() -> None:
     assert nomes and all(nome.startswith("Paciente Ficticio ") for nome in nomes)
     assert not nomes & {"Paciente Ficticio Preto", "Paciente Ficticio Magenta"}
     assert bloco["dados"]["relatorio"] == "pacientes_por_plano"
+
+
+def test_exemplo_de_pacientes_por_profissional_so_tem_nomes_ficticios() -> None:
+    """O bloco leva nomes de pacientes por definição: no exemplo, só os fictícios
+    do cenário `nomes_por_profissional`."""
+    import json
+
+    bloco = json.loads(gerar_exemplos()["tabela_generica_pacientes_por_profissional_nomes.json"])
+    nomes = {linha["paciente"] for linha in bloco["dados"]["linhas"]}
+
+    assert nomes and all(nome.casefold().startswith("paciente fict") for nome in nomes)
+    assert bloco["dados"]["relatorio"] == "pacientes_por_profissional_nomes"

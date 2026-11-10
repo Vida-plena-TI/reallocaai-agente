@@ -2,8 +2,9 @@
 
 Para o time do front/backend do chatbot. Descreve os blocos que saem de `gerar_relatorio` (tool
 do agente) e de `POST /relatorios/gerar`: `disponibilidade`, `convenio`, `agenda_paciente`,
-`qualidade_agenda` e `tabela_generica`. O plano semanal (`planejar_semana`) e os pacientes por
-plano (`pacientes_por_plano`) saem só pelo chat, também como `tabela_generica`.
+`qualidade_agenda` e `tabela_generica`. O plano semanal (`planejar_semana`), os pacientes por
+plano (`pacientes_por_plano`) e os nomes de pacientes por profissional
+(`listar_pacientes_por_profissional`) saem só pelo chat, também como `tabela_generica`.
 
 A fonte da verdade é o schema
 [`exemplos-blocos/bloco_relatorio.schema.json`](exemplos-blocos/bloco_relatorio.schema.json),
@@ -38,7 +39,7 @@ objetos do contrato.
 | `versao` | integer (`1`) | não (default `1`) | Versão do contrato; sempre sai `1`. |
 | `tipo` | string (enum) | sim | Um dos tipos do schema; igual a `dados.tipo`. |
 | `titulo` | string | sim | Pronto para exibir. |
-| `periodo` | `{inicio: date, fim: date}` \| `null` | sim | Inclusive. Sempre presente (nunca omitido). `null` só nos relatórios da grade semanal, sem datas: o plano semanal e os pacientes por plano (`tabela_generica` com `relatorio: "plano_semanal"` ou `"pacientes_por_plano"`); todos os outros blocos trazem `{inicio, fim}`. |
+| `periodo` | `{inicio: date, fim: date}` \| `null` | sim | Inclusive. Sempre presente (nunca omitido). `null` só nos relatórios da grade semanal, sem datas: o plano semanal, os pacientes por plano e os nomes de pacientes por profissional (`tabela_generica` com `relatorio: "plano_semanal"`, `"pacientes_por_plano"` ou `"pacientes_por_profissional_nomes"`); todos os outros blocos trazem `{inicio, fim}`. |
 | `meta` | number \| null | sim | Ver regras gerais. |
 | `parcial` | boolean | sim | `true` exatamente quando `dias_nao_lidos` não é vazia. |
 | `dias_nao_lidos` | list[date] | sim | Ordenada, sem repetição. |
@@ -267,10 +268,66 @@ Regras:
 identificação só pelo nome, que nome preto fica fora, `"Atendimentos contados apenas com cor de
 plano…"` e que faturamento, guias, valores e cadastro ficam fora do RealocAI.
 
+### Pacientes por profissional, com os nomes (`relatorio: "pacientes_por_profissional_nomes"`)
+
+Vem da tool `listar_pacientes_por_profissional` (só pelo chat; **não** existe em
+`POST /relatorios/gerar`, que responde `422` para esse valor). Relatório gerencial: para cada
+profissional, os pacientes que ela atende na grade semanal vigente, em que dias e quantos
+atendimentos. Usa o mesmo tipo `tabela_generica`, sem tipo novo de bloco. O bloco
+`pacientes_por_profissional` (só contagens) continua igual.
+
+> **Atenção: este bloco contém nomes de pacientes** (coluna `paciente`). Os nomes nunca vão
+> para o modelo da OpenAI nem para log: só para o bloco. Como em `pacientes_por_plano`, este
+> relatório deve ficar restrito ao grupo de coordenação, e o time do chatbot precisa revisar como
+> o bloco sai na tela, no Excel e no PDF antes de liberar a exportação dele.
+
+`titulo`: `"Pacientes por profissional (grade semanal vigente)"` (sem nomes). **`periodo` é
+`null`** (a fonte é a grade semanal, sem datas: a lista vale para a grade vigente, não para uma
+semana do calendário). `meta` é `null`, `dimensoes` e `metricas` vêm vazias, `total` é `{}` e
+`linhas_omitidas` é `0` (sem limite de linhas: todos os profissionais e pacientes do recorte).
+`dias_nao_lidos` traz as datas ISO dos dias que não puderam ser lidos (então `parcial` é
+`true`). Exemplo (nomes fictícios) em
+[`exemplos-blocos/tabela_generica_pacientes_por_profissional_nomes.json`](exemplos-blocos/tabela_generica_pacientes_por_profissional_nomes.json).
+
+| Coluna | Formato | Valores |
+| --- | --- | --- |
+| `especialidade` | `texto` | Rótulo da especialidade (`"Fonoaudiologia"`, `"Terapia Ocupacional"`…); `"—"` sem especialidade |
+| `profissional` | `texto` | Nome da profissional como na grade |
+| `paciente` | `texto` | Nome do paciente como na planilha (a primeira grafia lida) |
+| `dias` | `texto` | Dias da semana com sessão, em ordem: `"Seg, Qua"` (sem datas) |
+| `atendimentos_semana` | `inteiro` | Sessões do paciente com essa profissional no recorte |
+
+Uma linha por (profissional, paciente), agrupadas por especialidade e profissional (em ordem
+alfabética, sem especialidade por último) e com os pacientes em ordem alfabética dentro de cada
+profissional. **Não há linha de total no meio da lista**: os totais ficam no `resumo`
+(`"Profissionais"`, `"Pacientes distintos"` no recorte inteiro e `"Com mais de uma
+profissional"`, todos `inteiro`) e na tabela de exportação **Resumo por profissional**
+(`especialidade`, `profissional`, `pacientes` = pacientes distintos, `atendimentos_semana` =
+sessões da profissional, em que a sessão em grupo conta uma vez). A outra tabela de exportação
+é **Pacientes** (mesmas colunas e linhas de `dados`).
+
+Regras:
+
+- Paciente = nome normalizado (sem acento, caixa nem pontuação): homônimos se fundem e grafias
+  diferentes viram dois. É a mesma regra dos "pacientes distintos" do bloco
+  `pacientes_por_profissional`, e os números batem com ele.
+- Paciente atendido por mais de uma profissional aparece em cada uma (aviso
+  `"N pacientes são atendidos por mais de uma profissional…"`, só a contagem).
+- Atendimento = sessão (horários seguidos da mesma coluna contam uma vez); numa sessão em grupo,
+  conta para cada paciente.
+- Filtros opcionais da tool: profissionais (nome ou apelido, uma ou várias), especialidade e
+  dias da semana. Com filtro de dias, o aviso `"Só os dias pedidos: Seg, Qua."` entra no bloco.
+- Sem nenhuma linha no recorte, a tool não manda bloco (só o texto).
+
+`avisos` sempre traz: que cobre só a grade semanal vigente (não todos os pacientes), a
+identificação só pelo nome, que o paciente com mais de uma profissional aparece em cada uma e a
+definição de atendimento.
+
 ## Histórico de mudanças (versão 1)
 
 | Data | Mudança | Compatibilidade |
 | --- | --- | --- |
+| 2026-11-10 | Novo valor de `relatorio` em `tabela_generica`: `"pacientes_por_profissional_nomes"` (tool `listar_pacientes_por_profissional`, só pelo chat), com `periodo` `null`. **O bloco contém nomes de pacientes.** Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual. Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; deve entrar na restrição ao grupo de coordenação; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |
 | 2026-10-28 | Novo valor de `relatorio` em `tabela_generica`: `"pacientes_por_plano"` (tool `pacientes_por_plano`, só pelo chat), com `periodo` `null`. **O bloco contém nomes de pacientes.** Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual. Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |
 | 2026-10-27 | Plano semanal: alternativas só nos dias pedidos, sem repetição, sempre no grupo do dia em que acontecem (antes podiam vir de dias não pedidos, repetidas em cada grupo, com `dia` diferente do grupo); e o modo `seguidas` (mesmo formato). Nenhuma coluna nem valor de `situacao` mudou. | Compatível: `versao` continua `1`, formato igual. Só muda quais linhas vêm e a ordem dentro do grupo de cada dia. |
 | 2026-10-27 | `periodo` passou a aceitar `null` (o campo continua obrigatório e sempre presente). Só o plano semanal (`relatorio: "plano_semanal"`) envia `null`; nenhum outro tipo de bloco mudou. O schema (`bloco_relatorio.schema.json`) aceita `null` em qualquer tipo, por ser um envelope único. | Compatível: `versao` continua `1`. Quem guarda cópia do schema precisa atualizá-la, e quem exibe ou exporta o plano deve tratar `periodo` nulo (sem linha de período). |

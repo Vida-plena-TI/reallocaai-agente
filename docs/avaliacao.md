@@ -137,7 +137,8 @@ conferida na planilha**. Com isso:
    | `sem_datas` | Nem o texto nem o plano semanal citam datas (`28/10`, `2026-10-28`). | ambos |
    | `tools_chamadas {tools, nunca}` | O turno chamou todas as `tools` e nenhuma de `nunca`. | ambos |
    | `pacientes_por_plano_igual_ao_oraculo` | Em cada bloco `pacientes_por_plano`, (plano, paciente, atendimentos) = o que o oráculo conta na grade crua (hex exato, independente das faixas de matiz); avisos numéricos só quando devidos; ordem dos planos; sem linha de total. O detalhe só traz contagens. | ambos |
-   | `sem_nomes_de_paciente` | Nenhum nome do bloco `pacientes_por_plano` no texto das tools (o que o modelo lê) nem na resposta. | ambos |
+   | `pacientes_por_profissional_igual_ao_oraculo {profissionais?, dias?}` | Em cada bloco `pacientes_por_profissional_nomes`, (profissional, paciente, dias, atendimentos) = o que o oráculo conta na grade crua com os mesmos filtros; resumo por profissional bate com as linhas; sem linha de total. O detalhe só tem contagens. | ambos |
+   | `sem_nomes_de_paciente` | Nenhum nome de um bloco com nomes (`pacientes_por_plano`, `pacientes_por_profissional_nomes`) no texto das tools (o que o modelo lê) nem na resposta. | ambos |
    | `frase_proibida {frases}` | Nenhuma das frases aparece. | ambos |
    | `estado_profissional {na_planilha, dia, inicio, fim}` | Diz o mesmo estado que o oráculo: não existe, não atende no dia, sem vaga na janela ou com vaga (`na_planilha: null` = profissional inexistente). | ambos |
    | `max_planos {maximo}` | De 1 a `maximo` planos ("Plano 1", "Opção 2"). | ambos |
@@ -171,3 +172,4 @@ conferida na planilha**. Com isso:
 | c09 | Plano semanal com poucas vagas no mesmo dia (`cenario: poucas_vagas`) | passou (alternativas só nos dias pedidos, sem repetir, no grupo do dia; avisa dos outros dias) |
 | c10 | "E se eu preferir sessões seguidas?" depois do plano | passou (`planejar_semana` com `seguidas`; maior sequência = oráculo; oferece ampliar a janela) |
 | c11 | Pacientes por plano de saúde (`cenario: planos_por_cor`) | passou (`pacientes_por_plano`; contagens = oráculo; preto fora; avisos numéricos; nenhum nome no texto; o 2º turno roteirizado cita um nome e vira resumo determinístico) |
+| c12 | Nomes de pacientes por profissional (`cenario: nomes_por_profissional`) | passou (`listar_pacientes_por_profissional`; linhas = oráculo, com e sem filtros; homônimo fundido; paciente com duas profissionais em cada uma; nenhum nome no texto; o 2º turno roteirizado cita um nome e vira resumo determinístico; no 3º, "a tela já traz os nomes" num relatório de contagem é recusado e sai a resposta com "traz as quantidades") |
