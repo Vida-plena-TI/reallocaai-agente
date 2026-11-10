@@ -19,13 +19,10 @@ from langchain_core.outputs import ChatResult
 from pydantic import Field
 
 from app.ai.agente import criar_agente, perguntar_com_mensagens
-from app.ai.blocos_gerais import (
-    AVISOS_PACIENTES_POR_PROFISSIONAL_NOMES,
-    RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES,
-)
+from app.ai.blocos_gerais import AVISOS_PACIENTES_POR_PROFISSIONAL_NOMES
 from app.ai.fundamentacao import afirma_nomes_na_tela, nomes_de_paciente_na_resposta
 from app.ai.prompts import PROMPT_SISTEMA_COM_RELATORIOS
-from app.ai.relatorios import BlocoRelatorio
+from app.ai.relatorios import RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES, BlocoRelatorio
 from app.ai.tools import criar_tools
 from app.ai.tools_pacientes_profissional import executar_listar_pacientes_por_profissional
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
@@ -494,3 +491,53 @@ def test_prompt_com_tela_diz_que_contagem_traz_as_quantidades() -> None:
 
     assert "Nos relatórios de contagem, a tela traz as quantidades (não traz os nomes" in prompt
     assert "Pedido de nomes de pacientes por profissional chama" in prompt
+
+
+# --- exibição agrupada (dica `agrupar_por`) -------------------------------------
+
+
+def test_dica_de_agrupamento_e_marca_no_bloco() -> None:
+    _, bloco = _executar()
+    dump = bloco.model_dump(mode="json")
+
+    assert dump["contem_dados_pacientes"] is True
+    assert dump["dados"]["agrupar_por"] == ["especialidade", "profissional"]
+    assert dump["dados"]["unidade_grupo"] == {"singular": "paciente", "plural": "pacientes"}
+    # A tabela de exportação "Pacientes" continua plana, com as 5 colunas.
+    pacientes = dump["tabelas"][0]
+    assert [c["chave"] for c in pacientes["colunas"]] == [
+        "especialidade",
+        "profissional",
+        "paciente",
+        "dias",
+        "atendimentos_semana",
+    ]
+    assert pacientes["linhas"] == dump["dados"]["linhas"]
+
+
+def test_linhas_contiguas_e_em_ordem_pelo_rotulo_na_clinica_inteira() -> None:
+    """Agenda fictícia com várias especialidades: (rótulo da especialidade,
+    profissional, paciente) em ordem alfabética sem acento, grupos contíguos."""
+    tools = {
+        t.name: t for t in criar_tools(fonte_clinica(), SemHistoricoContinuidadeDataSource(), HOJE)
+    }
+    mensagem = tools[TOOL].invoke({"name": TOOL, "args": {}, "id": "t", "type": "tool_call"})
+    linhas = mensagem.artifact["dados"]["linhas"]
+
+    def chave(texto: str) -> str:
+        return oraculo.nome_normalizado(texto)
+
+    ordem = [
+        (
+            linha["especialidade"] == "—",
+            chave(linha["especialidade"]),
+            chave(linha["profissional"]),
+            chave(linha["paciente"]),
+        )
+        for linha in linhas
+    ]
+    assert len(linhas) > 5 and ordem == sorted(ordem)
+    grupos = [(linha["especialidade"], linha["profissional"]) for linha in linhas]
+    trechos = [g for i, g in enumerate(grupos) if i == 0 or grupos[i - 1] != g]
+    assert len(trechos) == len(set(grupos)) > 2
+    assert len({linha["especialidade"] for linha in linhas}) > 1
