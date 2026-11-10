@@ -9,7 +9,10 @@ Confere, no texto da resposta, o que dá para conferir sem interpretar:
   existir no resultado das ferramentas da mesma rodada. Um horário também
   vale se veio da pergunta de quem perguntou (a janela "10h às 12h") ou é um
   horário fixo da clínica; o modelo pode juntar faixas seguidas, então basta o
-  horário existir como início ou fim de alguma faixa.
+  horário existir como início ou fim de alguma faixa;
+- afirmação de que a tela (ou o relatório) traz os nomes dos pacientes,
+  quando nenhum relatório da rodada traz nomes: os relatórios de contagem
+  trazem as quantidades.
 
 Quem chama (`app.ai.agente.perguntar_com_mensagens`) tenta UMA nova geração
 com o aviso do que não bateu e, se ainda não bater, usa um resumo
@@ -83,6 +86,14 @@ _LINHA_DE_HORARIO = re.compile(
     r"(?m)^\s*(?:[-*•]|\d+[.)])?\s*\**\d{1,2}:\d{2}\s*(?:às|as|-|\u2013)\s*\d{1,2}:\d{2}\**\s*:"
 )
 _NUMERO = re.compile(r"(?<![\d,])\d+(?:[,.]\d+)?")
+#: "a tela já traz os nomes (dos pacientes)", "o relatório mostra a lista com os
+#: nomes" (texto já sem acento e em minúsculas). "Nomes das profissionais" não
+#: conta; a negação ("não traz os nomes") é descartada em `afirma_nomes_na_tela`.
+_AFIRMA_NOMES = re.compile(
+    r"\b(?:traz|trazem|mostra|mostram|exibe|exibem|apresenta|apresentam|lista|listam|"
+    r"inclui|incluem|contem|tem)\b(?:\s+[\w-]+){0,5}?\s+nomes?\b"
+    r"(?!\s+(?:d[aeo]s?\s+)?(?:profissiona|terapeut|equipe|sala|especialidade))"
+)
 
 
 def _normalizar(texto: str) -> str:
@@ -123,11 +134,18 @@ class Problemas:
     nomes: list[str] = field(default_factory=list)
     #: Linhas de lista de horários no texto quando a tela já mostra o relatório.
     linhas_de_lista: int = 0
+    #: Disse que a tela traz nomes de pacientes sem relatório com nomes na rodada.
+    nomes_na_tela: bool = False
 
     @property
     def ok(self) -> bool:
         return not (
-            self.vocabulario or self.horarios or self.numeros or self.nomes or self.linhas_de_lista
+            self.vocabulario
+            or self.horarios
+            or self.numeros
+            or self.nomes
+            or self.linhas_de_lista
+            or self.nomes_na_tela
         )
 
     @property
@@ -138,6 +156,7 @@ class Problemas:
             + len(self.numeros)
             + len(self.nomes)
             + self.linhas_de_lista
+            + int(self.nomes_na_tela)
         )
 
     def aviso(self) -> str:
@@ -153,6 +172,11 @@ class Problemas:
             partes.append(f"profissionais que não vieram das ferramentas: {', '.join(self.nomes)}")
         if self.linhas_de_lista:
             partes.append("lista de horários linha a linha, que o relatório na tela já mostra")
+        if self.nomes_na_tela:
+            partes.append(
+                "afirma que a tela traz nomes de pacientes, mas o relatório desta rodada traz "
+                "as quantidades"
+            )
         return (
             "[Verificação interna, não responda a esta mensagem como pergunta] A resposta "
             f"anterior não pode sair assim ({'; '.join(partes)}). Reescreva a resposta à última "
@@ -170,6 +194,30 @@ def _fontes(mensagens_do_turno: Sequence[BaseMessage]) -> str:
             if mensagem.artifact is not None:
                 partes.append(json.dumps(mensagem.artifact, ensure_ascii=False))
     return "\n".join(partes)
+
+
+def afirma_nomes_na_tela(resposta: str) -> bool:
+    """Se a resposta diz que a tela/relatório traz nomes (sem negar logo antes)."""
+    normalizado = _normalizar(resposta)
+    for achado in _AFIRMA_NOMES.finditer(normalizado):
+        antes = normalizado[max(0, achado.start() - 12) : achado.start()]
+        if not re.search(r"\b(?:nao|nem|sem)\b", antes):
+            return True
+    return False
+
+
+def _rodada_com_nomes(mensagens_do_turno: Sequence[BaseMessage]) -> bool:
+    """Se algum relatório da rodada leva nomes de pacientes (e só então a tela os mostra)."""
+    for mensagem in mensagens_do_turno:
+        if not isinstance(mensagem, ToolMessage) or mensagem.artifact is None:
+            continue
+        try:
+            bloco = BlocoRelatorio.model_validate(mensagem.artifact)
+        except ValueError:
+            continue
+        if nomes_de_pacientes_no_bloco(bloco):
+            return True
+    return False
 
 
 def chamou_ferramenta(mensagens_do_turno: Sequence[BaseMessage]) -> bool:
@@ -190,8 +238,9 @@ def verificar(
     o texto não pode repetir a lista de horários.
     """
     vocabulario = termos_proibidos(resposta)
+    nomes_na_tela = afirma_nomes_na_tela(resposta) and not _rodada_com_nomes(mensagens_do_turno)
     if not chamou_ferramenta(mensagens_do_turno):
-        return Problemas(vocabulario=vocabulario)
+        return Problemas(vocabulario=vocabulario, nomes_na_tela=nomes_na_tela)
     trouxe_relatorio = any(
         isinstance(m, ToolMessage) and m.artifact is not None for m in mensagens_do_turno
     )
@@ -227,6 +276,7 @@ def verificar(
         numeros=sem_fonte_numero,
         nomes=sem_fonte_nome,
         linhas_de_lista=linhas_de_lista,
+        nomes_na_tela=nomes_na_tela,
     )
 
 
