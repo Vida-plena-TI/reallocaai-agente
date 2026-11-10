@@ -37,10 +37,11 @@ def _rodar(tipo: str, turno: TurnoObservado, **params: object) -> ResultadoCrite
 
 def test_casos_do_yaml_carregam() -> None:
     casos = carregar_casos()
-    assert [caso.id for caso in casos] == [f"c{n:02d}" for n in range(1, 12)]
+    assert [caso.id for caso in casos] == [f"c{n:02d}" for n in range(1, 13)]
     assert {caso.id: caso.cenario for caso in casos if caso.cenario} == {
         "c09": "poucas_vagas",
         "c11": "planos_por_cor",
+        "c12": "nomes_por_profissional",
     }
     assert {caso.id for caso in casos if caso.xfail} == {"c06"}
 
@@ -388,3 +389,106 @@ def test_sem_nomes_de_paciente_no_content_nem_na_resposta() -> None:
         resultado = _rodar_planos("sem_nomes_de_paciente", turno)
         assert resultado.ok is False and resultado.detalhe == "1 nome(s) de paciente no texto"
     assert _rodar_planos("sem_nomes_de_paciente", TurnoObservado()).ok is False
+
+
+CONTEXTO_NOMES = Contexto(payload_da_semana("nomes_por_profissional"), CASO.semana)
+
+#: O que o cenário `nomes_por_profissional` deve dar (nomes fictícios).
+LINHAS_NOMES = (
+    ("Bia", "Paciente Ficticio Ametista", "Seg, Ter, Qua", 3),
+    ("Bia", "Paciente Ficticio Basalto", "Seg", 1),
+    ("Bia", "Paciente Fictício Ômega", "Seg, Qua", 2),
+    ("Elo", "Paciente Ficticio Feldspato", "Ter", 1),
+    ("Carol", "Paciente Ficticio Ametista", "Seg", 1),
+    ("Assizely", "Paciente Ficticio Basalto", "Seg, Qua", 2),
+    ("Assizely", "Paciente Ficticio Esmeralda", "Seg, Qua", 2),
+    ("Assizely", "Paciente Ficticio Feldspato", "Seg", 1),
+)
+
+
+def _bloco_por_profissional(*linhas: tuple[str, str, str, int]) -> dict[str, object]:
+    contagem: dict[str, int] = {}
+    for profissional, *_ in linhas:
+        contagem[profissional] = contagem.get(profissional, 0) + 1
+    return {
+        "tipo": "tabela_generica",
+        "avisos": [],
+        "dados": {
+            "relatorio": "pacientes_por_profissional_nomes",
+            "linhas": [
+                {
+                    "profissional": profissional,
+                    "paciente": paciente,
+                    "dias": dias,
+                    "atendimentos_semana": atendimentos,
+                }
+                for profissional, paciente, dias, atendimentos in linhas
+            ],
+        },
+        "tabelas": [
+            {},
+            {"linhas": [{"profissional": p, "pacientes": n} for p, n in contagem.items()]},
+        ],
+    }
+
+
+def _rodar_nomes(turno: TurnoObservado, **params: object) -> ResultadoCriterio:
+    tipo = "pacientes_por_profissional_igual_ao_oraculo"
+    return CRITERIOS[tipo](Criterio(tipo, dict(params)), [turno], CONTEXTO_NOMES)
+
+
+def test_pacientes_por_profissional_igual_ao_oraculo() -> None:
+    certo = _bloco_por_profissional(*LINHAS_NOMES)
+    dia_errado = _bloco_por_profissional(
+        *LINHAS_NOMES[:-1], ("Assizely", "Paciente Ficticio Feldspato", "Ter", 1)
+    )
+    sem_homonimo_fundido = _bloco_por_profissional(
+        *LINHAS_NOMES[:2],
+        ("Bia", "Paciente Fictício Ômega", "Seg", 1),
+        ("Bia", "paciente ficticio omega", "Qua", 1),
+        *LINHAS_NOMES[3:],
+    )
+    so_num_profissional = _bloco_por_profissional(
+        *(linha for linha in LINHAS_NOMES if linha[0] != "Carol")
+    )
+    com_total = _bloco_por_profissional(*LINHAS_NOMES, ("Bia", "Total", "", 6))
+
+    assert _rodar_nomes(TurnoObservado(blocos=[certo])).ok
+    for errado in (dia_errado, sem_homonimo_fundido, so_num_profissional, com_total):
+        resultado = _rodar_nomes(TurnoObservado(blocos=[errado]))
+        assert resultado.ok is False
+        # O detalhe vai para o JSON da régua: só contagens.
+        assert "Ficticio" not in resultado.detalhe and "Fictício" not in resultado.detalhe
+
+
+def test_pacientes_por_profissional_com_filtros() -> None:
+    bia_na_quarta = _bloco_por_profissional(
+        ("Bia", "Paciente Ficticio Ametista", "Qua", 1),
+        ("Bia", "Paciente Fictício Ômega", "Qua", 1),
+    )
+
+    turno = TurnoObservado(blocos=[bia_na_quarta])
+    assert _rodar_nomes(turno, profissionais=["Bia"], dias=["quarta"]).ok
+    assert _rodar_nomes(turno).ok is False
+
+
+def test_resumo_por_profissional_tem_de_bater_com_as_linhas() -> None:
+    bloco = _bloco_por_profissional(*LINHAS_NOMES)
+    bloco["tabelas"] = [{}, {"linhas": [{"profissional": "Bia", "pacientes": 9}]}]
+
+    resultado = _rodar_nomes(TurnoObservado(blocos=[bloco]))
+    assert resultado.ok is False and "resumo" in resultado.detalhe
+
+
+def test_sem_nomes_de_paciente_vale_para_o_bloco_por_profissional() -> None:
+    bloco = _bloco_por_profissional(*LINHAS_NOMES)
+    limpo = TurnoObservado(textos_das_tools=["Bia: 3 pacientes."], blocos=[bloco])
+    com_nome = TurnoObservado(textos_das_tools=["Bia: paciente ficticio omega."], blocos=[bloco])
+
+    assert CRITERIOS["sem_nomes_de_paciente"](
+        Criterio("sem_nomes_de_paciente", {}), [limpo], CONTEXTO_NOMES
+    ).ok
+    resultado = CRITERIOS["sem_nomes_de_paciente"](
+        Criterio("sem_nomes_de_paciente", {}), [com_nome], CONTEXTO_NOMES
+    )
+    assert resultado.ok is False and resultado.detalhe == "1 nome(s) de paciente no texto"

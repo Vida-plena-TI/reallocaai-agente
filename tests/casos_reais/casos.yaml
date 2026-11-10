@@ -335,3 +335,61 @@
     - {tipo: frase_proibida, frases: ["Paciente Ficticio"]}
     - {tipo: sem_datas}
     - {tipo: max_chamadas_planilha, maximo: 1}
+
+- id: c12
+  descricao: >-
+    Nomes de pacientes por profissional: linhas iguais à grade crua (homônimo
+    fundido, paciente com duas profissionais em cada uma, filtros), nenhum nome
+    fora do bloco e nunca "a tela traz os nomes" num relatório de contagem
+  hoje: 2026-09-28
+  # Paciente com duas profissionais, sessão em grupo e um homônimo
+  # ("Fictício Ômega" e "ficticio omega"): planilha.PECAS_DOS_CENARIOS.
+  cenario: nomes_por_profissional
+  turnos:
+    - pergunta: quais pacientes cada profissional atende?
+      chamada:
+        tool: listar_pacientes_por_profissional
+        args: {}
+    # O modelo roteirizado cita um nome: a resposta tem de virar o resumo
+    # determinístico, sem nomes.
+    - pergunta: e só os da Bia na quarta?
+      chamada:
+        tool: listar_pacientes_por_profissional
+        args: {profissionais: [Bia], dias_semana: [quarta]}
+      respostas_simuladas:
+        - "Na quarta, a Bia atende 2 pacientes, entre eles Paciente Ficticio Ametista."
+    # Relatório de contagem: dizer que a tela traz os nomes é recusado e a
+    # segunda resposta (só quantidades) é a que sai.
+    - pergunta: quantos pacientes cada profissional atende?
+      chamada:
+        tool: consultar_pacientes_por_profissional
+        args: {}
+      respostas_simuladas:
+        - "A Bia atende 3 pacientes na semana; a tela já traz os nomes dos pacientes."
+        - "A Bia atende 3 pacientes na semana; a tela traz as quantidades por profissional."
+  criterios:
+    - {tipo: tools_chamadas, tools: [listar_pacientes_por_profissional]}
+    - {tipo: bloco_presente, bloco: tabela_generica}
+    - {tipo: pacientes_por_profissional_igual_ao_oraculo, turno: 1}
+    - tipo: pacientes_por_profissional_igual_ao_oraculo
+      turno: 2
+      profissionais: [Bia]
+      dias: [quarta]
+    - {tipo: sem_nomes_de_paciente}
+    - tipo: texto_contem
+      turno: 1
+      frases:
+        - "4 profissionais, 5 pacientes distintos"
+        - "Bia (Fonoaudiologia): 3 pacientes, 6 atendimentos na semana"
+        - "Assizely (Terapia Ocupacional): 3 pacientes, 3 atendimentos na semana"
+        - "3 pacientes são atendidos por mais de uma profissional"
+    - tipo: texto_contem
+      turno: 2
+      frases: ["O detalhe está no relatório"]
+    - tipo: texto_contem
+      turno: 3
+      frases: ["traz as quantidades"]
+    - {tipo: frase_proibida, frases: ["Paciente Ficticio", "traz os nomes"]}
+    - {tipo: sem_datas, turno: 1}
+    - {tipo: sem_datas, turno: 2}
+    - {tipo: max_chamadas_planilha, maximo: 1}
