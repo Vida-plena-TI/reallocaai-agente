@@ -23,16 +23,20 @@ desatualizados (regenerar: `uv run python scripts/gerar_exemplos_blocos.py`).
 | **Booleanos JSON** | Valores booleanos (em `dados` e nas linhas das tabelas) saem como `true`/`false` do JSON, nunca como texto (`"Sim"`, `"Não"`, `"true"`). As colunas booleanas das tabelas (`abaixo_da_meta`, `aguardando_autorizacao`) vêm com `formato: "texto"`, porque o enum de formatos não tem booleano: o front decide como exibir. |
 | **Especialidade é rótulo** | Em todos os blocos novos, todo campo e toda coluna `especialidade` traz o rótulo legível (`"Terapia Ocupacional"`), nunca o identificador (`terapia_ocupacional`). Sem especialidade: `null` em `profissional.especialidade` (dados), `"—"` nas colunas das tabelas prontas e `"Sem especialidade"` como valor da dimensão em `tabela_generica`. Exceção: em `disponibilidade` a especialidade nunca é vazia: sem cadastro, vale a da grade e, se nem ela existir, `"Não informada"`. |
 | **Tipo desconhecido** | O front ignora bloco de `tipo` que não conhece (não quebra a tela nem a resposta). Blocos novos são aditivos na versão 1. |
+| **Campo opcional novo** | Campos opcionais novos podem entrar na versão 1 com aviso prévio ao time do chatbot; o cliente deve ignorar campo que não conhece. O schema continua com `additionalProperties: false`, mas declara cada campo opcional novo: quem valida contra o schema atual aceita o bloco. Campo opcional sem valor não sai no JSON (nem como `null`). Os campos opcionais da versão 1 estão em [Campos opcionais](#campos-opcionais-versão-1). |
 | **Tipo novo exige aviso prévio** | Um tipo novo de bloco só entra depois de avisar o time do chatbot: ele pode conter dado de paciente, e o front precisa decidir como exibir, guardar e exportar antes de recebê-lo. |
 
-Privacidade: `agenda_paciente` é o único bloco que cita um paciente (nome e convênio), e só o
-paciente pedido pelo nome. Os demais trazem apenas contagens. IDs de profissional
+Privacidade: três blocos trazem nomes de pacientes, e todos com `contem_dados_pacientes: true`:
+`agenda_paciente` (só o paciente pedido pelo nome, com convênio) e os relatórios gerenciais
+`tabela_generica` com `relatorio` `"pacientes_por_plano"` ou `"pacientes_por_profissional_nomes"`
+(só pelo chat). Os demais trazem apenas contagens. IDs de profissional
 (`profissional.id`) são hashes opacos.
 
 ## Envelope comum (`BlocoRelatorio`)
 
-Todo campo abaixo está sempre presente na saída. `additionalProperties: false` em todos os
-objetos do contrato.
+Todo campo abaixo está sempre presente na saída, exceto os [campos opcionais](#campos-opcionais-versão-1),
+que só saem quando têm valor. `additionalProperties: false` em todos os objetos do contrato (os
+campos opcionais estão declarados no schema).
 
 | Campo | Tipo | Obrigatório no schema | Observação |
 | --- | --- | --- | --- |
@@ -47,6 +51,7 @@ objetos do contrato.
 | `resumo` | list[`ItemResumo`] | sim | Destaques do relatório. |
 | `dados` | objeto (por `tipo`) | sim | Ver cada bloco abaixo. |
 | `tabelas` | list[`TabelaExportacao`] | sim | Uma aba por tabela na exportação. |
+| `contem_dados_pacientes` | `true` | não (opcional) | Só nos blocos com nomes de pacientes (`agenda_paciente`, `pacientes_por_plano`, `pacientes_por_profissional_nomes`), sempre `true`; ausente nos demais (nunca `false` nem `null`). Proteção extra: a restrição de acesso continua pela igualdade com `tipo`/`dados.relatorio`. |
 
 `ItemResumo`: `rotulo` (string), `valor` (string \| integer \| number \| boolean \| null),
 `formato` (`texto` \| `inteiro` \| `decimal` \| `percentual` \| `data`), `exibicao` (string já
@@ -178,6 +183,22 @@ Relatórios `ranking_ocupacao`, `comparativo_dias`, `salas_ociosas`,
 | `linhas` | list[objeto] | Valores das dimensões são rótulos (especialidade, convênio, sala…). |
 | `total` | objeto | Só as métricas (e `abaixo_da_meta` quando há meta), recalculadas sobre o recorte inteiro: não é a soma das linhas. |
 | `linhas_omitidas` | integer `>= 0` | Linhas fora da tabela por causa do `limite`. |
+| `agrupar_por` | list[string] (opcional) | Dica de exibição agrupada: chaves de `colunas` que formam o título de cada grupo, da mais externa para a mais interna. Ver [Exibição agrupada](#exibição-agrupada-agrupar_por-e-unidade_grupo). |
+| `unidade_grupo` | `{singular, plural}` (opcional) | Sempre junto com `agrupar_por`: como contar as linhas no título do grupo (`"1 paciente"`, `"3 pacientes"`). |
+
+#### Exibição agrupada (`agrupar_por` e `unidade_grupo`)
+
+Opcional; hoje só em `pacientes_por_profissional_nomes`. As linhas já vêm **contíguas por
+grupo**, na ordem desejada: o front **não reordena**. Ele junta as linhas consecutivas com os
+mesmos valores nas colunas de `agrupar_por`, usa esses valores (e a contagem de linhas com
+`unidade_grupo`) no título do grupo e tira essas colunas da tabela exibida. Sem os campos, a
+tabela é exibida como sempre; front antigo os ignora. As `tabelas` de exportação continuam
+planas (o Excel não agrupa).
+
+Garantias do agente (o bloco é recusado se falharem): `agrupar_por` não vazio, sem repetição, só
+com chaves de `colunas`; `unidade_grupo` com `singular` e `plural` não vazios; `agrupar_por` e
+`unidade_grupo` vêm juntos ou não vêm; cada combinação de valores das colunas de agrupamento
+aparece num único trecho de linhas seguidas.
 
 Tabelas: **Resultado** (mesmas colunas e linhas de `dados`) e **Total** (colunas de métrica e
 `abaixo_da_meta`, uma linha).
@@ -230,7 +251,8 @@ vigente, com a lista de nomes. Usa o mesmo tipo `tabela_generica`, sem tipo novo
 > para o modelo da OpenAI nem para log: só para o bloco. O time do chatbot precisa revisar como
 > o bloco sai na tela, no Excel e no PDF antes de liberar a exportação dele.
 
-`titulo`: `"Pacientes por plano de saúde (grade semanal vigente)"` (sem nomes). **`periodo` é
+`titulo`: `"Pacientes por plano de saúde (grade semanal vigente)"` (sem nomes). O bloco traz
+`contem_dados_pacientes: true`. **`periodo` é
 `null`** (a fonte é a grade semanal, sem datas). `meta` é `null`, `dimensoes` e `metricas` vêm
 vazias, `total` é `{}` e `linhas_omitidas` é `0`. Exemplo (nomes fictícios) em
 [`exemplos-blocos/tabela_generica_pacientes_por_plano.json`](exemplos-blocos/tabela_generica_pacientes_por_plano.json).
@@ -297,9 +319,14 @@ semana do calendário). `meta` é `null`, `dimensoes` e `metricas` vêm vazias, 
 | `dias` | `texto` | Dias da semana com sessão, em ordem: `"Seg, Qua"` (sem datas) |
 | `atendimentos_semana` | `inteiro` | Sessões do paciente com essa profissional no recorte |
 
-Uma linha por (profissional, paciente), agrupadas por especialidade e profissional (em ordem
-alfabética, sem especialidade por último) e com os pacientes em ordem alfabética dentro de cada
-profissional. **Não há linha de total no meio da lista**: os totais ficam no `resumo`
+Uma linha por (profissional, paciente). Ordem: o **rótulo** da especialidade em ordem alfabética
+sem acento nem caixa (sem especialidade por último), depois a profissional e o paciente, também
+em ordem alfabética. As linhas de cada (especialidade, profissional) são contíguas, e `dados`
+traz a dica de exibição agrupada: `agrupar_por: ["especialidade", "profissional"]` e
+`unidade_grupo: {"singular": "paciente", "plural": "pacientes"}` (ver
+[Exibição agrupada](#exibição-agrupada-agrupar_por-e-unidade_grupo)): na tela, cada grupo tem
+como título a especialidade e a profissional, com o número de pacientes, e os pacientes embaixo.
+O bloco traz `contem_dados_pacientes: true`. **Não há linha de total no meio da lista**: os totais ficam no `resumo`
 (`"Profissionais"`, `"Pacientes distintos"` no recorte inteiro e `"Com mais de uma
 profissional"`, todos `inteiro`) e na tabela de exportação **Resumo por profissional**
 (`especialidade`, `profissional`, `pacientes` = pacientes distintos, `atendimentos_semana` =
@@ -323,10 +350,19 @@ Regras:
 identificação só pelo nome, que o paciente com mais de uma profissional aparece em cada uma e a
 definição de atendimento.
 
+## Campos opcionais (versão 1)
+
+| Campo | Onde | Desde | Quando sai |
+| --- | --- | --- | --- |
+| `contem_dados_pacientes` | envelope | 2026-11-10 | Sempre `true`, só nos três blocos com nomes de pacientes. |
+| `agrupar_por` | `dados` de `tabela_generica` | 2026-11-10 | Só com exibição agrupada (hoje, `pacientes_por_profissional_nomes`). |
+| `unidade_grupo` | `dados` de `tabela_generica` | 2026-11-10 | Sempre junto com `agrupar_por`. |
+
 ## Histórico de mudanças (versão 1)
 
 | Data | Mudança | Compatibilidade |
 | --- | --- | --- |
+| 2026-11-10 | Regra nova: campos opcionais podem entrar na versão 1 com aviso prévio, e o cliente deve ignorar campo que não conhece. Campos opcionais novos: `contem_dados_pacientes` (envelope; `true` em `agenda_paciente`, `pacientes_por_plano` e `pacientes_por_profissional_nomes`) e `agrupar_por` + `unidade_grupo` (`dados` de `tabela_generica`; em `pacientes_por_profissional_nomes`, para a exibição em seções por especialidade e profissional). Ordem das linhas de `pacientes_por_profissional_nomes` pelo rótulo da especialidade. | Adição opcional: `versao` continua `1`. Os campos só saem quando têm valor; os demais blocos não mudaram. O schema continua com `additionalProperties: false` e declara os três campos: **quem valida contra uma cópia antiga do schema precisa atualizá-la** antes de receber os blocos novos. |
 | 2026-11-10 | Novo valor de `relatorio` em `tabela_generica`: `"pacientes_por_profissional_nomes"` (tool `listar_pacientes_por_profissional`, só pelo chat), com `periodo` `null`. **O bloco contém nomes de pacientes.** Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual. Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; deve entrar na restrição ao grupo de coordenação; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |
 | 2026-10-28 | Novo valor de `relatorio` em `tabela_generica`: `"pacientes_por_plano"` (tool `pacientes_por_plano`, só pelo chat), com `periodo` `null`. **O bloco contém nomes de pacientes.** Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual. Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |
 | 2026-10-27 | Plano semanal: alternativas só nos dias pedidos, sem repetição, sempre no grupo do dia em que acontecem (antes podiam vir de dias não pedidos, repetidas em cada grupo, com `dia` diferente do grupo); e o modo `seguidas` (mesmo formato). Nenhuma coluna nem valor de `situacao` mudou. | Compatível: `versao` continua `1`, formato igual. Só muda quais linhas vêm e a ordem dentro do grupo de cada dia. |

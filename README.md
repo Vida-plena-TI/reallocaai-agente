@@ -302,7 +302,9 @@ padrão é a semana de hoje, todas as profissionais, com o detalhe por dia.
 Responde "quais pacientes a Bia atende?" ou "lista de pacientes por profissional": para cada
 profissional, os pacientes com sessão na grade semanal vigente, os dias ("Seg, Qua") e os
 atendimentos, num bloco `tabela_generica` com `relatorio: "pacientes_por_profissional_nomes"` e
-`periodo: null`. Filtros opcionais: profissionais, especialidade e dias da semana. **Os nomes vão
+`periodo: null`. Filtros opcionais: profissionais, especialidade e dias da semana. As linhas
+saem contíguas por especialidade e profissional, com a dica de exibição em seções
+(`agrupar_por`, `unidade_grupo`), e o bloco traz `contem_dados_pacientes: true`. **Os nomes vão
 só no bloco** (para a tela): o texto que o modelo lê e a resposta só têm contagens, e a resposta
 que repetir um nome do bloco é trocada pelo resumo determinístico. Só pelo chat (`POST
 /relatorios/gerar` devolve `422`). Contrato em
