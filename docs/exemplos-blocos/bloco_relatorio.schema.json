@@ -434,6 +434,35 @@
           "minimum": 0,
           "title": "Linhas Omitidas",
           "type": "integer"
+        },
+        "agrupar_por": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Opcional. Colunas (chaves de `colunas`) que formam o título de cada grupo, da mais externa para a mais interna. As linhas já vêm contíguas por grupo.",
+          "title": "Agrupar Por"
+        },
+        "unidade_grupo": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UnidadeGrupo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Opcional, sempre junto com `agrupar_por`: unidade da contagem do grupo."
         }
       },
       "required": [
@@ -1281,6 +1310,28 @@
       "title": "TurnoOcupacao",
       "type": "object"
     },
+    "UnidadeGrupo": {
+      "additionalProperties": false,
+      "description": "Como contar as linhas de um grupo no título (\"1 paciente\", \"3 pacientes\").",
+      "properties": {
+        "singular": {
+          "minLength": 1,
+          "title": "Singular",
+          "type": "string"
+        },
+        "plural": {
+          "minLength": 1,
+          "title": "Plural",
+          "type": "string"
+        }
+      },
+      "required": [
+        "singular",
+        "plural"
+      ],
+      "title": "UnidadeGrupo",
+      "type": "object"
+    },
     "VagasDiaPeriodo": {
       "additionalProperties": false,
       "properties": {
@@ -1456,6 +1507,12 @@
       },
       "title": "Tabelas",
       "type": "array"
+    },
+    "contem_dados_pacientes": {
+      "const": true,
+      "description": "Opcional. Presente (e true) só nos blocos que trazem nomes de pacientes: agenda_paciente e tabela_generica com relatorio pacientes_por_plano ou pacientes_por_profissional_nomes. Ausente nos demais.",
+      "title": "Contem Dados Pacientes",
+      "type": "boolean"
     }
   },
   "required": [

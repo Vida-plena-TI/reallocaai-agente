@@ -2,6 +2,7 @@
 
 from datetime import date
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -321,6 +322,7 @@ def _bloco_por_plano(
     return {
         "tipo": "tabela_generica",
         "avisos": list(avisos),
+        "contem_dados_pacientes": True,
         "dados": {
             "relatorio": "pacientes_por_plano",
             "linhas": [
@@ -404,6 +406,13 @@ LINHAS_NOMES = (
     ("Assizely", "Paciente Ficticio Esmeralda", "Seg, Qua", 2),
     ("Assizely", "Paciente Ficticio Feldspato", "Seg", 1),
 )
+#: Especialidade (rótulo) de cada profissional do cenário.
+_ESPECIALIDADES = {
+    "Bia": "Fonoaudiologia",
+    "Elo": "Fonoaudiologia",
+    "Carol": "Psicologia",
+    "Assizely": "Terapia Ocupacional",
+}
 
 
 def _bloco_por_profissional(*linhas: tuple[str, str, str, int]) -> dict[str, object]:
@@ -413,10 +422,14 @@ def _bloco_por_profissional(*linhas: tuple[str, str, str, int]) -> dict[str, obj
     return {
         "tipo": "tabela_generica",
         "avisos": [],
+        "contem_dados_pacientes": True,
         "dados": {
             "relatorio": "pacientes_por_profissional_nomes",
+            "agrupar_por": ["especialidade", "profissional"],
+            "unidade_grupo": {"singular": "paciente", "plural": "pacientes"},
             "linhas": [
                 {
+                    "especialidade": _ESPECIALIDADES.get(profissional, "—"),
                     "profissional": profissional,
                     "paciente": paciente,
                     "dias": dias,
@@ -492,3 +505,45 @@ def test_sem_nomes_de_paciente_vale_para_o_bloco_por_profissional() -> None:
         Criterio("sem_nomes_de_paciente", {}), [com_nome], CONTEXTO_NOMES
     )
     assert resultado.ok is False and resultado.detalhe == "1 nome(s) de paciente no texto"
+
+
+def test_pacientes_por_profissional_exige_a_dica_de_agrupamento_e_a_marca() -> None:
+    sem_dica = _bloco_por_profissional(*LINHAS_NOMES)
+    cast(dict[str, Any], sem_dica["dados"]).pop("agrupar_por")
+    sem_unidade = _bloco_por_profissional(*LINHAS_NOMES)
+    cast(dict[str, Any], sem_unidade["dados"])["unidade_grupo"] = {"singular": "linha"}
+    sem_marca = _bloco_por_profissional(*LINHAS_NOMES)
+    sem_marca.pop("contem_dados_pacientes")
+
+    for errado, motivo in (
+        (sem_dica, "agrupar_por"),
+        (sem_unidade, "unidade_grupo"),
+        (sem_marca, "contem_dados_pacientes"),
+    ):
+        resultado = _rodar_nomes(TurnoObservado(blocos=[errado]))
+        assert resultado.ok is False and motivo in resultado.detalhe
+
+
+def test_pacientes_por_profissional_exige_grupos_contiguos_e_ordem() -> None:
+    # Carol (Psicologia) no meio dos pacientes da Bia: grupo da Bia partido.
+    partido = _bloco_por_profissional(
+        LINHAS_NOMES[0], LINHAS_NOMES[4], *LINHAS_NOMES[1:4], *LINHAS_NOMES[5:]
+    )
+    # Assizely (Terapia Ocupacional) antes de Bia (Fonoaudiologia): fora de ordem.
+    fora_de_ordem = _bloco_por_profissional(*LINHAS_NOMES[5:], *LINHAS_NOMES[:5])
+
+    resultado = _rodar_nomes(TurnoObservado(blocos=[partido]))
+    assert resultado.ok is False and "não contíguos" in resultado.detalhe
+    resultado = _rodar_nomes(TurnoObservado(blocos=[fora_de_ordem]))
+    assert resultado.ok is False and "fora da ordem" in resultado.detalhe
+    assert "Ficticio" not in resultado.detalhe
+
+
+def test_sem_nomes_de_paciente_exige_a_marca_no_bloco() -> None:
+    bloco = _bloco_por_plano(*LINHAS_PLANOS)
+    bloco.pop("contem_dados_pacientes")
+
+    resultado = CRITERIOS["sem_nomes_de_paciente"](
+        Criterio("sem_nomes_de_paciente", {}), [TurnoObservado(blocos=[bloco])], CONTEXTO_PLANOS
+    )
+    assert resultado.ok is False and "contem_dados_pacientes" in resultado.detalhe

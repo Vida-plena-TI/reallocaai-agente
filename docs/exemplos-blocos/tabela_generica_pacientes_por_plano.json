@@ -230,5 +230,6 @@
         }
       ]
     }
-  ]
+  ],
+  "contem_dados_pacientes": true
 }

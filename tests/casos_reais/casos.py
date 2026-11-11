@@ -832,6 +832,36 @@ def _blocos_por_profissional(turnos: Sequence[TurnoObservado]) -> list[dict[str,
     ]
 
 
+def _ordem(texto: str) -> str:
+    """Ordem alfabética sem acento nem caixa (independente do motor)."""
+    return _normalizar(texto)
+
+
+def _problemas_do_agrupamento(bloco: Mapping[str, Any]) -> list[str]:
+    """A dica de exibição agrupada: colunas e unidade combinadas com o time do
+    chatbot, grupos contíguos e linhas em ordem (especialidade, profissional,
+    paciente), e a marca de bloco com dados de pacientes."""
+    dados = bloco["dados"]
+    problemas: list[str] = []
+    if dados.get("agrupar_por") != ["especialidade", "profissional"]:
+        problemas.append("agrupar_por diferente de especialidade e profissional")
+    if dados.get("unidade_grupo") != {"singular": "paciente", "plural": "pacientes"}:
+        problemas.append("unidade_grupo diferente de paciente/pacientes")
+    if bloco.get("contem_dados_pacientes") is not True:
+        problemas.append("sem contem_dados_pacientes: true")
+    linhas = dados["linhas"]
+    grupos = [(str(linha["especialidade"]), str(linha["profissional"])) for linha in linhas]
+    if len(set(grupos)) != len([g for i, g in enumerate(grupos) if i == 0 or grupos[i - 1] != g]):
+        problemas.append("grupos não contíguos")
+    chaves = [
+        (str(linha["especialidade"]) == "—", _ordem(e), _ordem(p), _ordem(str(linha["paciente"])))
+        for linha, (e, p) in zip(linhas, grupos, strict=True)
+    ]
+    if chaves != sorted(chaves):
+        problemas.append("linhas fora da ordem especialidade, profissional, paciente")
+    return problemas
+
+
 @_sobre_a_saida
 def _pacientes_por_profissional_igual_ao_oraculo(
     c: Criterio, turnos: Sequence[TurnoObservado], ctx: Contexto
@@ -876,6 +906,7 @@ def _pacientes_por_profissional_igual_ao_oraculo(
             )
         if any(_normalizar(str(linha["paciente"])) == "total" for linha in linhas):
             problemas.append(f"bloco {indice}: linha de total no meio da lista")
+        problemas.extend(f"bloco {indice}: {p}" for p in _problemas_do_agrupamento(bloco))
         resumo = {
             _normalizar(str(linha["profissional"])): int(linha["pacientes"])
             for linha in bloco["tabelas"][1]["linhas"]
@@ -898,6 +929,9 @@ def _sem_nomes_de_paciente(
     blocos = _blocos_com_nomes(turnos)
     if not blocos:
         return _resultado(c, False, "sem bloco com nomes de pacientes")
+    sem_marca = sum(1 for bloco in blocos if bloco.get("contem_dados_pacientes") is not True)
+    if sem_marca:
+        return _resultado(c, False, f"{sem_marca} bloco(s) com nomes sem contem_dados_pacientes")
     nomes = {
         _normalizar(str(linha["paciente"]))
         for bloco in blocos

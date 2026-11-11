@@ -9,7 +9,10 @@ da contagem de pacientes distintos:
   cadastro da fotografia (a primeira grafia lida);
 - atendimento = `Atendimento` (sessão); numa sessão em grupo, conta para cada
   paciente;
-- paciente com mais de um profissional aparece em cada um.
+- paciente com mais de um profissional aparece em cada um;
+- ordem: rótulo legível da especialidade, profissional e paciente, em ordem
+  alfabética sem acento nem caixa (sem especialidade por último). Os grupos
+  saem contíguos: o bloco usa isso na dica `agrupar_por`.
 
 Só usa os dias pedidos que foram lidos; os não lidos ficam em
 `dias_com_falha`, para o relatório sair parcial.
@@ -20,8 +23,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date
 
-from app.domain import Especialidade, normalizar_id
-from app.domain.formatacao import chave_texto
+from app.domain import Especialidade
+from app.domain.formatacao import chave_texto, rotulo_enum
 from app.engine.fotografia import FotografiaPeriodo
 
 
@@ -57,13 +60,19 @@ class PacientesPorProfissional:
     dias_com_falha: tuple[date, ...]
 
 
-def _chave(especialidade: Especialidade | None, nome: str) -> tuple[bool, str, str]:
-    """Especialidade e depois nome, sem acento e sem caixa; sem especialidade vai ao fim.
-
-    A mesma ordem de `visoes_fotografia.carga_profissionais`.
+def _chave(grupo: GrupoDoProfissional) -> tuple[bool, str, str, str]:
+    """Rótulo legível da especialidade (`Terapia Ocupacional`), depois o nome da
+    profissional, sem acento e sem caixa; sem especialidade vai ao fim. O id
+    desempata dois nomes iguais, para a ordem (e os grupos contíguos) ser estável.
     """
-    rotulo = especialidade.value if especialidade is not None else ""
-    return especialidade is None, normalizar_id(rotulo), normalizar_id(nome)
+    especialidade = grupo.especialidade
+    rotulo = rotulo_enum(especialidade.value) if especialidade is not None else ""
+    return (
+        especialidade is None,
+        chave_texto(rotulo),
+        chave_texto(grupo.nome),
+        grupo.profissional_id,
+    )
 
 
 def listar_pacientes_por_profissional(
@@ -124,7 +133,7 @@ def listar_pacientes_por_profissional(
                 atendimentos=len(sessoes_do_profissional[profissional_id]),
             )
         )
-    grupos.sort(key=lambda grupo: _chave(grupo.especialidade, grupo.nome))
+    grupos.sort(key=_chave)
     return PacientesPorProfissional(
         grupos=tuple(grupos),
         pacientes=len(profissionais_por_paciente),

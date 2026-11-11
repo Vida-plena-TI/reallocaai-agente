@@ -130,6 +130,8 @@ Resposta `200`:
 - A busca é pelo **nome exato** como está na agenda (sem diferenciar acento e caixa), **sem
   sugestão de nomes parecidos**. Se o nome não estiver na agenda do período, a resposta é `200`
   com `bloco: null` e um texto dizendo que a busca é pelo nome exato.
+- O bloco `agenda_paciente` traz `contem_dados_pacientes: true` (campo opcional da versão 1; os
+  outros relatórios desta API não o trazem).
 - O nome nunca vai para log, nem no `422` (o valor recebido não volta).
 - `paciente` em qualquer outro relatório devolve `422`: os demais relatórios nunca trazem
   pacientes, só contagens.
@@ -183,8 +185,8 @@ agente (`POST /agenda/chat`), como um bloco `tabela_generica` com `relatorio:
 "pacientes_por_plano"` e `periodo: null` (formato em
 [`contrato-blocos-novos.md`](contrato-blocos-novos.md#pacientes-por-plano-relatorio-pacientes_por_plano)).
 
-- **O bloco contém nomes de pacientes.** O texto que o modelo lê e o texto da resposta só têm
-  contagens; os nomes vão só no bloco. A exibição e a exportação (Excel e PDF) desse bloco
+- **O bloco contém nomes de pacientes** e traz `contem_dados_pacientes: true`. O texto que o
+  modelo lê e o texto da resposta só têm contagens; os nomes vão só no bloco. A exibição e a exportação (Excel e PDF) desse bloco
   precisam de revisão do time do chatbot antes de serem liberadas.
 - Escopo: relatório gerencial da **grade semanal vigente** (só quem tem sessão na grade desta
   semana, não todos os pacientes). O plano vem da cor do texto do nome; nome em preto fica fora.
@@ -214,5 +216,12 @@ nem em rota própria). Ela sai só pela tool `listar_pacientes_por_profissional`
   especialidade e dias da semana). O paciente é identificado só pelo nome (homônimos se fundem,
   grafias diferentes viram dois) e quem é atendido por mais de uma profissional aparece em cada
   uma.
+- Exibição em seções: `dados` traz `agrupar_por: ["especialidade", "profissional"]` e
+  `unidade_grupo: {"singular": "paciente", "plural": "pacientes"}`, com as linhas já contíguas por
+  grupo; o front agrupa as linhas consecutivas e mostra especialidade, profissional e número de
+  pacientes no título de cada grupo. As tabelas de exportação continuam planas.
+- O bloco traz `contem_dados_pacientes: true`, como `pacientes_por_plano` e `agenda_paciente`
+  (campos opcionais da versão 1, ver
+  [`contrato-blocos-novos.md`](contrato-blocos-novos.md#campos-opcionais-versão-1)).
 - O relatório de contagem (`pacientes_por_profissional`, tool
   `consultar_pacientes_por_profissional`) continua igual e só traz quantidades.

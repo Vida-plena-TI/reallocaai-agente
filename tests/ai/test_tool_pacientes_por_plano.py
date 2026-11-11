@@ -18,9 +18,9 @@ from langchain_core.outputs import ChatResult
 from pydantic import Field
 
 from app.ai.agente import criar_agente, perguntar_com_mensagens
-from app.ai.blocos_gerais import AVISOS_PACIENTES_POR_PLANO, RELATORIO_PACIENTES_POR_PLANO
+from app.ai.blocos_gerais import AVISOS_PACIENTES_POR_PLANO
 from app.ai.fundamentacao import nomes_de_paciente_na_resposta
-from app.ai.relatorios import BlocoRelatorio
+from app.ai.relatorios import RELATORIO_PACIENTES_POR_PLANO, BlocoRelatorio
 from app.ai.tools import criar_tools
 from app.ai.tools_pacientes_plano import executar_pacientes_por_plano
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
@@ -107,6 +107,8 @@ def test_bloco_tabela_generica_sem_periodo_e_totais_so_no_resumo() -> None:
 
     assert bloco.tipo == "tabela_generica"
     assert dump["periodo"] is None and dump["meta"] is None
+    assert dump["contem_dados_pacientes"] is True
+    assert "agrupar_por" not in dump["dados"] and "unidade_grupo" not in dump["dados"]
     assert dump["dados"]["relatorio"] == RELATORIO_PACIENTES_POR_PLANO
     assert [c["chave"] for c in dump["dados"]["colunas"]] == [
         "plano",

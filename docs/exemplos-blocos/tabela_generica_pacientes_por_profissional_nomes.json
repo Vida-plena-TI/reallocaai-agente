@@ -124,7 +124,15 @@
       }
     ],
     "total": {},
-    "linhas_omitidas": 0
+    "linhas_omitidas": 0,
+    "agrupar_por": [
+      "especialidade",
+      "profissional"
+    ],
+    "unidade_grupo": {
+      "singular": "paciente",
+      "plural": "pacientes"
+    }
   },
   "tabelas": [
     {
@@ -266,5 +274,6 @@
         }
       ]
     }
-  ]
+  ],
+  "contem_dados_pacientes": true
 }

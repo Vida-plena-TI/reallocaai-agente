@@ -6,9 +6,16 @@ entidades de pacientes, arquivos ou desenho. IDs de profissionais são opacos.
 
 from datetime import date
 from hashlib import sha256
-from typing import Annotated, Literal
+from typing import Annotated, Any, Final, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    WithJsonSchema,
+    field_validator,
+    model_validator,
+)
 
 from app.domain.constants import META_OCUPACAO_POR_SALA
 from app.domain.formatacao import chave_natural, formatar_razao
@@ -300,6 +307,32 @@ class DadosQualidadeAgenda(_ModeloRelatorio):
     por_dia: list[QualidadeProfissionalDiaRelatorio]
 
 
+#: Identificadores (`dados.relatorio`) dos relatórios de `tabela_generica` cujo
+#: bloco leva nomes de pacientes (só para a tela, nunca para o modelo).
+RELATORIO_PACIENTES_POR_PLANO: Final[str] = "pacientes_por_plano"
+RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES: Final[str] = "pacientes_por_profissional_nomes"
+RELATORIOS_COM_NOMES_DE_PACIENTES: Final[frozenset[str]] = frozenset(
+    {RELATORIO_PACIENTES_POR_PLANO, RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES}
+)
+
+
+def _ausente(valor: Any) -> bool:
+    """Campo opcional da versão 1 sem valor: não sai no JSON (nem como `null`)."""
+    return valor is None
+
+
+def _sem_default(schema: dict[str, Any]) -> None:
+    """Tira o `default: null` do schema de um campo que só aceita `true`."""
+    schema.pop("default", None)
+
+
+class UnidadeGrupo(_ModeloRelatorio):
+    """Como contar as linhas de um grupo no título ("1 paciente", "3 pacientes")."""
+
+    singular: str = Field(min_length=1)
+    plural: str = Field(min_length=1)
+
+
 class DadosTabelaGenerica(_ModeloRelatorio):
     tipo: Literal["tabela_generica"] = "tabela_generica"
     # Relatório nomeado que gerou a tabela, ou `personalizado`.
@@ -312,6 +345,46 @@ class DadosTabelaGenerica(_ModeloRelatorio):
     total: dict[str, ValorSimples]
     # Linhas fora da tabela por causa do limite pedido.
     linhas_omitidas: int = Field(ge=0)
+    # Opcionais (adição de 2026-11-10, versão 1): dica de exibição agrupada. As
+    # linhas já vêm contíguas por grupo, na ordem desejada; o front agrupa as
+    # consecutivas com os mesmos valores nestas colunas e as tira da tabela.
+    agrupar_por: list[str] | None = Field(
+        default=None,
+        min_length=1,
+        exclude_if=_ausente,
+        description=(
+            "Opcional. Colunas (chaves de `colunas`) que formam o título de cada grupo, da "
+            "mais externa para a mais interna. As linhas já vêm contíguas por grupo."
+        ),
+    )
+    unidade_grupo: UnidadeGrupo | None = Field(
+        default=None,
+        exclude_if=_ausente,
+        description="Opcional, sempre junto com `agrupar_por`: unidade da contagem do grupo.",
+    )
+
+    @model_validator(mode="after")
+    def _validar_agrupamento(self) -> DadosTabelaGenerica:
+        if (self.agrupar_por is None) != (self.unidade_grupo is None):
+            raise ValueError("agrupar_por e unidade_grupo vêm juntos ou não vêm.")
+        if self.agrupar_por is None:
+            return self
+        if len(set(self.agrupar_por)) != len(self.agrupar_por):
+            raise ValueError("agrupar_por não pode repetir coluna.")
+        chaves = {coluna.chave for coluna in self.colunas}
+        if fora := [nome for nome in self.agrupar_por if nome not in chaves]:
+            raise ValueError(f"agrupar_por cita colunas que não existem: {', '.join(fora)}.")
+        vistos: set[tuple[ValorSimples, ...]] = set()
+        anterior: tuple[ValorSimples, ...] | None = None
+        for linha in self.linhas:
+            grupo = tuple(linha.get(nome) for nome in self.agrupar_por)
+            if grupo != anterior:
+                # Não cita os valores: podem ser dados da planilha.
+                if grupo in vistos:
+                    raise ValueError("As linhas de cada grupo de agrupar_por devem ser contíguas.")
+                vistos.add(grupo)
+                anterior = grupo
+        return self
 
 
 DadosRelatorio = Annotated[
@@ -343,11 +416,49 @@ class BlocoRelatorio(_ModeloRelatorio):
     resumo: list[ItemResumo]
     dados: DadosRelatorio
     tabelas: list[TabelaExportacao]
+    # Opcional (adição de 2026-11-10, versão 1): `true` exatamente nos blocos que
+    # trazem nomes de pacientes; ausente nos demais (nunca `false` nem `null`).
+    contem_dados_pacientes: Annotated[
+        Literal[True] | None,
+        WithJsonSchema(
+            {
+                "const": True,
+                "type": "boolean",
+                "description": (
+                    "Opcional. Presente (e true) só nos blocos que trazem nomes de pacientes: "
+                    "agenda_paciente e tabela_generica com relatorio pacientes_por_plano ou "
+                    "pacientes_por_profissional_nomes. Ausente nos demais."
+                ),
+            }
+        ),
+    ] = Field(default=None, exclude_if=_ausente, json_schema_extra=_sem_default)
+
+    @field_validator("contem_dados_pacientes", mode="before")
+    @classmethod
+    def _so_true(cls, valor: Any) -> Any:
+        # `1 == True` em Python: sem isto, 1 passaria como true.
+        if valor is not None and valor is not True:
+            raise ValueError("contem_dados_pacientes só aceita true.")
+        return valor
+
+    @property
+    def traz_nomes_de_pacientes(self) -> bool:
+        """Se o bloco, pelo tipo e pelo relatório, leva nomes de pacientes."""
+        if isinstance(self.dados, DadosAgendaPaciente):
+            return True
+        return (
+            isinstance(self.dados, DadosTabelaGenerica)
+            and self.dados.relatorio in RELATORIOS_COM_NOMES_DE_PACIENTES
+        )
 
     @model_validator(mode="after")
     def _validar_tipo(self) -> BlocoRelatorio:
         if self.tipo != self.dados.tipo:
             raise ValueError("O tipo do bloco deve corresponder ao tipo dos dados.")
+        if self.traz_nomes_de_pacientes and self.contem_dados_pacientes is not True:
+            raise ValueError("Bloco com nomes de pacientes exige contem_dados_pacientes: true.")
+        if not self.traz_nomes_de_pacientes and self.contem_dados_pacientes is not None:
+            raise ValueError("contem_dados_pacientes só vale nos blocos com nomes de pacientes.")
         if self.parcial != bool(self.dias_nao_lidos):
             raise ValueError("dias_nao_lidos deve ser vazio exatamente quando parcial é False.")
         if self.dias_nao_lidos != sorted(set(self.dias_nao_lidos)):
