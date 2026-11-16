@@ -139,3 +139,10 @@ def test_exemplos_do_plano_de_realocacao_plano_e_pergunta() -> None:
         "Paciente Ficticio Rubi Alva",
         "Paciente Ficticio Rubi Estrela",
     ]
+
+    # Abas de exportação: nomes esperados, até 31 caracteres e sem \ / ? * [ ] : (Excel).
+    assert [t["nome"] for t in plano["tabelas"]] == ["Passos", "Resumo por opção"]
+    assert [t["nome"] for t in pergunta["tabelas"]] == ["Candidatas"]
+    for tabela in (*plano["tabelas"], *pergunta["tabelas"]):
+        assert len(tabela["nome"]) <= 31
+        assert not set(tabela["nome"]) & set("\\/?*[]:")

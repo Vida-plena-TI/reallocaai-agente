@@ -218,8 +218,9 @@ nem em rota própria). Ela sai só pela tool `listar_pacientes_por_profissional`
   uma.
 - Exibição em seções: `dados` traz `agrupar_por: ["especialidade", "profissional"]` e
   `unidade_grupo: {"singular": "paciente", "plural": "pacientes"}`, com as linhas já contíguas por
-  grupo; o front agrupa as linhas consecutivas e mostra especialidade, profissional e número de
-  pacientes no título de cada grupo. As tabelas de exportação continuam planas.
+  grupo; o front agrupa as linhas consecutivas e monta o título de cada grupo no padrão
+  `valor (N unidade)`: especialidade e profissional seguidas de `(1 paciente)` ou
+  `(3 pacientes)`. As tabelas de exportação continuam planas.
 - O bloco traz `contem_dados_pacientes: true`, como `pacientes_por_plano` e `agenda_paciente`
   (campos opcionais da versão 1, ver
   [`contrato-blocos-novos.md`](contrato-blocos-novos.md#campos-opcionais-versão-1)).
