@@ -147,9 +147,6 @@
 - id: c06
   descricao: Realocação com autorização do usuário ("pode mover o que for necessário")
   hoje: 2026-09-28
-  xfail: >-
-    Ainda não existe a tool de realocação por pedido (planejar_realocacao);
-    sugerir_realocacao exige atendimento_id.
   turnos:
     - pergunta: >-
         preciso encaixar psicologia de 1 hora na quarta às 10h para um
@@ -160,16 +157,23 @@
           data: "{quarta}"
           itens: [{especialidade: psicologia, duracao_minutos: 60}]
           horario_desejado: "10:00"
+    # Na quarta, a Carol tem B das 10:00 às 11:00 e vagas das 08:00 às 10:00:
+    # 1 deslocado, mesma terapia e profissional.
     - pergunta: pode mover o que for necessário
       chamada:
         tool: planejar_realocacao
         args:
-          data: "{quarta}"
-          itens: [{especialidade: psicologia, duracao_minutos: 60}]
+          dias_semana: [quarta]
+          especialidade: psicologia
+          duracao_minutos: 60
           horario_desejado: "10:00"
+          horario_minimo: "10:00"
+          horario_maximo: "11:00"
   criterios:
     - {tipo: nao_pede_atendimento_id}
-    - {tipo: max_planos, turno: 2, maximo: 3}
+    - {tipo: opcoes_no_bloco, turno: 2, maximo: 3}
+    - {tipo: sem_nomes_de_paciente}
+    - {tipo: plano_valido_pelo_oraculo, turno: 2}
 
 - id: c07
   descricao: 'Regressão: "vagas de segunda a sexta" em 1 chamada à planilha e menos de 20 s'
@@ -394,3 +398,60 @@
     - {tipo: sem_datas, turno: 1}
     - {tipo: sem_datas, turno: 2}
     - {tipo: max_chamadas_planilha, maximo: 1}
+
+- id: c13
+  descricao: 'Realocação em cadeia (2 deslocados) e pedido sem solução (`cenario: realocacao`)'
+  hoje: 2026-09-28
+  cenario: realocacao
+  turnos:
+    # B, das 10:00 às 11:00 com a Carol, está na TO quando a Carol tem vaga:
+    # só sai com B no lugar de outro paciente e esse na vaga da tarde.
+    - pergunta: >-
+        preciso colocar psicologia de 1 hora na quarta às 10h para um paciente
+        novo; pode mover quem precisar
+      chamada:
+        tool: planejar_realocacao
+        args:
+          dias_semana: [quarta]
+          especialidade: psicologia
+          duracao_minutos: 60
+          horario_desejado: "10:00"
+          horario_minimo: "10:00"
+          horario_maximo: "11:00"
+    # A TO não tem nenhuma vaga na semana: nenhuma cadeia termina.
+    - pergunta: e terapia ocupacional de 1 hora na quinta às 10h?
+      chamada:
+        tool: planejar_realocacao
+        args:
+          dias_semana: [quinta]
+          especialidade: terapia_ocupacional
+          duracao_minutos: 60
+          horario_desejado: "10:00"
+          horario_minimo: "10:00"
+          horario_maximo: "11:00"
+    # Resposta que diz que já mudou: recusada; a sugestão é a que sai.
+    - pergunta: pode mover quem precisar para a psicologia na quarta às 10h
+      chamada:
+        tool: planejar_realocacao
+        args:
+          dias_semana: [quarta]
+          especialidade: psicologia
+          duracao_minutos: 60
+          horario_desejado: "10:00"
+          horario_minimo: "10:00"
+          horario_maximo: "11:00"
+      respostas_simuladas:
+        - "Movi quem estava às 10:00 para as 11:00 e quem estava às 11:00 para as 16:00."
+        - "Sugiro mover quem está às 11:00 para as 16:00 e quem está às 10:00 para as 11:00; confirme com os pacientes e faça a mudança na planilha."
+  criterios:
+    - {tipo: tools_chamadas, turno: 1, tools: [planejar_realocacao]}
+    - {tipo: opcoes_no_bloco, turno: 1, maximo: 3}
+    - {tipo: plano_valido_pelo_oraculo, turno: 1}
+    - {tipo: texto_contem, turno: 1, frases: ["a melhor desloca 2 pacientes"]}
+    - {tipo: max_chamadas_planilha, turno: 1, maximo: 1}
+    - tipo: texto_contem
+      turno: 2
+      frases: ["não encontrei opção para Terapia Ocupacional de 60 minutos"]
+    - {tipo: vocabulario_proibido, turno: 3}
+    - {tipo: texto_contem, turno: 3, frases: ["Sugiro mover"]}
+    - {tipo: sem_nomes_de_paciente}

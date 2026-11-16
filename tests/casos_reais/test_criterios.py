@@ -38,13 +38,14 @@ def _rodar(tipo: str, turno: TurnoObservado, **params: object) -> ResultadoCrite
 
 def test_casos_do_yaml_carregam() -> None:
     casos = carregar_casos()
-    assert [caso.id for caso in casos] == [f"c{n:02d}" for n in range(1, 13)]
+    assert [caso.id for caso in casos] == [f"c{n:02d}" for n in range(1, 14)]
     assert {caso.id: caso.cenario for caso in casos if caso.cenario} == {
         "c09": "poucas_vagas",
         "c11": "planos_por_cor",
         "c12": "nomes_por_profissional",
+        "c13": "realocacao",
     }
-    assert {caso.id for caso in casos if caso.xfail} == {"c06"}
+    assert {caso.id for caso in casos if caso.xfail} == set()
 
 
 def test_criterio_desconhecido_e_recusado(tmp_path: Path) -> None:
@@ -547,3 +548,88 @@ def test_sem_nomes_de_paciente_exige_a_marca_no_bloco() -> None:
         Criterio("sem_nomes_de_paciente", {}), [TurnoObservado(blocos=[bloco])], CONTEXTO_PLANOS
     )
     assert resultado.ok is False and "contem_dados_pacientes" in resultado.detalhe
+
+
+# --- plano de realocação (c06, c13) -------------------------------------------
+
+_COLUNAS_PLANO = ["opcao", "passo", "paciente", "terapia", "profissional", "de", "para"]
+
+
+def _bloco_realocacao(*linhas: tuple[str, str, str, str]) -> dict[str, Any]:
+    """(opção, quem, de, para) -> bloco `plano_realocacao` como a tool o manda."""
+    return {
+        "tipo": "tabela_generica",
+        "contem_dados_pacientes": True,
+        "dados": {
+            "relatorio": "plano_realocacao",
+            "colunas": [{"chave": chave} for chave in _COLUNAS_PLANO],
+            "linhas": [
+                {
+                    "opcao": opcao,
+                    "passo": indice,
+                    "paciente": quem,
+                    "terapia": "Psicologia",
+                    "profissional": "Carol",
+                    "de": de,
+                    "para": para,
+                }
+                for indice, (opcao, quem, de, para) in enumerate(linhas, 1)
+            ],
+        },
+    }
+
+
+#: O c06 na semana padrão: B (Sala 3) das 10:00 às 11:00 vai para 09:00.
+_C06_CERTO = _bloco_realocacao(
+    (
+        "Opção 1",
+        "Paciente Ficticio Bravo 3",
+        "Qua 10:00 às 11:00 · Carol · Sala 3",
+        "Qua 09:00 às 10:00 · Carol · Sala 3",
+    ),
+    ("Opção 1", "Paciente novo", "— (paciente novo)", "Qua 10:00 às 11:00 · Carol · Sala 3"),
+)
+
+
+def test_opcoes_no_bloco_conta_os_valores_de_opcao() -> None:
+    turno = TurnoObservado(blocos=[_C06_CERTO])
+    assert _rodar("opcoes_no_bloco", turno, maximo=3).ok
+    assert _rodar("opcoes_no_bloco", turno, maximo=0).ok is False
+    sem_plano = TurnoObservado(resposta="Sugiro mover quem está às 10:00.")
+    assert _rodar("opcoes_no_bloco", sem_plano, maximo=3).ok is False
+
+
+def test_plano_valido_pelo_oraculo() -> None:
+    assert _rodar("plano_valido_pelo_oraculo", TurnoObservado(blocos=[_C06_CERTO])).ok
+
+    # Na ordem errada, o pedido ocupa um lugar que ainda não foi liberado.
+    linhas = _C06_CERTO["dados"]["linhas"]
+    invertido = _bloco_realocacao(
+        *[(x["opcao"], x["paciente"], x["de"], x["para"]) for x in reversed(linhas)]
+    )
+    resultado = _rodar("plano_valido_pelo_oraculo", TurnoObservado(blocos=[invertido]))
+    assert resultado.ok is False and "destino ocupado" in resultado.detalhe
+    # Outra profissional: muda a terapia e o profissional.
+    outra = _bloco_realocacao(
+        (
+            "Opção 1",
+            "Paciente Ficticio Bravo 3",
+            "Qua 10:00 às 11:00 · Carol · Sala 3",
+            "Qua 07:00 às 08:00 · Elo · Sala 5",
+        ),
+    )
+    resultado = _rodar("plano_valido_pelo_oraculo", TurnoObservado(blocos=[outra]))
+    assert resultado.ok is False and "muda profissional" in resultado.detalhe
+    # O detalhe nunca traz nomes de pacientes.
+    assert "Ficticio" not in resultado.detalhe
+    assert _rodar("plano_valido_pelo_oraculo", TurnoObservado()).ok is False
+
+
+def test_sem_nomes_ignora_o_rotulo_do_paciente_novo() -> None:
+    texto = "Plano: o paciente novo fica na quarta às 10:00."
+    turno = TurnoObservado(textos_das_tools=[texto], blocos=[_C06_CERTO])
+    assert _rodar("sem_nomes_de_paciente", turno).ok
+    com_nome = TurnoObservado(
+        textos_das_tools=["Paciente Ficticio Bravo 3 vai"], blocos=[_C06_CERTO]
+    )
+    assert _rodar("sem_nomes_de_paciente", com_nome).ok is False
