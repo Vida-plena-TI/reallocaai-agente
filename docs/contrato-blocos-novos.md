@@ -185,15 +185,17 @@ Relatórios `ranking_ocupacao`, `comparativo_dias`, `salas_ociosas`,
 | `total` | objeto | Só as métricas (e `abaixo_da_meta` quando há meta), recalculadas sobre o recorte inteiro: não é a soma das linhas. |
 | `linhas_omitidas` | integer `>= 0` | Linhas fora da tabela por causa do `limite`. |
 | `agrupar_por` | list[string] (opcional) | Dica de exibição agrupada: chaves de `colunas` que formam o título de cada grupo, da mais externa para a mais interna. Ver [Exibição agrupada](#exibição-agrupada-agrupar_por-e-unidade_grupo). |
-| `unidade_grupo` | `{singular, plural}` (opcional) | Sempre junto com `agrupar_por`: como contar as linhas no título do grupo (`"1 paciente"`, `"3 pacientes"`). |
+| `unidade_grupo` | `{singular, plural}` (opcional) | Sempre junto com `agrupar_por`: como contar as linhas no título do grupo, que o front monta como `valor (N unidade)` (`"Opção 1 (1 passo)"`, `"Opção 1 (3 passos)"`). |
 
 #### Exibição agrupada (`agrupar_por` e `unidade_grupo`)
 
 Opcional; hoje em `pacientes_por_profissional_nomes` e no plano de realocação
 (`plano_realocacao`). As linhas já vêm **contíguas por
 grupo**, na ordem desejada: o front **não reordena**. Ele junta as linhas consecutivas com os
-mesmos valores nas colunas de `agrupar_por`, usa esses valores (e a contagem de linhas com
-`unidade_grupo`) no título do grupo e tira essas colunas da tabela exibida. Sem os campos, a
+mesmos valores nas colunas de `agrupar_por`, monta o título do grupo no formato
+`valor (N unidade)` (os valores dessas colunas e, entre parênteses, a contagem de linhas com
+`unidade_grupo`: `"Opção 1 (3 passos)"`, `"Opção 1 (1 passo)"`) e tira essas colunas da tabela
+exibida. O agente não envia o título do grupo: ele é montado pelo front. Sem os campos, a
 tabela é exibida como sempre; front antigo os ignora. As `tabelas` de exportação continuam
 planas (o Excel não agrupa).
 
@@ -327,7 +329,8 @@ em ordem alfabética. As linhas de cada (especialidade, profissional) são cont�
 traz a dica de exibição agrupada: `agrupar_por: ["especialidade", "profissional"]` e
 `unidade_grupo: {"singular": "paciente", "plural": "pacientes"}` (ver
 [Exibição agrupada](#exibição-agrupada-agrupar_por-e-unidade_grupo)): na tela, cada grupo tem
-como título a especialidade e a profissional, com o número de pacientes, e os pacientes embaixo.
+como título a especialidade e a profissional seguidas da contagem entre parênteses, no padrão
+`valor (N unidade)` (`(1 paciente)`, `(3 pacientes)`), e os pacientes embaixo.
 O bloco traz `contem_dados_pacientes: true`. **Não há linha de total no meio da lista**: os totais ficam no `resumo`
 (`"Profissionais"`, `"Pacientes distintos"` no recorte inteiro e `"Com mais de uma
 profissional"`, todos `inteiro`) e na tabela de exportação **Resumo por profissional**
@@ -393,8 +396,8 @@ Os passos de cada opção vêm **na ordem de execução manual na planilha**: pr
 lugar no fim da cadeia, por último o pedido (ex.: C vai para a vaga, B vai para o antigo lugar
 de C, o pedido fica no antigo lugar de B). As linhas de cada opção são contíguas, e `dados`
 traz a dica de exibição agrupada: `agrupar_por: ["opcao"]` e
-`unidade_grupo: {"singular": "passo", "plural": "passos"}` (título do grupo: `"Opção 1 · 3
-passos"`). `resumo`: `"Opções"` e `"Mínimo de pacientes deslocados"` (`inteiro`). Tabelas de
+`unidade_grupo: {"singular": "passo", "plural": "passos"}` (título do grupo, montado pelo front: `"Opção 1 (3 passos)"`, ou `"Opção 1 (1 passo)"` na opção
+sem deslocados). `resumo`: `"Opções"` e `"Mínimo de pacientes deslocados"` (`inteiro`). Tabelas de
 exportação: **Passos** (mesmas colunas e linhas de `dados`) e **Resumo por opção** (`opcao`,
 `deslocados`, `mudam_de_dia`, `pedido` = onde o pedido fica).
 
