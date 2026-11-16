@@ -63,6 +63,8 @@ def test_so_os_relatorios_da_grade_semanal_tem_periodo_nulo() -> None:
             "tabela_generica_plano_semanal.json",
             "tabela_generica_pacientes_por_plano.json",
             "tabela_generica_pacientes_por_profissional_nomes.json",
+            "tabela_generica_plano_realocacao.json",
+            "tabela_generica_plano_realocacao_pergunta.json",
         ):
             assert bloco["periodo"] is None
         else:
@@ -102,3 +104,38 @@ def test_exemplo_de_pacientes_por_profissional_so_tem_nomes_ficticios() -> None:
 
     assert nomes and all(nome.casefold().startswith("paciente fict") for nome in nomes)
     assert bloco["dados"]["relatorio"] == "pacientes_por_profissional_nomes"
+
+
+def test_exemplos_do_plano_de_realocacao_plano_e_pergunta() -> None:
+    """Os dois formatos do mesmo `dados.relatorio`: o plano, agrupado por opção, e a
+    pergunta de nome ambíguo, com as candidatas. Só nomes fictícios."""
+    import json
+
+    exemplos = gerar_exemplos()
+    plano = json.loads(exemplos["tabela_generica_plano_realocacao.json"])
+    pergunta = json.loads(exemplos["tabela_generica_plano_realocacao_pergunta.json"])
+    for bloco in (plano, pergunta):
+        assert bloco["dados"]["relatorio"] == "plano_realocacao"
+        assert bloco["contem_dados_pacientes"] is True
+        nomes = {linha["paciente"] for linha in bloco["dados"]["linhas"]}
+        assert nomes and all(
+            nome.startswith("Paciente Ficticio ") or nome == "Paciente novo" for nome in nomes
+        )
+
+    assert plano["dados"]["agrupar_por"] == ["opcao"]
+    assert plano["dados"]["unidade_grupo"] == {"singular": "passo", "plural": "passos"}
+    assert [c["rotulo"] for c in plano["dados"]["colunas"]] == [
+        "Opção", "Passo", "Quem", "Terapia", "Profissional", "De", "Para", "Observação",
+    ]  # fmt: skip
+    # 2 deslocados por opção: 3 passos cada.
+    assert len(plano["dados"]["linhas"]) == 9
+
+    assert "agrupar_por" not in pergunta["dados"]
+    assert "unidade_grupo" not in pergunta["dados"]
+    assert [c["rotulo"] for c in pergunta["dados"]["colunas"]] == [
+        "Candidata", "Nome", "Terapia", "Profissional", "Dias",
+    ]  # fmt: skip
+    assert [linha["paciente"] for linha in pergunta["dados"]["linhas"]] == [
+        "Paciente Ficticio Rubi Alva",
+        "Paciente Ficticio Rubi Estrela",
+    ]

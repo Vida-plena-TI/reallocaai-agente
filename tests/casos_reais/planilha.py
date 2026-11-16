@@ -216,6 +216,8 @@ PECAS_DOS_CENARIOS: dict[str, dict[str, tuple[tuple[str, str], ...]]] = {
         "F": (("Paciente Ficticio Feldspato", AZUL),),
     },
     # `realocacao` (c13): B (Berilo) faz psicologia e TO; os outros, uma terapia só.
+    # R e S começam igual ("Paciente Ficticio Rubi ..."): o nome sem o sobrenome é
+    # ambíguo (exemplo da pergunta em docs/exemplos-blocos).
     "realocacao": {
         "A": (("Paciente Ficticio Agata", AZUL),),
         "B": (("Paciente Ficticio Berilo", AZUL),),
@@ -232,8 +234,8 @@ PECAS_DOS_CENARIOS: dict[str, dict[str, tuple[tuple[str, str], ...]]] = {
         "O": (("Paciente Ficticio Opala", AZUL),),
         "P": (("Paciente Ficticio Pirita", AZUL),),
         "Q": (("Paciente Ficticio Quartzo", AZUL),),
-        "R": (("Paciente Ficticio Rubi", AZUL),),
-        "S": (("Paciente Ficticio Safira", AZUL),),
+        "R": (("Paciente Ficticio Rubi Alva", AZUL),),
+        "S": (("Paciente Ficticio Rubi Estrela", AZUL),),
     },
 }
 
