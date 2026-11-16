@@ -48,6 +48,17 @@ VOCABULARIO_PROIBIDO = (
     "agendar",
     "agendei",
     "marquei",
+    "movi",
+    "mudei",
+    "troquei",
+    "realoquei",
+    "remanejei",
+    "transferi",
+    "alterei",
+    "foi movido",
+    "foi movida",
+    "foi trocado",
+    "foi trocada",
 )
 
 Status = Literal["passou", "falhou", "xfail", "xpass", "n/a", "pulado"]
@@ -812,7 +823,13 @@ _ORDEM_DOS_PLANOS = ["SulAmérica", "Klini", "Particulares", "Care Plus", "Unime
 
 
 #: Relatórios cujo bloco leva nomes de pacientes (só para a tela).
-_RELATORIOS_COM_NOMES = ("pacientes_por_plano", "pacientes_por_profissional_nomes")
+_RELATORIOS_COM_NOMES = (
+    "pacientes_por_plano",
+    "pacientes_por_profissional_nomes",
+    "plano_realocacao",
+)
+#: Rótulo do pedido de paciente novo sem nome no plano de realocação (não é nome).
+_PACIENTE_NOVO = "Paciente novo"
 
 
 def _blocos_com_nomes(turnos: Sequence[TurnoObservado]) -> list[dict[str, Any]]:
@@ -924,8 +941,8 @@ def _sem_nomes_de_paciente(
     c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
 ) -> ResultadoCriterio:
     """Nenhum nome de um bloco com nomes (`pacientes_por_plano`,
-    `pacientes_por_profissional_nomes`) no texto das tools (o que o modelo lê) nem
-    na resposta. O detalhe só traz a contagem."""
+    `pacientes_por_profissional_nomes`, `plano_realocacao`) no texto das tools (o que o
+    modelo lê) nem na resposta. O detalhe só traz a contagem."""
     blocos = _blocos_com_nomes(turnos)
     if not blocos:
         return _resultado(c, False, "sem bloco com nomes de pacientes")
@@ -933,9 +950,11 @@ def _sem_nomes_de_paciente(
     if sem_marca:
         return _resultado(c, False, f"{sem_marca} bloco(s) com nomes sem contem_dados_pacientes")
     nomes = {
-        _normalizar(str(linha["paciente"]))
+        _normalizar(parte)
         for bloco in blocos
         for linha in bloco["dados"]["linhas"]
+        for parte in str(linha["paciente"]).split(" / ")
+        if parte.strip() and parte.strip() != _PACIENTE_NOVO
     }
     textos = _normalizar(
         " ".join(
@@ -947,6 +966,89 @@ def _sem_nomes_de_paciente(
     )
     citados = sum(1 for nome in nomes if re.search(rf"(?<!\w){re.escape(nome)}(?!\w)", textos))
     return _resultado(c, citados == 0, f"{citados} nome(s) de paciente no texto")
+
+
+def _blocos_do_plano_de_realocacao(turnos: Sequence[TurnoObservado]) -> list[dict[str, Any]]:
+    """Blocos do plano (os da pergunta de "qual paciente?" não têm `opcao`)."""
+    return [
+        bloco
+        for bloco in _blocos_com_nomes(turnos)
+        if bloco["dados"]["relatorio"] == "plano_realocacao"
+        and any(coluna["chave"] == "opcao" for coluna in bloco["dados"]["colunas"])
+    ]
+
+
+_FORA_DA_JANELA = "Fora da janela pedida"
+
+
+@_sobre_a_saida
+def _opcoes_no_bloco(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    """De 1 a `maximo` opções (valores distintos de `opcao`) no bloco do plano."""
+    opcoes = {
+        linha["opcao"]
+        for bloco in _blocos_do_plano_de_realocacao(turnos)
+        for linha in bloco["dados"]["linhas"]
+        if linha["opcao"] != _FORA_DA_JANELA
+    }
+    return _resultado(c, 1 <= len(opcoes) <= c.params["maximo"], f"{len(opcoes)} opção(ões)")
+
+
+_DIA_CURTO = {"Seg": 0, "Ter": 1, "Qua": 2, "Qui": 3, "Sex": 4, "Sáb": 5}
+_LUGAR_NA_TELA = re.compile(
+    r"^(?P<dia>\S+) (?P<inicio>\d{2}:\d{2}) às (?P<fim>\d{2}:\d{2}) · (?P<profissional>.+) · "
+    r"Sala\s*0*(?P<sala>\d+)"
+)
+
+
+def _lugar_do_plano(texto: str, semana: Mapping[str, date]) -> oraculo.LugarDoPlano | None:
+    achado = _LUGAR_NA_TELA.match(texto)
+    if achado is None:
+        return None
+    dia = list(semana.values())[_DIA_CURTO[achado["dia"]]]
+    return oraculo.LugarDoPlano(
+        dia,
+        _hora(achado["inicio"]),
+        _hora(achado["fim"]),
+        achado["profissional"],
+        int(achado["sala"]),
+    )
+
+
+@_sobre_a_saida
+def _plano_valido_pelo_oraculo(
+    c: Criterio, turnos: Sequence[TurnoObservado], ctx: Contexto
+) -> ResultadoCriterio:
+    """Cada opção do plano, aplicada à grade crua pelo oráculo, na ordem dos passos:
+    sessões inteiras, destinos vagos e do mesmo profissional, mesma terapia e duração,
+    ninguém em dois lugares nem com duas sessões da mesma terapia no dia."""
+    blocos = _blocos_do_plano_de_realocacao(turnos)
+    opcoes: dict[tuple[int, str], list[oraculo.PassoDoPlano]] = {}
+    for indice, bloco in enumerate(blocos):
+        for linha in bloco["dados"]["linhas"]:
+            if linha["opcao"] == _FORA_DA_JANELA:
+                continue
+            para = _lugar_do_plano(str(linha["para"]), ctx.semana)
+            if para is None:
+                return _resultado(c, False, "destino fora do formato")
+            paciente = str(linha["paciente"])
+            opcoes.setdefault((indice, str(linha["opcao"])), []).append(
+                oraculo.PassoDoPlano(
+                    None if paciente == _PACIENTE_NOVO else paciente,
+                    _lugar_do_plano(str(linha["de"]), ctx.semana),
+                    para,
+                )
+            )
+    if not opcoes:
+        return _resultado(c, False, "sem plano de realocação")
+    invalidas = {
+        opcao: problemas
+        for (_, opcao), passos in opcoes.items()
+        if (problemas := oraculo.validar_plano(ctx.payload, list(ctx.semana.values()), passos))
+    }
+    detalhe = "; ".join(f"{opcao}: {', '.join(p)}" for opcao, p in invalidas.items())
+    return _resultado(c, not invalidas, detalhe or f"{len(opcoes)} opção(ões) válida(s)")
 
 
 CRITERIOS: dict[
@@ -963,6 +1065,8 @@ CRITERIOS: dict[
     "vocabulario_proibido": _vocabulario_proibido,
     "nao_pede_atendimento_id": _nao_pede_atendimento_id,
     "max_planos": _max_planos,
+    "opcoes_no_bloco": _opcoes_no_bloco,
+    "plano_valido_pelo_oraculo": _plano_valido_pelo_oraculo,
     "max_chamadas_planilha": _max_chamadas_planilha,
     "max_segundos": _max_segundos,
     "vagas_iguais_ao_oraculo": _vagas_iguais_ao_oraculo,

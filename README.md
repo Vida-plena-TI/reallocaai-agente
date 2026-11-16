@@ -310,6 +310,26 @@ que repetir um nome do bloco é trocada pelo resumo determinístico. Só pelo ch
 /relatorios/gerar` devolve `422`). Contrato em
 [`docs/contrato-blocos-novos.md`](docs/contrato-blocos-novos.md).
 
+### Plano de realocação (tool `planejar_realocacao`)
+
+Responde "preciso colocar psicologia de 1h na quarta às 10h; pode mover o que for necessário"
+ou "dá para passar esse paciente para o começo da manhã?": sugere até 3 opções de como abrir espaço
+deslocando, no máximo, 2 outros pacientes. O motor (`app/engine/realocacao.py`) é determinístico
+e trabalha sobre uma leitura da semana: cada deslocado mantém a mesma terapia, o mesmo
+profissional e a mesma duração (pode ir para outro dia ou outra sala do mesmo profissional);
+sessão em grupo e nome em preto (aguardando autorização) não se movem; toda opção passa por uma
+validação independente da grade final antes de sair. As regras ficam em
+`app/domain/constants.py` (`MAX_DESLOCADOS`, `MAX_CADEIAS_AVALIADAS`,
+`MOVER_AGUARDANDO_AUTORIZACAO`, `PACIENTES_FIXOS`…). Nunca se pede `atendimento_id`: basta o
+nome (ou nada, para paciente novo); nome ambíguo vira pergunta com as candidatas na tela.
+
+O bloco é `tabela_generica` com `relatorio: "plano_realocacao"`, `periodo: null`, passos na
+ordem de execução, agrupados por opção, e `contem_dados_pacientes: true`. **Os nomes vão só no
+bloco**: o texto que o modelo lê descreve papéis e horários, o nome passado à tool nunca vai
+para log, e a resposta que repetir um nome (do bloco ou do pedido) vira o resumo determinístico.
+Só pelo chat (`POST /relatorios/gerar` devolve `422`). Nada é alterado na planilha. Contrato em
+[`docs/contrato-blocos-novos.md`](docs/contrato-blocos-novos.md).
+
 ### Relatórios gerais (tools `gerar_relatorio` e `consultar_catalogo`)
 
 Em vez de uma tool fixa por relatório (e uma chamada por dia), o agente responde qualquer
@@ -517,9 +537,10 @@ depois — nenhum destes pontos é um problema em aberto de "esqueceram de fazer
 - **Continuidade terapêutica é um contrato trivial hoje.** `SemHistoricoContinuidadeDataSource`
   (`app/data_sources/continuidade.py`) sempre devolve `None` — a integração real com o
   Agendador/API Gateway fica para quando esse sistema estiver em produção.
-- **Realocação é sempre de um atendimento por vez.** `sugerir_realocacao` move um único
-  atendimento; reorganizar vários pacientes de uma vez para destravar espaço (realocação em
-  massa) não foi implementado.
+- **Realocação em cadeia é limitada a 2 deslocados.** `planejar_realocacao` desloca no máximo
+  dois pacientes por opção e só olha a semana lida; não considera a disponibilidade dos
+  pacientes nem terapias quinzenais fora da semana. `sugerir_realocacao` continua movendo um
+  único atendimento pelo id.
 - **A fonte de dados atual (Google Sheets) é temporária.** A migração para o Agendador via API
   Gateway ainda depende da documentação dessa API estar disponível.
 - **O modelo de IA de produção ainda não foi decidido.** Enquanto isso, o projeto testa via

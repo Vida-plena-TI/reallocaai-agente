@@ -3,8 +3,9 @@
 Para o time do front/backend do chatbot. Descreve os blocos que saem de `gerar_relatorio` (tool
 do agente) e de `POST /relatorios/gerar`: `disponibilidade`, `convenio`, `agenda_paciente`,
 `qualidade_agenda` e `tabela_generica`. O plano semanal (`planejar_semana`), os pacientes por
-plano (`pacientes_por_plano`) e os nomes de pacientes por profissional
-(`listar_pacientes_por_profissional`) saem só pelo chat, também como `tabela_generica`.
+plano (`pacientes_por_plano`), os nomes de pacientes por profissional
+(`listar_pacientes_por_profissional`) e o plano de realocação (`planejar_realocacao`) saem só
+pelo chat, também como `tabela_generica`.
 
 A fonte da verdade é o schema
 [`exemplos-blocos/bloco_relatorio.schema.json`](exemplos-blocos/bloco_relatorio.schema.json),
@@ -26,10 +27,10 @@ desatualizados (regenerar: `uv run python scripts/gerar_exemplos_blocos.py`).
 | **Campo opcional novo** | Campos opcionais novos podem entrar na versão 1 com aviso prévio ao time do chatbot; o cliente deve ignorar campo que não conhece. O schema continua com `additionalProperties: false`, mas declara cada campo opcional novo: quem valida contra o schema atual aceita o bloco. Campo opcional sem valor não sai no JSON (nem como `null`). Os campos opcionais da versão 1 estão em [Campos opcionais](#campos-opcionais-versão-1). |
 | **Tipo novo exige aviso prévio** | Um tipo novo de bloco só entra depois de avisar o time do chatbot: ele pode conter dado de paciente, e o front precisa decidir como exibir, guardar e exportar antes de recebê-lo. |
 
-Privacidade: três blocos trazem nomes de pacientes, e todos com `contem_dados_pacientes: true`:
-`agenda_paciente` (só o paciente pedido pelo nome, com convênio) e os relatórios gerenciais
-`tabela_generica` com `relatorio` `"pacientes_por_plano"` ou `"pacientes_por_profissional_nomes"`
-(só pelo chat). Os demais trazem apenas contagens. IDs de profissional
+Privacidade: quatro blocos trazem nomes de pacientes, e todos com `contem_dados_pacientes: true`:
+`agenda_paciente` (só o paciente pedido pelo nome, com convênio) e os blocos `tabela_generica`
+com `relatorio` `"pacientes_por_plano"`, `"pacientes_por_profissional_nomes"` ou
+`"plano_realocacao"` (só pelo chat). Os demais trazem apenas contagens. IDs de profissional
 (`profissional.id`) são hashes opacos.
 
 ## Envelope comum (`BlocoRelatorio`)
@@ -43,7 +44,7 @@ campos opcionais estão declarados no schema).
 | `versao` | integer (`1`) | não (default `1`) | Versão do contrato; sempre sai `1`. |
 | `tipo` | string (enum) | sim | Um dos tipos do schema; igual a `dados.tipo`. |
 | `titulo` | string | sim | Pronto para exibir. |
-| `periodo` | `{inicio: date, fim: date}` \| `null` | sim | Inclusive. Sempre presente (nunca omitido). `null` só nos relatórios da grade semanal, sem datas: o plano semanal, os pacientes por plano e os nomes de pacientes por profissional (`tabela_generica` com `relatorio: "plano_semanal"`, `"pacientes_por_plano"` ou `"pacientes_por_profissional_nomes"`); todos os outros blocos trazem `{inicio, fim}`. |
+| `periodo` | `{inicio: date, fim: date}` \| `null` | sim | Inclusive. Sempre presente (nunca omitido). `null` só nos relatórios da grade semanal, sem datas: o plano semanal, os pacientes por plano, os nomes de pacientes por profissional e o plano de realocação (`tabela_generica` com `relatorio: "plano_semanal"`, `"pacientes_por_plano"`, `"pacientes_por_profissional_nomes"` ou `"plano_realocacao"`); todos os outros blocos trazem `{inicio, fim}`. |
 | `meta` | number \| null | sim | Ver regras gerais. |
 | `parcial` | boolean | sim | `true` exatamente quando `dias_nao_lidos` não é vazia. |
 | `dias_nao_lidos` | list[date] | sim | Ordenada, sem repetição. |
@@ -51,7 +52,7 @@ campos opcionais estão declarados no schema).
 | `resumo` | list[`ItemResumo`] | sim | Destaques do relatório. |
 | `dados` | objeto (por `tipo`) | sim | Ver cada bloco abaixo. |
 | `tabelas` | list[`TabelaExportacao`] | sim | Uma aba por tabela na exportação. |
-| `contem_dados_pacientes` | `true` | não (opcional) | Só nos blocos com nomes de pacientes (`agenda_paciente`, `pacientes_por_plano`, `pacientes_por_profissional_nomes`), sempre `true`; ausente nos demais (nunca `false` nem `null`). Proteção extra: a restrição de acesso continua pela igualdade com `tipo`/`dados.relatorio`. |
+| `contem_dados_pacientes` | `true` | não (opcional) | Só nos blocos com nomes de pacientes (`agenda_paciente`, `pacientes_por_plano`, `pacientes_por_profissional_nomes`, `plano_realocacao`), sempre `true`; ausente nos demais (nunca `false` nem `null`). Proteção extra: a restrição de acesso continua pela igualdade com `tipo`/`dados.relatorio`. |
 
 `ItemResumo`: `rotulo` (string), `valor` (string \| integer \| number \| boolean \| null),
 `formato` (`texto` \| `inteiro` \| `decimal` \| `percentual` \| `data`), `exibicao` (string já
@@ -188,7 +189,8 @@ Relatórios `ranking_ocupacao`, `comparativo_dias`, `salas_ociosas`,
 
 #### Exibição agrupada (`agrupar_por` e `unidade_grupo`)
 
-Opcional; hoje só em `pacientes_por_profissional_nomes`. As linhas já vêm **contíguas por
+Opcional; hoje em `pacientes_por_profissional_nomes` e no plano de realocação
+(`plano_realocacao`). As linhas já vêm **contíguas por
 grupo**, na ordem desejada: o front **não reordena**. Ele junta as linhas consecutivas com os
 mesmos valores nas colunas de `agrupar_por`, usa esses valores (e a contagem de linhas com
 `unidade_grupo`) no título do grupo e tira essas colunas da tabela exibida. Sem os campos, a
@@ -350,18 +352,93 @@ Regras:
 identificação só pelo nome, que o paciente com mais de uma profissional aparece em cada uma e a
 definição de atendimento.
 
+### Plano de realocação (`relatorio: "plano_realocacao"`)
+
+Vem da tool `planejar_realocacao` (só pelo chat; **não** existe em `POST /relatorios/gerar`, que
+responde `422` para esse valor). Sugere como abrir espaço para um atendimento (de um paciente
+novo ou de um que já está na grade) deslocando outros pacientes, na grade semanal vigente. Usa o
+mesmo tipo `tabela_generica`, sem tipo novo de bloco, em dois formatos com o mesmo `relatorio`:
+o **plano** e a **pergunta** (quando o nome dito casa com mais de um paciente ou atendimento).
+Nos dois, `periodo` e `meta` são `null`, `dimensoes` e `metricas` vêm vazias, `total` é `{}`,
+`linhas_omitidas` é `0` e `contem_dados_pacientes` é `true`.
+
+> **Atenção: este bloco contém nomes de pacientes** (coluna `paciente`). Os nomes nunca vão
+> para o modelo da OpenAI nem para log: só para o bloco. Como nos outros relatórios com nomes,
+> deve ficar restrito ao grupo de coordenação, e o time do chatbot precisa revisar como o bloco
+> sai na tela, no Excel e no PDF antes de liberar a exportação dele.
+
+Regras da sugestão (determinística, sem LLM): no máximo 2 pacientes deslocados por opção e até 3
+opções; cada deslocado mantém a **mesma terapia, o mesmo profissional e a mesma duração** (pode
+ir para outro dia ou outra sala do mesmo profissional, e o passo diz isso); sessão em grupo e
+atendimento aguardando autorização (nome em preto) não são deslocados; ninguém fica em dois
+lugares ao mesmo tempo nem ganha uma segunda sessão da mesma terapia no dia. Nada é alterado na
+planilha: é só sugestão.
+
+**Plano.** `titulo`: `"Plano de realocação (grade semanal vigente)"`. Exemplo (nomes fictícios,
+2 deslocados por opção) em
+[`exemplos-blocos/tabela_generica_plano_realocacao.json`](exemplos-blocos/tabela_generica_plano_realocacao.json).
+
+| Coluna | Formato | Valores |
+| --- | --- | --- |
+| `opcao` | `texto` | `"Opção 1"`, `"Opção 2"`, `"Opção 3"`, da melhor para a pior |
+| `passo` | `inteiro` | Ordem de execução dentro da opção, a partir de 1 |
+| `paciente` (rótulo `"Quem"`) | `texto` | Nome do paciente como na planilha; o pedido de paciente novo sem nome é `"Paciente novo"` |
+| `terapia` | `texto` | Rótulo da especialidade (`"Psicologia"`…) |
+| `profissional` | `texto` | Nome da profissional do destino |
+| `de` | `texto` | `"Qua 10:00 às 11:00 · Carol · Sala 3"`; paciente novo: `"— (paciente novo)"`. Sala com mais de uma coluna: `"Sala 3 (coluna 2)"` |
+| `para` | `texto` | Mesmo formato de `de` |
+| `observacao` | `texto` | `"atendimento pedido"` no pedido; `"mesma terapia e profissional"` nos deslocados; mais `"; outro dia"` e/ou `"; outra sala"` quando for o caso |
+
+Os passos de cada opção vêm **na ordem de execução manual na planilha**: primeiro quem libera o
+lugar no fim da cadeia, por último o pedido (ex.: C vai para a vaga, B vai para o antigo lugar
+de C, o pedido fica no antigo lugar de B). As linhas de cada opção são contíguas, e `dados`
+traz a dica de exibição agrupada: `agrupar_por: ["opcao"]` e
+`unidade_grupo: {"singular": "passo", "plural": "passos"}` (título do grupo: `"Opção 1 · 3
+passos"`). `resumo`: `"Opções"` e `"Mínimo de pacientes deslocados"` (`inteiro`). Tabelas de
+exportação: **Passos** (mesmas colunas e linhas de `dados`) e **Resumo por opção** (`opcao`,
+`deslocados`, `mudam_de_dia`, `pedido` = onde o pedido fica).
+
+`avisos` sempre traz: que a sugestão considera só os atendimentos da semana lida (terapias
+quinzenais não aparecem), que não considera a disponibilidade dos pacientes, que cada mudança
+precisa ser confirmada com os pacientes e feita manualmente na planilha, e que vagas livres
+podem estar reservadas (reuniões, supervisão). Quando a busca atinge o teto de combinações,
+entra `"Busca limitada: …"`.
+
+**Sem opção.** Mesmo formato e colunas do plano, `titulo` `"Plano de realocação (grade semanal
+vigente): nenhuma opção"`, o motivo no primeiro aviso (`"Sem opção: …"`) e `resumo` com
+`"Opções"` = `0`. `linhas` vem vazia ou com uma linha (`opcao` `"Fora da janela pedida"`) com o
+horário livre mais perto, fora da janela pedida, sem deslocar ninguém.
+
+**Pergunta.** `titulo`: `"Plano de realocação: qual paciente?"`. Sem `agrupar_por` nem
+`unidade_grupo`. Exemplo em
+[`exemplos-blocos/tabela_generica_plano_realocacao_pergunta.json`](exemplos-blocos/tabela_generica_plano_realocacao_pergunta.json).
+Uma linha por (paciente, terapia, profissional) que casa com o nome dito; o modelo pergunta qual
+é sem escrever nomes, e a pessoa responde pelo número da candidata.
+
+| Coluna | Formato | Valores |
+| --- | --- | --- |
+| `candidata` | `inteiro` | Número da candidata, a partir de 1 |
+| `paciente` (rótulo `"Nome"`) | `texto` | Nome do paciente como na planilha |
+| `terapia` | `texto` | Rótulo da especialidade |
+| `profissional` | `texto` | Nome da profissional |
+| `dias` | `texto` | Dias da semana com esse atendimento: `"Seg, Qua"` (sem datas) |
+
+`resumo`: `"Candidatas"` (`inteiro`); tabela de exportação **Candidatas**. Perguntas sem
+candidatas (o que falta: especialidade, duração, dia, horário) não trazem bloco, só o texto.
+
 ## Campos opcionais (versão 1)
 
 | Campo | Onde | Desde | Quando sai |
 | --- | --- | --- | --- |
-| `contem_dados_pacientes` | envelope | 2026-11-10 | Sempre `true`, só nos três blocos com nomes de pacientes. |
-| `agrupar_por` | `dados` de `tabela_generica` | 2026-11-10 | Só com exibição agrupada (hoje, `pacientes_por_profissional_nomes`). |
+| `contem_dados_pacientes` | envelope | 2026-11-10 | Sempre `true`, só nos quatro blocos com nomes de pacientes. |
+| `agrupar_por` | `dados` de `tabela_generica` | 2026-11-10 | Só com exibição agrupada (hoje, `pacientes_por_profissional_nomes` e o plano de `plano_realocacao`). |
 | `unidade_grupo` | `dados` de `tabela_generica` | 2026-11-10 | Sempre junto com `agrupar_por`. |
 
 ## Histórico de mudanças (versão 1)
 
 | Data | Mudança | Compatibilidade |
 | --- | --- | --- |
+| 2026-11-16 | Novo valor de `relatorio` em `tabela_generica`: `"plano_realocacao"` (tool `planejar_realocacao`, só pelo chat), com `periodo` `null`, nos dois formatos: o plano (agrupado por opção, `agrupar_por: ["opcao"]`, `unidade_grupo: {"singular": "passo", "plural": "passos"}`) e a pergunta de nome ambíguo (sem agrupamento). **O bloco contém nomes de pacientes** (`contem_dados_pacientes: true`). Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual (usa só campos opcionais que já existem). Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; deve entrar na restrição ao grupo de coordenação; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |
 | 2026-11-10 | Regra nova: campos opcionais podem entrar na versão 1 com aviso prévio, e o cliente deve ignorar campo que não conhece. Campos opcionais novos: `contem_dados_pacientes` (envelope; `true` em `agenda_paciente`, `pacientes_por_plano` e `pacientes_por_profissional_nomes`) e `agrupar_por` + `unidade_grupo` (`dados` de `tabela_generica`; em `pacientes_por_profissional_nomes`, para a exibição em seções por especialidade e profissional). Ordem das linhas de `pacientes_por_profissional_nomes` pelo rótulo da especialidade. | Adição opcional: `versao` continua `1`. Os campos só saem quando têm valor; os demais blocos não mudaram. O schema continua com `additionalProperties: false` e declara os três campos: **quem valida contra uma cópia antiga do schema precisa atualizá-la** antes de receber os blocos novos. |
 | 2026-11-10 | Novo valor de `relatorio` em `tabela_generica`: `"pacientes_por_profissional_nomes"` (tool `listar_pacientes_por_profissional`, só pelo chat), com `periodo` `null`. **O bloco contém nomes de pacientes.** Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual. Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; deve entrar na restrição ao grupo de coordenação; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |
 | 2026-10-28 | Novo valor de `relatorio` em `tabela_generica`: `"pacientes_por_plano"` (tool `pacientes_por_plano`, só pelo chat), com `periodo` `null`. **O bloco contém nomes de pacientes.** Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual. Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |

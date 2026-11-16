@@ -56,6 +56,18 @@ VOCABULARIO_PROIBIDO: tuple[str, ...] = (
     "agendar",
     "agendei",
     "marquei",
+    # Realocação: o RealocAI só sugere ("sugiro mover"), nunca diz que mudou algo.
+    "movi",
+    "mudei",
+    "troquei",
+    "realoquei",
+    "remanejei",
+    "transferi",
+    "alterei",
+    "foi movido",
+    "foi movida",
+    "foi trocado",
+    "foi trocada",
 )
 
 #: Horários que o prompt dá como fatos da clínica (expediente, pausa, piso padrão).
@@ -328,12 +340,42 @@ def registrar_nova_geracao(problemas: Problemas) -> None:
         )
 
 
-def nomes_de_paciente_na_resposta(resposta: str, blocos: Sequence[BlocoRelatorio]) -> int:
-    """Quantos nomes de paciente de um bloco `pacientes_por_plano` a resposta repete.
+#: Tools cujo argumento `paciente` é um nome dito na conversa (protegido como os do bloco).
+TOOLS_COM_NOME_DE_PACIENTE_NOS_ARGUMENTOS: frozenset[str] = frozenset({"planejar_realocacao"})
 
-    Esses nomes só vão para a tela: o modelo nunca os recebe, então citá-los é
-    sempre erro (ou eco do histórico). Compara o nome inteiro, palavra a
-    palavra, sem acento nem caixa. Devolve só a contagem, para o log.
+#: Valores do argumento `paciente` que não são nome de ninguém.
+_NAO_SAO_NOMES = frozenset(
+    {"paciente", "paciente novo", "novo paciente", "o paciente", "um paciente", "novo"}
+)
+
+
+def nomes_nos_argumentos(mensagens_do_turno: Sequence[BaseMessage]) -> set[str]:
+    """Nomes de paciente que o modelo passou às tools de
+    `TOOLS_COM_NOME_DE_PACIENTE_NOS_ARGUMENTOS` neste turno (já normalizados)."""
+    nomes: set[str] = set()
+    for mensagem in mensagens_do_turno:
+        for chamada in getattr(mensagem, "tool_calls", None) or ():
+            if chamada.get("name") not in TOOLS_COM_NOME_DE_PACIENTE_NOS_ARGUMENTOS:
+                continue
+            valor = (chamada.get("args") or {}).get("paciente")
+            if isinstance(valor, str):
+                normalizado = _normalizar(valor)
+                if any(c.isalpha() for c in normalizado) and normalizado not in _NAO_SAO_NOMES:
+                    nomes.add(normalizado)
+    return nomes
+
+
+def nomes_de_paciente_na_resposta(
+    resposta: str,
+    blocos: Sequence[BlocoRelatorio],
+    mensagens_do_turno: Sequence[BaseMessage] = (),
+) -> int:
+    """Quantos nomes de paciente (de um bloco com nomes ou do argumento `paciente` de
+    `planejar_realocacao`) a resposta repete.
+
+    Esses nomes só vão para a tela: o modelo nunca os recebe das tools, então
+    citá-los é sempre erro (ou eco do histórico). Compara o nome inteiro,
+    palavra a palavra, sem acento nem caixa. Devolve só a contagem, para o log.
     """
     resposta_normalizada = _normalizar(resposta)
     nomes = {
@@ -341,7 +383,7 @@ def nomes_de_paciente_na_resposta(resposta: str, blocos: Sequence[BlocoRelatorio
         for bloco in blocos
         for nome in nomes_de_pacientes_no_bloco(bloco)
         if any(caractere.isalpha() for caractere in nome)
-    }
+    } | nomes_nos_argumentos(mensagens_do_turno)
     return sum(
         1 for nome in nomes if re.search(rf"(?<!\w){re.escape(nome)}(?!\w)", resposta_normalizada)
     )

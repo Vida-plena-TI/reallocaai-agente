@@ -1,0 +1,363 @@
+{
+  "versao": 1,
+  "tipo": "tabela_generica",
+  "titulo": "Plano de realocação (grade semanal vigente)",
+  "periodo": null,
+  "meta": null,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Sugestão: considera apenas os atendimentos presentes na semana lida (terapias quinzenais ou fora desta semana não aparecem).",
+    "Não considera a disponibilidade dos pacientes.",
+    "Cada mudança precisa ser confirmada com os pacientes e feita manualmente na planilha.",
+    "Vagas livres na grade podem estar reservadas (reuniões, supervisão); confira antes de mover."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Opções",
+      "valor": 3,
+      "formato": "inteiro",
+      "exibicao": "3"
+    },
+    {
+      "rotulo": "Mínimo de pacientes deslocados",
+      "valor": 2,
+      "formato": "inteiro",
+      "exibicao": "2"
+    }
+  ],
+  "dados": {
+    "tipo": "tabela_generica",
+    "relatorio": "plano_realocacao",
+    "dimensoes": [],
+    "metricas": [],
+    "colunas": [
+      {
+        "chave": "opcao",
+        "rotulo": "Opção",
+        "formato": "texto"
+      },
+      {
+        "chave": "passo",
+        "rotulo": "Passo",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "paciente",
+        "rotulo": "Quem",
+        "formato": "texto"
+      },
+      {
+        "chave": "terapia",
+        "rotulo": "Terapia",
+        "formato": "texto"
+      },
+      {
+        "chave": "profissional",
+        "rotulo": "Profissional",
+        "formato": "texto"
+      },
+      {
+        "chave": "de",
+        "rotulo": "De",
+        "formato": "texto"
+      },
+      {
+        "chave": "para",
+        "rotulo": "Para",
+        "formato": "texto"
+      },
+      {
+        "chave": "observacao",
+        "rotulo": "Observação",
+        "formato": "texto"
+      }
+    ],
+    "linhas": [
+      {
+        "opcao": "Opção 1",
+        "passo": 1,
+        "paciente": "Paciente Ficticio Epidoto",
+        "terapia": "Psicologia",
+        "profissional": "Carol",
+        "de": "Qua 11:00 às 12:00 · Carol · Sala 3",
+        "para": "Qua 16:00 às 17:00 · Carol · Sala 3",
+        "observacao": "mesma terapia e profissional"
+      },
+      {
+        "opcao": "Opção 1",
+        "passo": 2,
+        "paciente": "Paciente Ficticio Berilo",
+        "terapia": "Psicologia",
+        "profissional": "Carol",
+        "de": "Qua 10:00 às 11:00 · Carol · Sala 3",
+        "para": "Qua 11:00 às 12:00 · Carol · Sala 3",
+        "observacao": "mesma terapia e profissional"
+      },
+      {
+        "opcao": "Opção 1",
+        "passo": 3,
+        "paciente": "Paciente novo",
+        "terapia": "Psicologia",
+        "profissional": "Carol",
+        "de": "— (paciente novo)",
+        "para": "Qua 10:00 às 11:00 · Carol · Sala 3",
+        "observacao": "atendimento pedido"
+      },
+      {
+        "opcao": "Opção 2",
+        "passo": 1,
+        "paciente": "Paciente Ficticio Fluorita",
+        "terapia": "Psicologia",
+        "profissional": "Carol",
+        "de": "Qua 13:00 às 14:00 · Carol · Sala 3",
+        "para": "Qua 16:00 às 17:00 · Carol · Sala 3",
+        "observacao": "mesma terapia e profissional"
+      },
+      {
+        "opcao": "Opção 2",
+        "passo": 2,
+        "paciente": "Paciente Ficticio Berilo",
+        "terapia": "Psicologia",
+        "profissional": "Carol",
+        "de": "Qua 10:00 às 11:00 · Carol · Sala 3",
+        "para": "Qua 13:00 às 14:00 · Carol · Sala 3",
+        "observacao": "mesma terapia e profissional"
+      },
+      {
+        "opcao": "Opção 2",
+        "passo": 3,
+        "paciente": "Paciente novo",
+        "terapia": "Psicologia",
+        "profissional": "Carol",
+        "de": "— (paciente novo)",
+        "para": "Qua 10:00 às 11:00 · Carol · Sala 3",
+        "observacao": "atendimento pedido"
+      },
+      {
+        "opcao": "Opção 3",
+        "passo": 1,
+        "paciente": "Paciente Ficticio Granada",
+        "terapia": "Psicologia",
+        "profissional": "Carol",
+        "de": "Qua 14:00 às 15:00 · Carol · Sala 3",
+        "para": "Qua 16:00 às 17:00 · Carol · Sala 3",
+        "observacao": "mesma terapia e profissional"
+      },
+      {
+        "opcao": "Opção 3",
+        "passo": 2,
+        "paciente": "Paciente Ficticio Berilo",
+        "terapia": "Psicologia",
+        "profissional": "Carol",
+        "de": "Qua 10:00 às 11:00 · Carol · Sala 3",
+        "para": "Qua 14:00 às 15:00 · Carol · Sala 3",
+        "observacao": "mesma terapia e profissional"
+      },
+      {
+        "opcao": "Opção 3",
+        "passo": 3,
+        "paciente": "Paciente novo",
+        "terapia": "Psicologia",
+        "profissional": "Carol",
+        "de": "— (paciente novo)",
+        "para": "Qua 10:00 às 11:00 · Carol · Sala 3",
+        "observacao": "atendimento pedido"
+      }
+    ],
+    "total": {},
+    "linhas_omitidas": 0,
+    "agrupar_por": [
+      "opcao"
+    ],
+    "unidade_grupo": {
+      "singular": "passo",
+      "plural": "passos"
+    }
+  },
+  "tabelas": [
+    {
+      "nome": "Passos",
+      "colunas": [
+        {
+          "chave": "opcao",
+          "rotulo": "Opção",
+          "formato": "texto"
+        },
+        {
+          "chave": "passo",
+          "rotulo": "Passo",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "paciente",
+          "rotulo": "Quem",
+          "formato": "texto"
+        },
+        {
+          "chave": "terapia",
+          "rotulo": "Terapia",
+          "formato": "texto"
+        },
+        {
+          "chave": "profissional",
+          "rotulo": "Profissional",
+          "formato": "texto"
+        },
+        {
+          "chave": "de",
+          "rotulo": "De",
+          "formato": "texto"
+        },
+        {
+          "chave": "para",
+          "rotulo": "Para",
+          "formato": "texto"
+        },
+        {
+          "chave": "observacao",
+          "rotulo": "Observação",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "opcao": "Opção 1",
+          "passo": 1,
+          "paciente": "Paciente Ficticio Epidoto",
+          "terapia": "Psicologia",
+          "profissional": "Carol",
+          "de": "Qua 11:00 às 12:00 · Carol · Sala 3",
+          "para": "Qua 16:00 às 17:00 · Carol · Sala 3",
+          "observacao": "mesma terapia e profissional"
+        },
+        {
+          "opcao": "Opção 1",
+          "passo": 2,
+          "paciente": "Paciente Ficticio Berilo",
+          "terapia": "Psicologia",
+          "profissional": "Carol",
+          "de": "Qua 10:00 às 11:00 · Carol · Sala 3",
+          "para": "Qua 11:00 às 12:00 · Carol · Sala 3",
+          "observacao": "mesma terapia e profissional"
+        },
+        {
+          "opcao": "Opção 1",
+          "passo": 3,
+          "paciente": "Paciente novo",
+          "terapia": "Psicologia",
+          "profissional": "Carol",
+          "de": "— (paciente novo)",
+          "para": "Qua 10:00 às 11:00 · Carol · Sala 3",
+          "observacao": "atendimento pedido"
+        },
+        {
+          "opcao": "Opção 2",
+          "passo": 1,
+          "paciente": "Paciente Ficticio Fluorita",
+          "terapia": "Psicologia",
+          "profissional": "Carol",
+          "de": "Qua 13:00 às 14:00 · Carol · Sala 3",
+          "para": "Qua 16:00 às 17:00 · Carol · Sala 3",
+          "observacao": "mesma terapia e profissional"
+        },
+        {
+          "opcao": "Opção 2",
+          "passo": 2,
+          "paciente": "Paciente Ficticio Berilo",
+          "terapia": "Psicologia",
+          "profissional": "Carol",
+          "de": "Qua 10:00 às 11:00 · Carol · Sala 3",
+          "para": "Qua 13:00 às 14:00 · Carol · Sala 3",
+          "observacao": "mesma terapia e profissional"
+        },
+        {
+          "opcao": "Opção 2",
+          "passo": 3,
+          "paciente": "Paciente novo",
+          "terapia": "Psicologia",
+          "profissional": "Carol",
+          "de": "— (paciente novo)",
+          "para": "Qua 10:00 às 11:00 · Carol · Sala 3",
+          "observacao": "atendimento pedido"
+        },
+        {
+          "opcao": "Opção 3",
+          "passo": 1,
+          "paciente": "Paciente Ficticio Granada",
+          "terapia": "Psicologia",
+          "profissional": "Carol",
+          "de": "Qua 14:00 às 15:00 · Carol · Sala 3",
+          "para": "Qua 16:00 às 17:00 · Carol · Sala 3",
+          "observacao": "mesma terapia e profissional"
+        },
+        {
+          "opcao": "Opção 3",
+          "passo": 2,
+          "paciente": "Paciente Ficticio Berilo",
+          "terapia": "Psicologia",
+          "profissional": "Carol",
+          "de": "Qua 10:00 às 11:00 · Carol · Sala 3",
+          "para": "Qua 14:00 às 15:00 · Carol · Sala 3",
+          "observacao": "mesma terapia e profissional"
+        },
+        {
+          "opcao": "Opção 3",
+          "passo": 3,
+          "paciente": "Paciente novo",
+          "terapia": "Psicologia",
+          "profissional": "Carol",
+          "de": "— (paciente novo)",
+          "para": "Qua 10:00 às 11:00 · Carol · Sala 3",
+          "observacao": "atendimento pedido"
+        }
+      ]
+    },
+    {
+      "nome": "Resumo por opção",
+      "colunas": [
+        {
+          "chave": "opcao",
+          "rotulo": "Opção",
+          "formato": "texto"
+        },
+        {
+          "chave": "deslocados",
+          "rotulo": "Pacientes deslocados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "mudam_de_dia",
+          "rotulo": "Mudam de dia",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "pedido",
+          "rotulo": "O pedido fica em",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "opcao": "Opção 1",
+          "deslocados": 2,
+          "mudam_de_dia": 0,
+          "pedido": "Qua 10:00 às 11:00 · Carol · Sala 3"
+        },
+        {
+          "opcao": "Opção 2",
+          "deslocados": 2,
+          "mudam_de_dia": 0,
+          "pedido": "Qua 10:00 às 11:00 · Carol · Sala 3"
+        },
+        {
+          "opcao": "Opção 3",
+          "deslocados": 2,
+          "mudam_de_dia": 0,
+          "pedido": "Qua 10:00 às 11:00 · Carol · Sala 3"
+        }
+      ]
+    }
+  ],
+  "contem_dados_pacientes": true
+}

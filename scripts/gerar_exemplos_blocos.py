@@ -84,6 +84,25 @@ VARIANTES_PLANO: dict[str, dict[str, Any]] = {
 ARQUIVO_PACIENTES_POR_PLANO = "tabela_generica_pacientes_por_plano.json"
 #: `listar_pacientes_por_profissional` (sem argumentos) sobre `nomes_por_profissional`.
 ARQUIVO_PACIENTES_POR_PROFISSIONAL_NOMES = "tabela_generica_pacientes_por_profissional_nomes.json"
+#: `planejar_realocacao` sobre o cenário `realocacao`: o plano (2 deslocados) e a
+#: pergunta de nome ambíguo (o mesmo `dados.relatorio`).
+ARQUIVO_PLANO_REALOCACAO = "tabela_generica_plano_realocacao.json"
+ARQUIVO_PLANO_REALOCACAO_PERGUNTA = "tabela_generica_plano_realocacao_pergunta.json"
+VARIANTES_REALOCACAO: dict[str, dict[str, Any]] = {
+    ARQUIVO_PLANO_REALOCACAO: {
+        "dias_semana": ["quarta"],
+        "especialidade": "psicologia",
+        "duracao_minutos": 60,
+        "horario_desejado": "10:00",
+        "horario_minimo": "10:00",
+        "horario_maximo": "11:00",
+    },
+    ARQUIVO_PLANO_REALOCACAO_PERGUNTA: {
+        "paciente": "Paciente Ficticio Rubi",
+        "dias_semana": ["quinta"],
+        "horario_minimo": "08:00",
+    },
+}
 ARQUIVO_SCHEMA = "bloco_relatorio.schema.json"
 
 
@@ -137,6 +156,11 @@ def gerar_exemplos() -> dict[str, str]:
             {},
         )
     )
+    realocacao = _tools_do_cenario("realocacao")
+    chamadas += [
+        (arquivo, realocacao, "planejar_realocacao", args)
+        for arquivo, args in VARIANTES_REALOCACAO.items()
+    ]
     arquivos: dict[str, str] = {}
     for arquivo, disponiveis, nome, args in chamadas:
         mensagem = disponiveis[nome].invoke(

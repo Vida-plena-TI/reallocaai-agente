@@ -200,3 +200,51 @@ COLUNAS_IGNORADAS_PROFISSIONAL: Final[frozenset[str]] = frozenset(
         "larissa-consultas",
     }
 )
+
+# ------------------------------------------------------------- realocação
+# Regras do plano de realocação (`app.engine.realocacao`). Padrões
+# conservadores: na dúvida, o paciente fica onde está.
+
+#: Pacientes que nunca são deslocados (ids normalizados: `normalizar_id(nome)`).
+PACIENTES_FIXOS: Final[frozenset[str]] = frozenset()
+
+#: Profissionais cujos pacientes nunca são deslocados (ids normalizados).
+PROFISSIONAIS_FIXOS: Final[frozenset[str]] = frozenset()
+
+#: Se um paciente deslocado pode ir para outro dia da semana.
+REALOCACAO_PODE_MUDAR_DE_DIA: Final[bool] = True
+
+#: Minutos somados ao custo de uma opção por paciente deslocado que muda de dia.
+#: Maior que qualquer distância dentro de um dia: mudar de dia sempre perde
+#: para ficar no mesmo dia, com o mesmo número de deslocados.
+PENALIDADE_OUTRO_DIA: Final[int] = 24 * 60
+
+#: Se o deslocado pode ir para outro profissional da mesma especialidade (o
+#: passo sai marcado "outro profissional — confirmar"). Desligado: nunca.
+PERMITIR_OUTRO_PROFISSIONAL_MESMA_ESPECIALIDADE: Final[bool] = False
+
+#: Máximo de pacientes deslocados numa opção.
+MAX_DESLOCADOS: Final[int] = 2
+
+#: Máximo de opções devolvidas.
+MAX_OPCOES_REALOCACAO: Final[int] = 3
+
+#: Teto de cadeias avaliadas numa busca; ao atingi-lo, a busca para e avisa.
+MAX_CADEIAS_AVALIADAS: Final[int] = 20_000
+
+#: Sessão em grupo pode ser deslocada? Mover um grupo desloca vários pacientes.
+MOVER_SESSAO_EM_GRUPO: Final[bool] = False
+
+#: Atendimento aguardando autorização (nome em preto) pode ser deslocado?
+MOVER_AGUARDANDO_AUTORIZACAO: Final[bool] = False
+
+#: Preferir que o deslocado continue no mesmo turno (manhã/tarde), por causa
+#: da escola. Só desempate no ranking, nunca proibição.
+MANTER_TURNO_DO_DESLOCADO: Final[bool] = True
+
+#: Atendimento fora da grade do profissional (dado inconsistente) pode ser deslocado?
+MOVER_ATENDIMENTO_FORA_DA_GRADE: Final[bool] = False
+
+#: Piso de horário para o destino de quem é deslocado (ou o horário de origem
+#: dele, se for mais cedo).
+HORARIO_MINIMO_DESLOCADO: Final[time] = HORARIO_PREFERENCIAL_PADRAO

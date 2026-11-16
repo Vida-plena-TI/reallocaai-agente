@@ -149,6 +149,12 @@ CHAMADAS_COM_APELIDO: dict[str, dict[str, Any]] = {
         "especialidades": ["fonoaudiologia"],
         "profissionais_preferidos": ["beatriz"],
     },
+    "planejar_realocacao": {
+        "dias_semana": ["quinta"],
+        "profissional": "beatriz",
+        "duracao_minutos": 30,
+        "horario_minimo": "10:00",
+    },
 }
 
 

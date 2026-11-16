@@ -176,3 +176,87 @@ def test_pacientes_por_profissional_conferidos_a_mao() -> None:
         "Carol": {"paciente ficticio ametista": ("Seg", 1)},
         "Elo": {"paciente ficticio feldspato": ("Ter", 1)},
     }
+
+
+def _lugar(dia: date, inicio: str, fim: str, profissional: str, sala: int) -> oraculo.LugarDoPlano:
+    return oraculo.LugarDoPlano(
+        dia, time.fromisoformat(inicio), time.fromisoformat(fim), profissional, sala
+    )
+
+
+#: O c06 conferido à mão: na quarta, a Carol (Sala 3, "AA....BB.C") tem o
+#: paciente B das 10:00 às 11:00 e vagas das 08:00 às 10:00.
+_B_DA_SALA_3 = "Paciente Ficticio Bravo 3"
+_C06 = [
+    oraculo.PassoDoPlano(
+        _B_DA_SALA_3,
+        _lugar(QUARTA, "10:00", "11:00", "Carol", 3),
+        _lugar(QUARTA, "09:00", "10:00", "Carol", 3),
+    ),
+    oraculo.PassoDoPlano(None, None, _lugar(QUARTA, "10:00", "11:00", "Carol", 3)),
+]
+
+
+def test_plano_valido_conferido_a_mao() -> None:
+    assert oraculo.validar_plano(payload_da_semana(), SEMANA, _C06) == []
+
+
+def test_plano_na_ordem_errada_ocupa_lugar_ainda_ocupado() -> None:
+    problemas = oraculo.validar_plano(payload_da_semana(), SEMANA, list(reversed(_C06)))
+
+    assert "passo 1: destino ocupado nesse momento" in problemas
+
+
+@pytest.mark.parametrize(
+    ("para", "problema"),
+    [
+        # Outra profissional (Elo, fono) e outra terapia.
+        (_lugar(QUARTA, "08:00", "09:00", "Elo", 5), "passo 1: muda profissional ou duração"),
+        (_lugar(QUARTA, "08:00", "09:30", "Carol", 3), "passo 1: muda profissional ou duração"),
+        # 07:00 está ocupado por A.
+        (_lugar(QUARTA, "07:00", "08:00", "Carol", 3), "passo 1: destino ocupado nesse momento"),
+        # 12:00 é a pausa.
+        (
+            _lugar(QUARTA, "11:30", "12:30", "Carol", 3),
+            "passo 1: destino fora da grade ou do expediente",
+        ),
+    ],
+)
+def test_plano_que_quebra_uma_regra(para: oraculo.LugarDoPlano, problema: str) -> None:
+    passos = [oraculo.PassoDoPlano(_B_DA_SALA_3, _C06[0].de, para), _C06[1]]
+
+    assert problema in oraculo.validar_plano(payload_da_semana(), SEMANA, passos)
+
+
+def test_origem_que_nao_e_do_paciente_ou_nao_e_a_sessao_inteira() -> None:
+    errado = oraculo.PassoDoPlano("Paciente Ficticio Alfa 3", _C06[0].de, _C06[0].para)
+    assert "passo 1: a origem não traz esse paciente" in oraculo.validar_plano(
+        payload_da_semana(), SEMANA, [errado]
+    )
+    metade = oraculo.PassoDoPlano(
+        _B_DA_SALA_3,
+        _lugar(QUARTA, "10:00", "10:30", "Carol", 3),
+        _lugar(QUARTA, "09:00", "09:30", "Carol", 3),
+    )
+    assert "passo 1: a origem não é a sessão inteira" in oraculo.validar_plano(
+        payload_da_semana(), SEMANA, [metade]
+    )
+
+
+def test_plano_que_poe_paciente_em_dois_lugares_ou_repete_a_terapia_no_dia() -> None:
+    # Cenário `realocacao`: Berilo faz psicologia às 10:00 e TO das 16:00 às 18:00.
+    payload = payload_da_semana("realocacao")
+    berilo = "Paciente Ficticio Berilo"
+    dois_lugares = oraculo.PassoDoPlano(
+        berilo,
+        _lugar(QUARTA, "10:00", "11:00", "Carol", 3),
+        _lugar(QUARTA, "16:00", "17:00", "Carol", 3),
+    )
+    assert "um paciente ficaria em dois lugares ao mesmo tempo" in oraculo.validar_plano(
+        payload, SEMANA, [dois_lugares]
+    )
+    novo_do_berilo = oraculo.PassoDoPlano(
+        berilo, None, _lugar(QUARTA, "16:00", "17:00", "Carol", 3)
+    )
+    problemas = oraculo.validar_plano(payload, SEMANA, [novo_do_berilo])
+    assert "um paciente ficaria com duas sessões da mesma terapia no dia" in problemas

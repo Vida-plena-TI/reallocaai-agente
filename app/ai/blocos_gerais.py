@@ -21,6 +21,7 @@ from app.ai.relatorios import (
     DIAS_DA_SEMANA,
     RELATORIO_PACIENTES_POR_PLANO,
     RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES,
+    RELATORIO_PLANO_REALOCACAO,
     RELATORIOS_COM_NOMES_DE_PACIENTES,
     AguardandoProfissionalDia,
     BlocoRelatorio,
@@ -54,6 +55,7 @@ from app.engine.fotografia import FotografiaPeriodo
 from app.engine.pacientes_por_plano import PacientesPorPlano
 from app.engine.pacientes_por_profissional_nomes import PacientesPorProfissional
 from app.engine.planejamento import PlanoDia, PlanoSemanal, SessaoPlano, maior_sequencia
+from app.engine.realocacao import ROTULO_PACIENTE_NOVO
 from app.engine.relatorio_generico import (
     Dimensao,
     LinhaRelatorio,
@@ -1458,4 +1460,14 @@ def nomes_de_pacientes_no_bloco(bloco: BlocoRelatorio) -> list[str]:
         or dados.relatorio not in RELATORIOS_COM_NOMES_DE_PACIENTES
     ):
         return []
-    return [str(linha["paciente"]) for linha in dados.linhas if linha.get("paciente")]
+    nomes = [str(linha["paciente"]) for linha in dados.linhas if linha.get("paciente")]
+    if dados.relatorio == RELATORIO_PLANO_REALOCACAO:
+        # Sessão em grupo deslocada: os nomes vêm juntos ("A / B"). O rótulo do
+        # paciente novo sem nome não é nome de paciente.
+        nomes = [
+            parte.strip()
+            for nome in nomes
+            for parte in nome.split(" / ")
+            if parte.strip() and parte.strip() != ROTULO_PACIENTE_NOVO
+        ]
+    return nomes

@@ -311,8 +311,14 @@ class DadosQualidadeAgenda(_ModeloRelatorio):
 #: bloco leva nomes de pacientes (só para a tela, nunca para o modelo).
 RELATORIO_PACIENTES_POR_PLANO: Final[str] = "pacientes_por_plano"
 RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES: Final[str] = "pacientes_por_profissional_nomes"
+#: Plano de realocação e a pergunta de "qual paciente?" (só pelo chat).
+RELATORIO_PLANO_REALOCACAO: Final[str] = "plano_realocacao"
 RELATORIOS_COM_NOMES_DE_PACIENTES: Final[frozenset[str]] = frozenset(
-    {RELATORIO_PACIENTES_POR_PLANO, RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES}
+    {
+        RELATORIO_PACIENTES_POR_PLANO,
+        RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES,
+        RELATORIO_PLANO_REALOCACAO,
+    }
 )
 
 

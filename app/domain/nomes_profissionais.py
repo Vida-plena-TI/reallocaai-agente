@@ -20,7 +20,7 @@ o nome exibido é sempre o da planilha.
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from enum import StrEnum
 
 from app.domain.constants import MAPA_ALIAS_PROFISSIONAL, PROFISSIONAIS_APELIDOS
@@ -54,6 +54,35 @@ def _uma_sequencia_e_prefixo_da_outra(palavras: list[str], outras: list[str]) ->
     return bool(menor) and maior[: len(menor)] == menor
 
 
+def casar_nome(ids: Iterable[str], texto: str) -> tuple[str, ...]:
+    """Ids que casam com `texto` sem grafias nem apelidos de profissional.
+
+    O id exato (nome normalizado), depois os níveis 2 e 3 da resolução: nome
+    inteiro igual pela chave de comparação e prefixo de palavras inteiras.
+    Serve também para nomes de pacientes, a quem os aliases e apelidos de
+    profissional nunca se aplicam. Vazio: ninguém.
+    """
+    alvo = normalizar_id(texto)
+    candidatos = tuple(ids)
+    if not alvo:
+        return ()
+    if alvo in candidatos:
+        return (alvo,)
+    chave_alvo = chave_de_comparacao(alvo)
+    chaves = {candidato: chave_de_comparacao(candidato) for candidato in candidatos}
+    iguais = tuple(sorted(i for i, chave in chaves.items() if chave == chave_alvo))
+    if iguais:
+        return iguais
+    palavras_alvo = chave_alvo.split("-")
+    return tuple(
+        sorted(
+            i
+            for i, chave in chaves.items()
+            if _uma_sequencia_e_prefixo_da_outra(palavras_alvo, chave.split("-"))
+        )
+    )
+
+
 def resolver_nome(nomes_por_id: Mapping[str, str], texto: str) -> tuple[str, ...]:
     """Ids que casam com `texto`, do primeiro nível que achou alguém (vazio: ninguém).
 
@@ -67,18 +96,4 @@ def resolver_nome(nomes_por_id: Mapping[str, str], texto: str) -> tuple[str, ...
     apelido_de = PROFISSIONAIS_APELIDOS.get(alvo)
     if apelido_de is not None and apelido_de in nomes_por_id:
         return (apelido_de,)
-    chave_alvo = chave_de_comparacao(alvo)
-    chaves = {
-        profissional_id: chave_de_comparacao(profissional_id) for profissional_id in nomes_por_id
-    }
-    iguais = tuple(sorted(i for i, chave in chaves.items() if chave == chave_alvo))
-    if iguais:
-        return iguais
-    palavras_alvo = chave_alvo.split("-")
-    return tuple(
-        sorted(
-            i
-            for i, chave in chaves.items()
-            if _uma_sequencia_e_prefixo_da_outra(palavras_alvo, chave.split("-"))
-        )
-    )
+    return casar_nome(nomes_por_id, alvo)

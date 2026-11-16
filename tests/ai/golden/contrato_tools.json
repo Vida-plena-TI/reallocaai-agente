@@ -886,6 +886,220 @@
   "descricao": "Relatório gerencial de pacientes por plano de saúde (SulAmérica, Klini, Particulares, Care Plus, Unimed), lido pela cor do texto do nome na grade semanal vigente: quantos pacientes e atendimentos na semana cada plano tem, com a lista de nomes na tela.\n\nUse para 'quantos pacientes de cada plano/convênio', 'pacientes da SulAmérica', 'lista de pacientes por plano'. Você recebe só as contagens: NUNCA escreva nomes de pacientes na resposta. Cobre só quem tem sessão na grade desta semana (sem datas). Sessões por convênio e autorizações pendentes -> gerar_relatorio (convenios).",
   "formato_resposta": "content_and_artifact"
  },
+ "planejar_realocacao": {
+  "argumentos": {
+   "$defs": {
+    "DiaDaSemana": {
+     "enum": [
+      "segunda",
+      "terca",
+      "quarta",
+      "quinta",
+      "sexta",
+      "sabado"
+     ],
+     "title": "DiaDaSemana",
+     "type": "string"
+    },
+    "Especialidade": {
+     "enum": [
+      "terapia_ocupacional",
+      "fonoaudiologia",
+      "psicologia"
+     ],
+     "title": "Especialidade",
+     "type": "string"
+    }
+   },
+   "description": "Sugere como abrir espaço para um atendimento deslocando outros pacientes, na\ngrade semanal, com até 3 opções na tela.\n\nUse quando pedirem para mudar um paciente de horário, para abrir espaço movendo\noutros, ou quando, depois de um encaixe sem vaga, disserem \"pode mover o que for\nnecessário\". NUNCA peça atendimento_id nem id de paciente: bastam o nome (ou nada,\npara paciente novo), a especialidade, a duração, o dia e o horário. Cada paciente\ndeslocado mantém a mesma terapia, o mesmo profissional e a mesma duração: nunca\nproponha mudar terapia ou profissional. Você recebe só papéis e horários: NUNCA\nescreva nomes de pacientes. Se a ferramenta fizer uma pergunta, repita a pergunta\nsem nomes. Grade semanal: não cite datas.",
+   "properties": {
+    "candidata": {
+     "anyOf": [
+      {
+       "minimum": 1,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Número da opção escolhida, quando a ferramenta perguntar qual paciente.",
+     "title": "Candidata"
+    },
+    "dia_origem": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/DiaDaSemana"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Dia da semana do atendimento atual, quando a ferramenta perguntar."
+    },
+    "dias_semana": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/DiaDaSemana"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Dias da semana aceitos para o atendimento (grade semanal: sem datas).",
+     "title": "Dias Semana"
+    },
+    "duracao_minutos": {
+     "anyOf": [
+      {
+       "exclusiveMinimum": 0,
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Duração do atendimento novo, em minutos. Para quem já está na grade, a duração atual é mantida.",
+     "title": "Duracao Minutos"
+    },
+    "especialidade": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Especialidade"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Especialidade do atendimento ('fono', 'psico', 'TO')."
+    },
+    "horario_desejado": {
+     "anyOf": [
+      {
+       "format": "time",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Horário de início pedido. Sozinho, a busca começa exatamente nele; com a faixa, só desempata.",
+     "title": "Horario Desejado"
+    },
+    "horario_maximo": {
+     "anyOf": [
+      {
+       "format": "time",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Horário até o qual o atendimento precisa terminar.",
+     "title": "Horario Maximo"
+    },
+    "horario_minimo": {
+     "anyOf": [
+      {
+       "format": "time",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Início mais cedo aceito, quando pedirem uma faixa.",
+     "title": "Horario Minimo"
+    },
+    "horario_origem": {
+     "anyOf": [
+      {
+       "format": "time",
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Horário do atendimento atual, quando a ferramenta perguntar.",
+     "title": "Horario Origem"
+    },
+    "mesmo_paciente_da_grade": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Resposta à pergunta da ferramenta se o paciente novo é a mesma pessoa que já está na grade com esse nome.",
+     "title": "Mesmo Paciente Da Grade"
+    },
+    "paciente": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Nome do paciente como foi dito, só quando a pergunta citar um. Em branco: paciente novo sem nome. Nunca peça id.",
+     "title": "Paciente"
+    },
+    "profissional": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Profissional pedida, com o nome como foi dito, só quando a pergunta citar uma.",
+     "title": "Profissional"
+    },
+    "situacao": {
+     "anyOf": [
+      {
+       "enum": [
+        "novo",
+        "ja_na_grade"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "'novo' para um atendimento que ainda não existe (mesmo de paciente que já faz outra terapia); 'ja_na_grade' para mudar um atendimento que já está na grade. Em branco: deduzido pelo nome.",
+     "title": "Situacao"
+    }
+   },
+   "title": "planejar_realocacao",
+   "type": "object"
+  },
+  "descricao": "Sugere como abrir espaço para um atendimento deslocando outros pacientes, na\ngrade semanal, com até 3 opções na tela.\n\nUse quando pedirem para mudar um paciente de horário, para abrir espaço movendo\noutros, ou quando, depois de um encaixe sem vaga, disserem \"pode mover o que for\nnecessário\". NUNCA peça atendimento_id nem id de paciente: bastam o nome (ou nada,\npara paciente novo), a especialidade, a duração, o dia e o horário. Cada paciente\ndeslocado mantém a mesma terapia, o mesmo profissional e a mesma duração: nunca\nproponha mudar terapia ou profissional. Você recebe só papéis e horários: NUNCA\nescreva nomes de pacientes. Se a ferramenta fizer uma pergunta, repita a pergunta\nsem nomes. Grade semanal: não cite datas.",
+  "formato_resposta": "content_and_artifact"
+ },
  "planejar_semana": {
   "argumentos": {
    "$defs": {

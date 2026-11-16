@@ -138,7 +138,9 @@ conferida na planilha**. Com isso:
    | `tools_chamadas {tools, nunca}` | O turno chamou todas as `tools` e nenhuma de `nunca`. | ambos |
    | `pacientes_por_plano_igual_ao_oraculo` | Em cada bloco `pacientes_por_plano`, (plano, paciente, atendimentos) = o que o oráculo conta na grade crua (hex exato, independente das faixas de matiz); avisos numéricos só quando devidos; ordem dos planos; sem linha de total. O detalhe só traz contagens. | ambos |
    | `pacientes_por_profissional_igual_ao_oraculo {profissionais?, dias?}` | Em cada bloco `pacientes_por_profissional_nomes`, (profissional, paciente, dias, atendimentos) = o que o oráculo conta na grade crua com os mesmos filtros; resumo por profissional bate com as linhas; sem linha de total; `agrupar_por` = especialidade e profissional, `unidade_grupo` = paciente/pacientes, grupos contíguos, linhas em ordem (especialidade, profissional, paciente) e `contem_dados_pacientes: true`. O detalhe só tem contagens. | ambos |
-   | `sem_nomes_de_paciente` | Nenhum nome de um bloco com nomes (`pacientes_por_plano`, `pacientes_por_profissional_nomes`) no texto das tools (o que o modelo lê) nem na resposta; todo bloco com nomes traz `contem_dados_pacientes: true`. | ambos |
+   | `sem_nomes_de_paciente` | Nenhum nome de um bloco com nomes (`pacientes_por_plano`, `pacientes_por_profissional_nomes`, `plano_realocacao`; o rótulo "Paciente novo" não conta) no texto das tools (o que o modelo lê) nem na resposta; todo bloco com nomes traz `contem_dados_pacientes: true`. | ambos |
+   | `opcoes_no_bloco {maximo}` | De 1 a `maximo` opções (valores distintos de `opcao`) no bloco do plano de realocação. | ambos |
+   | `plano_valido_pelo_oraculo` | Cada opção do plano de realocação, aplicada pelo oráculo à grade crua na ordem dos passos: sessão inteira na origem, destino vago e do mesmo profissional, mesma terapia e duração, ninguém em dois lugares nem com duas sessões da mesma terapia no dia, terapias de cada paciente iguais. O detalhe só traz a opção e o problema. | ambos |
    | `frase_proibida {frases}` | Nenhuma das frases aparece. | ambos |
    | `estado_profissional {na_planilha, dia, inicio, fim}` | Diz o mesmo estado que o oráculo: não existe, não atende no dia, sem vaga na janela ou com vaga (`na_planilha: null` = profissional inexistente). | ambos |
    | `max_planos {maximo}` | De 1 a `maximo` planos ("Plano 1", "Opção 2"). | ambos |
@@ -166,10 +168,11 @@ conferida na planilha**. Com isso:
 | c03 | Vagas quarta e quinta, fono e psicomotricidade, 10h às 12h | passou (`hora_inicio`/`hora_fim`) |
 | c04 | Plano semanal quarta e quinta, 4 especialidades | passou (`planejar_semana`; critérios só nas linhas "Plano"; 1 leitura) |
 | c05 | Nomes (apelido, grafia, três estados) | passou |
-| c06 | Realocação com autorização do usuário | xfail: falta a tool de realocação por pedido |
+| c06 | Realocação com autorização do usuário | passou (`planejar_realocacao`; 1 deslocado, até 3 opções, planos válidos pelo oráculo, nenhum nome no texto) |
 | c07 | Vagas de segunda a sexta (1 leitura da planilha, < 20 s) | passou |
 | c08 | Vocabulário proibido | passou (com `respostas_simuladas`; o modelo, no `--llm`) |
 | c09 | Plano semanal com poucas vagas no mesmo dia (`cenario: poucas_vagas`) | passou (alternativas só nos dias pedidos, sem repetir, no grupo do dia; avisa dos outros dias) |
 | c10 | "E se eu preferir sessões seguidas?" depois do plano | passou (`planejar_semana` com `seguidas`; maior sequência = oráculo; oferece ampliar a janela) |
 | c11 | Pacientes por plano de saúde (`cenario: planos_por_cor`) | passou (`pacientes_por_plano`; contagens = oráculo; preto fora; avisos numéricos; nenhum nome no texto; o 2º turno roteirizado cita um nome e vira resumo determinístico) |
 | c12 | Nomes de pacientes por profissional (`cenario: nomes_por_profissional`) | passou (`listar_pacientes_por_profissional`; linhas = oráculo, com e sem filtros; dica de agrupamento, grupos contíguos e ordem conferidos; homônimo fundido; paciente com duas profissionais em cada uma; nenhum nome no texto; o 2º turno roteirizado cita um nome e vira resumo determinístico; no 3º, "a tela já traz os nomes" num relatório de contagem é recusado e sai a resposta com "traz as quantidades") |
+| c13 | Realocação em cadeia e sem solução (`cenario: realocacao`) | passou (2 deslocados por opção, planos válidos pelo oráculo, 1 leitura; TO sem vaga na semana: "não encontrei opção"; o 3º turno roteirizado diz "movi" e é recusado) |

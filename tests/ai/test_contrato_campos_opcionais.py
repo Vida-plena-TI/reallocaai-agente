@@ -23,6 +23,8 @@ COM_NOMES = {
     "agenda_paciente.json",
     "tabela_generica_pacientes_por_plano.json",
     "tabela_generica_pacientes_por_profissional_nomes.json",
+    "tabela_generica_plano_realocacao.json",
+    "tabela_generica_plano_realocacao_pergunta.json",
 }
 CAMPOS_NOVOS_NO_ENVELOPE = {"contem_dados_pacientes"}
 CAMPOS_NOVOS_EM_DADOS = {"agrupar_por", "unidade_grupo"}
@@ -163,7 +165,7 @@ def test_marca_e_proibida_nos_blocos_sem_nomes() -> None:
 # --- onde os campos aparecem -------------------------------------------------
 
 
-def test_marca_so_nos_tres_blocos_com_nomes() -> None:
+def test_marca_so_nos_blocos_com_nomes() -> None:
     exemplos = _exemplos()
 
     com_marca = {a for a, bloco in exemplos.items() if "contem_dados_pacientes" in bloco}
@@ -171,14 +173,18 @@ def test_marca_so_nos_tres_blocos_com_nomes() -> None:
     assert all(exemplos[a]["contem_dados_pacientes"] is True for a in COM_NOMES)
 
 
-def test_agrupamento_so_em_pacientes_por_profissional_nomes() -> None:
+def test_agrupamento_so_nos_relatorios_agrupados() -> None:
+    """Nomes por profissional e o plano de realocação (a pergunta não agrupa)."""
     com_agrupamento = {
         arquivo
         for arquivo, bloco in _exemplos().items()
         if CAMPOS_NOVOS_EM_DADOS & set(bloco["dados"])
     }
 
-    assert com_agrupamento == {"tabela_generica_pacientes_por_profissional_nomes.json"}
+    assert com_agrupamento == {
+        "tabela_generica_pacientes_por_profissional_nomes.json",
+        "tabela_generica_plano_realocacao.json",
+    }
 
 
 def test_blocos_sem_nomes_nao_ganharam_nenhum_campo() -> None:

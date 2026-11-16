@@ -221,7 +221,9 @@ def perguntar_com_mensagens(
     blocos = extrair_blocos_do_turno(mensagens)
     # Nome de paciente na resposta não ganha nova geração: o aviso teria de
     # citar o nome para o modelo. Vai direto para o resumo, que não tem nomes.
-    if repetidos := nomes_de_paciente_na_resposta(resposta, blocos):
+    if repetidos := nomes_de_paciente_na_resposta(
+        resposta, blocos, mensagens[len(historico_mensagens) :]
+    ):
         registrar_nome_de_paciente(repetidos)
         return (
             resumo_deterministico(blocos, mensagens[len(historico_mensagens) :]),
@@ -244,7 +246,7 @@ def perguntar_com_mensagens(
     resposta = _extrair_texto_da_resposta(refeito[-1])
     blocos = extrair_blocos_do_turno(refeito) or blocos
     turno = refeito[len(historico_mensagens) :]
-    if repetidos := nomes_de_paciente_na_resposta(resposta, blocos):
+    if repetidos := nomes_de_paciente_na_resposta(resposta, blocos, turno):
         registrar_nome_de_paciente(repetidos)
         return resumo_deterministico(blocos, turno), refeito, blocos
     problemas = verificar(
