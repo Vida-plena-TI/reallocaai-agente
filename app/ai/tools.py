@@ -63,6 +63,7 @@ from app.ai.tools_equipe import criar_tool_consultar_profissionais
 from app.ai.tools_pacientes_plano import criar_tool_pacientes_por_plano
 from app.ai.tools_pacientes_profissional import criar_tool_listar_pacientes_por_profissional
 from app.ai.tools_plano import criar_tool_planejar_semana
+from app.ai.tools_realocacao import criar_tool_planejar_realocacao
 from app.ai.tools_relatorios import (
     MAXIMO_DE_LINHAS_EM_TEXTO,
     criar_tools_relatorios,
@@ -1352,5 +1353,6 @@ def criar_tools(
         criar_tool_planejar_semana(fonte, data_referencia, catalogo),
         criar_tool_pacientes_por_plano(fonte, data_referencia),
         criar_tool_listar_pacientes_por_profissional(fonte, data_referencia, catalogo),
+        criar_tool_planejar_realocacao(fonte, data_referencia, catalogo),
         *criar_tools_relatorios(fonte, data_referencia),
     ]

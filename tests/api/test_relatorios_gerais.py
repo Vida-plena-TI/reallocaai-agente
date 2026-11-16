@@ -294,3 +294,11 @@ def test_pacientes_por_profissional_nomes_nao_e_exposto_na_api(cliente: TestClie
 
     assert resposta.status_code == 422
     assert "pacientes_por_profissional_nomes" not in RELATORIOS
+
+
+def test_plano_realocacao_nao_e_exposto_na_api(cliente: TestClient) -> None:
+    """O plano de realocação leva nomes de pacientes: sai só pelo chat."""
+    resposta = _gerar(cliente, {"relatorio": "plano_realocacao"})
+
+    assert resposta.status_code == 422
+    assert "plano_realocacao" not in RELATORIOS
