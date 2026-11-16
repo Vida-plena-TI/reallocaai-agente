@@ -379,3 +379,160 @@ def pacientes_por_profissional(
         }
         for profissional, por_nome in sessoes.items()
     }
+
+
+@dataclass(frozen=True)
+class LugarDoPlano:
+    dia: date
+    inicio: time
+    fim: time
+    profissional: str
+    sala: int
+
+
+@dataclass(frozen=True)
+class PassoDoPlano:
+    """Um passo do plano de realocação, como a tela o mostra."""
+
+    #: Nome do paciente; `None` = paciente novo sem nome.
+    paciente: str | None
+    #: `None` = paciente novo, sem lugar de origem.
+    de: LugarDoPlano | None
+    para: LugarDoPlano
+
+
+def _meias_horas_entre(inicio: time, fim: time) -> list[time]:
+    horas = []
+    atual = datetime.combine(date(2000, 1, 1), inicio)
+    while atual.time() < fim:
+        horas.append(atual.time())
+        atual += timedelta(minutes=30)
+    return horas
+
+
+_NOVO = "\x00paciente novo"
+
+
+def _nomes_da_celula_texto(texto: str) -> set[str]:
+    if texto == _NOVO:
+        return {_NOVO}
+    return {nome_normalizado(parte) for parte in texto.split("/") if nome_normalizado(parte)}
+
+
+def _sessoes(
+    grade: Mapping[tuple[date, int, time], str], rotulos: Mapping[tuple[date, int], str]
+) -> list[tuple[frozenset[str], str, date, int, time, time]]:
+    """(pacientes, especialidade, dia, sala, início, fim) de cada sessão da grade."""
+    sessoes = []
+    for (dia, sala, hora), texto in sorted(grade.items()):
+        if not texto:
+            continue
+        anterior = (datetime.combine(dia, hora) - timedelta(minutes=30)).time()
+        if grade.get((dia, sala, anterior)) == texto:
+            continue
+        fim = hora
+        while grade.get((dia, sala, fim)) == texto:
+            fim = (datetime.combine(dia, fim) + timedelta(minutes=30)).time()
+        sessoes.append(
+            (frozenset(_nomes_da_celula_texto(texto)), rotulos[(dia, sala)], dia, sala, hora, fim)
+        )
+    return sessoes
+
+
+def validar_plano(
+    payload: Mapping[str, Any], dias: Sequence[date], passos: Sequence[PassoDoPlano]
+) -> list[str]:
+    """Problemas do plano aplicado à grade crua, na ordem dos passos (vazio: válido).
+
+    Cada passo tira a sessão INTEIRA do paciente do lugar de origem e a põe no
+    destino, que precisa existir sob o mesmo profissional e estar vago naquele
+    momento. No fim: ninguém em dois lugares ao mesmo tempo, a contagem de
+    sessões por (paciente, especialidade, dia) não passa de max(antes, 1) e as
+    especialidades de cada paciente na semana não mudam (o paciente novo ganha
+    só a do pedido).
+    """
+    grade: dict[tuple[date, int, time], str] = {}
+    profissionais: dict[tuple[date, int], str] = {}
+    rotulos: dict[tuple[date, int], str] = {}
+    for dia in dias:
+        for celula in _celulas(payload, dia):
+            grade[(dia, celula.sala, celula.hora)] = celula.texto
+            profissionais[(dia, celula.sala)] = celula.profissional
+            rotulos[(dia, celula.sala)] = celula.especialidade
+    antes = _sessoes(grade, rotulos)
+    problemas: list[str] = []
+    envolvidos: set[str] = set()
+    novos: dict[str, str] = {}
+    for numero, passo in enumerate(passos, 1):
+        nome = nome_normalizado(passo.paciente) if passo.paciente else _NOVO
+        texto = passo.paciente or _NOVO
+        para = passo.para
+        if passo.de is not None:
+            de = passo.de
+            envolvidos.add(nome)
+            horas = _meias_horas_entre(de.inicio, de.fim)
+            if any(
+                nome not in _nomes_da_celula_texto(grade.get((de.dia, de.sala, h), ""))
+                for h in horas
+            ):
+                problemas.append(f"passo {numero}: a origem não traz esse paciente")
+                continue
+            texto = grade[(de.dia, de.sala, horas[0])]
+            antes_da_sessao = (datetime.combine(de.dia, de.inicio) - timedelta(minutes=30)).time()
+            if texto in (
+                grade.get((de.dia, de.sala, antes_da_sessao)),
+                grade.get((de.dia, de.sala, de.fim)),
+            ):
+                problemas.append(f"passo {numero}: a origem não é a sessão inteira")
+            if profissionais.get((de.dia, de.sala)) != de.profissional:
+                problemas.append(f"passo {numero}: profissional de origem não confere")
+            if (de.profissional, len(horas)) != (
+                para.profissional,
+                len(_meias_horas_entre(para.inicio, para.fim)),
+            ):
+                problemas.append(f"passo {numero}: muda profissional ou duração")
+            if rotulos.get((de.dia, de.sala)) != rotulos.get((para.dia, para.sala)):
+                problemas.append(f"passo {numero}: muda a especialidade")
+            for h in horas:
+                grade[(de.dia, de.sala, h)] = ""
+        elif passo.paciente:
+            envolvidos.add(nome)
+            novos[nome] = rotulos.get((para.dia, para.sala), "")
+        if profissionais.get((para.dia, para.sala)) != para.profissional:
+            problemas.append(f"passo {numero}: o destino não é desse profissional")
+            continue
+        for h in _meias_horas_entre(para.inicio, para.fim):
+            if (para.dia, para.sala, h) not in grade:
+                problemas.append(f"passo {numero}: destino fora da grade ou do expediente")
+            elif grade[(para.dia, para.sala, h)]:
+                problemas.append(f"passo {numero}: destino ocupado nesse momento")
+            grade[(para.dia, para.sala, h)] = texto
+
+    depois = _sessoes(grade, rotulos)
+    for nome in envolvidos:
+        das_antes = [s for s in antes if nome in s[0]]
+        das_depois = [s for s in depois if nome in s[0]]
+        cruzam = sum(
+            1
+            for i, a in enumerate(das_depois)
+            for b in das_depois[i + 1 :]
+            if a[2] == b[2] and a[4] < b[5] and b[4] < a[5]
+        )
+        cruzavam = sum(
+            1
+            for i, a in enumerate(das_antes)
+            for b in das_antes[i + 1 :]
+            if a[2] == b[2] and a[4] < b[5] and b[4] < a[5]
+        )
+        if cruzam > cruzavam:
+            problemas.append("um paciente ficaria em dois lugares ao mesmo tempo")
+        contagem_antes = Counter((s[1], s[2]) for s in das_antes)
+        for chave, quantidade in Counter((s[1], s[2]) for s in das_depois).items():
+            if quantidade > max(contagem_antes[chave], 1):
+                problemas.append("um paciente ficaria com duas sessões da mesma terapia no dia")
+        especialidades_antes = {s[1] for s in das_antes} | (
+            {novos[nome]} if nome in novos else set()
+        )
+        if {s[1] for s in das_depois} != especialidades_antes:
+            problemas.append("as terapias de um paciente na semana mudariam")
+    return problemas

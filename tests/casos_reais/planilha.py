@@ -152,6 +152,21 @@ CENARIOS: dict[str, dict[str, dict[str, str]]] = {
             "Sala 2": "..EE...... ..........",
         },
     },
+    # `realocacao` (c13): a Carol (psicologia) só atende na quarta e a Assizely
+    # (TO) na quarta e na quinta, sem nenhuma vaga. Na quarta, a Carol tem B
+    # das 10:00 às 11:00 e vagas só das 16:00 às 18:00, quando B está na TO:
+    # psicologia na quarta às 10h só sai com 2 deslocados (B para o lugar de
+    # outro paciente da Carol, que vai para a vaga da tarde). TO na quinta às
+    # 10h não tem solução: nenhuma cadeia termina numa vaga da TO.
+    "realocacao": {
+        "Quarta": {
+            "Sala 2": "KKLLMMNNOO PPQQRRBBBB",
+            "Sala 3": "AACCDDBBEE FFGGHH....",
+        },
+        "Quinta": {
+            "Sala 2": "KKLLMMNNOO PPQQRRSSSS",
+        },
+    },
 }
 
 #: Cores de texto usadas nos cenários (as da planilha real).
@@ -199,6 +214,26 @@ PECAS_DOS_CENARIOS: dict[str, dict[str, tuple[tuple[str, str], ...]]] = {
         "D": (("paciente ficticio omega", AZUL),),
         "E": (("Paciente Ficticio Esmeralda / Paciente Ficticio Basalto", AZUL),),
         "F": (("Paciente Ficticio Feldspato", AZUL),),
+    },
+    # `realocacao` (c13): B (Berilo) faz psicologia e TO; os outros, uma terapia só.
+    "realocacao": {
+        "A": (("Paciente Ficticio Agata", AZUL),),
+        "B": (("Paciente Ficticio Berilo", AZUL),),
+        "C": (("Paciente Ficticio Calcita", AZUL),),
+        "D": (("Paciente Ficticio Dolomita", AZUL),),
+        "E": (("Paciente Ficticio Epidoto", AZUL),),
+        "F": (("Paciente Ficticio Fluorita", AZUL),),
+        "G": (("Paciente Ficticio Granada", AZUL),),
+        "H": (("Paciente Ficticio Hematita", AZUL),),
+        "K": (("Paciente Ficticio Cianita", AZUL),),
+        "L": (("Paciente Ficticio Lapislazuli", AZUL),),
+        "M": (("Paciente Ficticio Malaquita", AZUL),),
+        "N": (("Paciente Ficticio Nefrita", AZUL),),
+        "O": (("Paciente Ficticio Opala", AZUL),),
+        "P": (("Paciente Ficticio Pirita", AZUL),),
+        "Q": (("Paciente Ficticio Quartzo", AZUL),),
+        "R": (("Paciente Ficticio Rubi", AZUL),),
+        "S": (("Paciente Ficticio Safira", AZUL),),
     },
 }
 
