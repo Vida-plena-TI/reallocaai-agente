@@ -189,9 +189,9 @@ Relatórios `ranking_ocupacao`, `comparativo_dias`, `salas_ociosas`,
 
 #### Exibição agrupada (`agrupar_por` e `unidade_grupo`)
 
-Opcional; hoje em `pacientes_por_profissional_nomes` e no plano de realocação
-(`plano_realocacao`). As linhas já vêm **contíguas por
-grupo**, na ordem desejada: o front **não reordena**. Ele junta as linhas consecutivas com os
+Opcional; hoje em `pacientes_por_profissional_nomes`, no plano de realocação
+(`plano_realocacao`) e no panorama de enxugamento (`panorama_enxugamento`, em dois níveis).
+As linhas já vêm **contíguas por grupo**, na ordem desejada: o front **não reordena**. Ele junta as linhas consecutivas com os
 mesmos valores nas colunas de `agrupar_por`, monta o título do grupo no formato
 `valor (N unidade)` (os valores dessas colunas e, entre parênteses, a contagem de linhas com
 `unidade_grupo`: `"Opção 1 (3 passos)"`, `"Opção 1 (1 passo)"`) e tira essas colunas da tabela
@@ -429,18 +429,80 @@ Uma linha por (paciente, terapia, profissional) que casa com o nome dito; o mode
 `resumo`: `"Candidatas"` (`inteiro`); tabela de exportação **Candidatas**. Perguntas sem
 candidatas (o que falta: especialidade, duração, dia, horário) não trazem bloco, só o texto.
 
+### Panorama de enxugamento (`relatorio: "panorama_enxugamento"`)
+
+Vem da tool `planejar_enxugamento` (só pelo chat; **não** existe em `POST /relatorios/gerar`,
+que responde `422` para esse valor). Sugere vários cenários de movimentação que liberam turnos
+com presença paga (um turno é um par profissional e dia, de manhã ou à tarde, com pelo menos um
+atendimento), na grade semanal vigente. Usa o mesmo tipo `tabela_generica`, sem tipo novo de
+bloco. `periodo` e `meta` são `null`, `dimensoes` e `metricas` vêm vazias, `total` é `{}`,
+`linhas_omitidas` é `0` e `contem_dados_pacientes` é `true`.
+
+> **Atenção: este bloco contém nomes de pacientes (coluna `paciente`) e é sensível de RH**
+> (nomes de profissionais em `turno_liberado`, `de` e `para`). Os nomes nunca vão para o modelo
+> nem para log: só para o bloco; o texto da resposta traz só contagens e os códigos dos
+> cenários. Deve ficar restrito ao grupo de coordenação, e o time do chatbot precisa revisar como
+> o bloco sai na tela, no Excel e no PDF antes de liberar a exportação dele.
+
+Regras da sugestão (determinística, sem LLM): nenhum cenário abre turno que estava vazio (todo
+destino fica num turno que já acontece); cada paciente mantém a **mesma terapia e a mesma
+duração**, e pode mudar de turno, de profissional da mesma terapia ou, só quando pedido, de dia
+(cada passo diz qual alavanca usou); quem é deslocado só para abrir espaço fica com o mesmo
+profissional; sessão em grupo, atendimento aguardando autorização (nome em preto) e atendimento
+fora da grade não se movem (o turno fica "preso" e entra só como contagem nos avisos); ninguém
+fica em dois lugares ao mesmo tempo nem ganha uma segunda sessão da mesma terapia no dia. Nada é
+alterado na planilha: é só sugestão. Não há valores em dinheiro em lugar nenhum do bloco.
+
+`titulo`: `"Panorama de enxugamento (grade semanal vigente)"`. Exemplo (nomes fictícios, 3
+cenários) em
+[`exemplos-blocos/tabela_generica_panorama_enxugamento.json`](exemplos-blocos/tabela_generica_panorama_enxugamento.json).
+
+| Coluna | Formato | Valores |
+| --- | --- | --- |
+| `cenario` | `texto` | `"Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos"`: número, código opaco, perfil (`equilibrado`, `mais turnos`, `menos mudança`) e turnos liberados. **Nunca traz nome** |
+| `turno_liberado` | `texto` | `"Qua manhã · Profissional · Terapia Alimentar"` |
+| `passo` | `inteiro` | Ordem de execução dentro do cenário, a partir de 1 |
+| `paciente` (rótulo `"Quem"`) | `texto` | Nome do paciente como na planilha (sessão em grupo: `"A / B"`) |
+| `terapia` | `texto` | Rótulo da especialidade |
+| `de` | `texto` | `"Qua 08:00 às 09:00 · Profissional · Sala 7"` (mesmo formato do plano de realocação) |
+| `para` | `texto` | Mesmo formato de `de` |
+| `alavanca` | `texto` | `"L1 · outro turno"`, `"L2 · outro profissional"`, `"L3 · outro profissional e turno"`, `"L4 · outro dia"`, `"L5 · cadeia, outro profissional"` ou `"L5 · abre espaço"` |
+| `observacao` | `texto` | `"mesma terapia e profissional"` ou `"mesma terapia; outro profissional — confirmar"`, mais `"; outra sala"`, `"; posto simultâneo da profissional"` e `"; esta profissional fica sem atendimento na semana"` quando for o caso |
+
+As linhas vêm contíguas por cenário e, dentro dele, por turno liberado, e `dados` traz a dica de
+exibição agrupada em **dois níveis**: `agrupar_por: ["cenario", "turno_liberado"]` e
+`unidade_grupo: {"singular": "passo", "plural": "passos"}` (o mesmo mecanismo de
+`pacientes_por_profissional_nomes`; título do grupo montado pelo front, ex.:
+`"Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos (4 passos)"`). O primeiro cenário é o
+recomendado para o objetivo pedido. `resumo` (`inteiro`, sem nomes): `"Cenários"`, `"Maior
+número de turnos liberados"`, `"Turnos com presença paga na semana"` e `"Turnos presos por
+regra"`. Tabelas de exportação: **Passos** (mesmas colunas e linhas de `dados`) e **Resumo dos
+cenários** (`cenario`, `codigo`, `perfil`, `turnos_liberados`, `turnos_novos` (sempre 0),
+`trocam_profissional`, `trocam_turno`, `trocam_dia` (pacientes), `minutos_medio` (`decimal`),
+`minutos_maximo`, `ocupacao_absorventes` (`percentual`, fração; `null` quando ninguém absorve),
+`sem_presenca` e `sem_cobertura`).
+
+`avisos` sempre traz: que a sugestão considera só os atendimentos da semana lida, que não
+considera a disponibilidade dos pacientes, que vagas livres podem estar reservadas e que cada
+mudança precisa ser confirmada com a família e feita manualmente na planilha. Conforme o
+resultado, só com contagens: quantos turnos ficaram presos e por quê; por cenário, quantos turnos
+de terapia ficariam sem profissional num dia em que hoje têm e quantas profissionais ficariam sem
+atendimento na semana; `"Busca limitada: …"` quando a busca atinge o teto. Sem nenhum cenário, a
+tool não manda bloco (só o texto). A pergunta de profissional ambígua também vem sem bloco.
+
 ## Campos opcionais (versão 1)
 
 | Campo | Onde | Desde | Quando sai |
 | --- | --- | --- | --- |
-| `contem_dados_pacientes` | envelope | 2026-11-10 | Sempre `true`, só nos quatro blocos com nomes de pacientes. |
-| `agrupar_por` | `dados` de `tabela_generica` | 2026-11-10 | Só com exibição agrupada (hoje, `pacientes_por_profissional_nomes` e o plano de `plano_realocacao`). |
+| `contem_dados_pacientes` | envelope | 2026-11-10 | Sempre `true`, só nos blocos com nomes de pacientes. |
+| `agrupar_por` | `dados` de `tabela_generica` | 2026-11-10 | Só com exibição agrupada (hoje, `pacientes_por_profissional_nomes`, o plano de `plano_realocacao` e `panorama_enxugamento`). |
 | `unidade_grupo` | `dados` de `tabela_generica` | 2026-11-10 | Sempre junto com `agrupar_por`. |
 
 ## Histórico de mudanças (versão 1)
 
 | Data | Mudança | Compatibilidade |
 | --- | --- | --- |
+| 2026-11-19 | Novo valor de `relatorio` em `tabela_generica`: `"panorama_enxugamento"` (tool `planejar_enxugamento`, só pelo chat), com `periodo` e `meta` `null`, agrupado em dois níveis (`agrupar_por: ["cenario", "turno_liberado"]`, `unidade_grupo: {"singular": "passo", "plural": "passos"}`) e abas de exportação **Passos** e **Resumo dos cenários**. **O bloco contém nomes de pacientes** (`contem_dados_pacientes: true`) **e é sensível de RH** (nomes de profissionais). Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual (usa só campos opcionais que já existem). Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; deve entrar na restrição ao grupo de coordenação; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |
 | 2026-11-16 | Novo valor de `relatorio` em `tabela_generica`: `"plano_realocacao"` (tool `planejar_realocacao`, só pelo chat), com `periodo` `null`, nos dois formatos: o plano (agrupado por opção, `agrupar_por: ["opcao"]`, `unidade_grupo: {"singular": "passo", "plural": "passos"}`) e a pergunta de nome ambíguo (sem agrupamento). **O bloco contém nomes de pacientes** (`contem_dados_pacientes: true`). Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual (usa só campos opcionais que já existem). Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; deve entrar na restrição ao grupo de coordenação; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |
 | 2026-11-10 | Regra nova: campos opcionais podem entrar na versão 1 com aviso prévio, e o cliente deve ignorar campo que não conhece. Campos opcionais novos: `contem_dados_pacientes` (envelope; `true` em `agenda_paciente`, `pacientes_por_plano` e `pacientes_por_profissional_nomes`) e `agrupar_por` + `unidade_grupo` (`dados` de `tabela_generica`; em `pacientes_por_profissional_nomes`, para a exibição em seções por especialidade e profissional). Ordem das linhas de `pacientes_por_profissional_nomes` pelo rótulo da especialidade. | Adição opcional: `versao` continua `1`. Os campos só saem quando têm valor; os demais blocos não mudaram. O schema continua com `additionalProperties: false` e declara os três campos: **quem valida contra uma cópia antiga do schema precisa atualizá-la** antes de receber os blocos novos. |
 | 2026-11-10 | Novo valor de `relatorio` em `tabela_generica`: `"pacientes_por_profissional_nomes"` (tool `listar_pacientes_por_profissional`, só pelo chat), com `periodo` `null`. **O bloco contém nomes de pacientes.** Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual. Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; deve entrar na restrição ao grupo de coordenação; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |

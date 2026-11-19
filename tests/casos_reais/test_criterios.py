@@ -38,12 +38,14 @@ def _rodar(tipo: str, turno: TurnoObservado, **params: object) -> ResultadoCrite
 
 def test_casos_do_yaml_carregam() -> None:
     casos = carregar_casos()
-    assert [caso.id for caso in casos] == [f"c{n:02d}" for n in range(1, 14)]
+    assert [caso.id for caso in casos] == [f"c{n:02d}" for n in range(1, 16)]
     assert {caso.id: caso.cenario for caso in casos if caso.cenario} == {
         "c09": "poucas_vagas",
         "c11": "planos_por_cor",
         "c12": "nomes_por_profissional",
         "c13": "realocacao",
+        "c14": "enxugamento",
+        "c15": "enxugamento",
     }
     assert {caso.id for caso in casos if caso.xfail} == set()
 
@@ -633,3 +635,88 @@ def test_sem_nomes_ignora_o_rotulo_do_paciente_novo() -> None:
         textos_das_tools=["Paciente Ficticio Bravo 3 vai"], blocos=[_C06_CERTO]
     )
     assert _rodar("sem_nomes_de_paciente", com_nome).ok is False
+
+
+# --- panorama de enxugamento (c14, c15) ---------------------------------------
+#: O bloco do exemplo versionado (semana fictícia `enxugamento`, 3 cenários).
+_EXEMPLO_PANORAMA = (
+    Path(__file__).resolve().parents[2]
+    / "docs"
+    / "exemplos-blocos"
+    / "tabela_generica_panorama_enxugamento.json"
+)
+_CONTEXTO_ENXUGAMENTO = Contexto(
+    payload_da_semana("enxugamento"),
+    Caso("t", "teste", date(2026, 9, 28), (), ()).semana,
+)
+
+
+def _panorama() -> dict[str, Any]:
+    import json
+
+    return cast(dict[str, Any], json.loads(_EXEMPLO_PANORAMA.read_text(encoding="utf-8")))
+
+
+def _rodar_panorama(tipo: str, turnos: list[TurnoObservado], **params: object) -> ResultadoCriterio:
+    return CRITERIOS[tipo](Criterio(tipo, dict(params)), turnos, _CONTEXTO_ENXUGAMENTO)
+
+
+def test_cenarios_validos_pelo_oraculo_aprova_o_exemplo() -> None:
+    turno = TurnoObservado(blocos=[_panorama()])
+    resultado = _rodar_panorama("cenarios_validos_pelo_oraculo", [turno], minimo=3, maximo=5)
+    assert resultado.ok, resultado.detalhe
+    assert not _rodar_panorama("cenarios_validos_pelo_oraculo", [turno], minimo=4).ok
+
+
+def test_cenarios_validos_pelo_oraculo_reprova_destino_ocupado_e_rotulo_errado() -> None:
+    bloco = _panorama()
+    primeira = bloco["dados"]["linhas"][0]
+    # Ter 11:00 está livre na Acácia; Ter 08:00 já é dela (o próprio paciente da manhã).
+    primeira["para"] = primeira["para"].replace("11:00 às 12:00", "07:30 às 08:30")
+    turno = TurnoObservado(blocos=[bloco])
+    assert not _rodar_panorama("cenarios_validos_pelo_oraculo", [turno]).ok
+
+    bloco = _panorama()
+    rotulo = bloco["dados"]["linhas"][0]["cenario"]
+    for linha in bloco["dados"]["linhas"]:
+        if linha["cenario"] == rotulo:
+            linha["cenario"] = rotulo.replace("libera 3 turnos", "libera 4 turnos")
+    resultado = _rodar_panorama("cenarios_validos_pelo_oraculo", [TurnoObservado(blocos=[bloco])])
+    assert not resultado.ok and "o rótulo diz 4" in resultado.detalhe
+
+
+def test_sem_nomes_de_profissional() -> None:
+    limpo = TurnoObservado(blocos=[_panorama()], resposta="Sugiro o cenário E-5EB1.")
+    assert _rodar_panorama("sem_nomes_de_profissional", [limpo]).ok
+    vazou = TurnoObservado(blocos=[_panorama()], resposta="Sugiro tirar a Ficticia Acacia.")
+    resultado = _rodar_panorama("sem_nomes_de_profissional", [vazou])
+    assert not resultado.ok and resultado.detalhe == "1 nome(s) de profissional no texto"
+    assert not _rodar_panorama("sem_nomes_de_profissional", [TurnoObservado()]).ok
+
+
+def test_turnos_liberados_so_de() -> None:
+    turno = TurnoObservado(blocos=[_panorama()])
+    # O exemplo libera turnos de manhã e de tarde, e da Bromélia também.
+    assert not _rodar_panorama(
+        "turnos_liberados_so_de", [turno], profissional="Ficticia Acacia", periodo="tarde"
+    ).ok
+    bloco = _panorama()
+    bloco["dados"]["linhas"] = [
+        linha
+        for linha in bloco["dados"]["linhas"]
+        if linha["turno_liberado"].startswith("Ter tarde · Ficticia Acacia")
+    ]
+    assert _rodar_panorama(
+        "turnos_liberados_so_de",
+        [TurnoObservado(blocos=[bloco])],
+        profissional="Ficticia Acacia",
+        periodo="tarde",
+    ).ok
+
+
+def test_cenarios_diferentes_dos_vistos() -> None:
+    mesmo = [TurnoObservado(blocos=[_panorama()]), TurnoObservado(blocos=[_panorama()])]
+    resultado = _rodar_panorama("cenarios_diferentes_dos_vistos", mesmo, vistos=1, novos=2)
+    assert not resultado.ok and "3 repetido(s)" in resultado.detalhe
+    so_um = [TurnoObservado(blocos=[_panorama()]), TurnoObservado()]
+    assert not _rodar_panorama("cenarios_diferentes_dos_vistos", so_um, vistos=1, novos=2).ok

@@ -29,6 +29,7 @@ from dataclasses import dataclass, field
 
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 
+from app.ai.blocos_enxugamento import nomes_de_profissionais_no_bloco
 from app.ai.blocos_gerais import nomes_de_pacientes_no_bloco
 from app.ai.relatorios import BlocoRelatorio
 from app.domain.constants import (
@@ -68,6 +69,19 @@ VOCABULARIO_PROIBIDO: tuple[str, ...] = (
     "foi movida",
     "foi trocado",
     "foi trocada",
+    # Enxugamento: linguagem neutra ("turno liberado", "presença"); o agente não
+    # conhece valores e só sugere ("sugiro"), nunca diz que liberou ou reduziu.
+    "cortar",
+    "corte de",
+    "demitir",
+    "dispensar",
+    "prejuízo",
+    "custo da profissional",
+    "salário",
+    "R$",
+    "economizei",
+    "liberei",
+    "reduzi",
 )
 
 #: Horários que o prompt dá como fatos da clínica (expediente, pausa, piso padrão).
@@ -89,7 +103,7 @@ _HORARIO_OU_DATA = re.compile(r"\d{1,2}:\d{2}|\d{1,4}[/-]\d{1,2}(?:[/-]\d{2,4})?
 _HORA_FALADA = re.compile(r"(?<!\d)([01]?\d|2[0-3])\s?h(?:\s?([0-5]\d))?(?![a-z])")
 _UNIDADES = (
     r"vagas?|horários?|horarios?|pacientes?|sessões|sessoes|sessão|sessao|"
-    r"profissionais|profissional|faixas?|atendimentos?|horas?"
+    r"profissionais|profissional|faixas?|atendimentos?|horas?|turnos?|cenários?|cenarios?"
 )
 _CONTAGEM = re.compile(rf"(?<![\d,.:/])(\d+)\s+(?:{_UNIDADES})\b", re.IGNORECASE)
 _PERCENTUAL = re.compile(r"(?<![\d,])(\d+(?:,\d+)?)\s?%")
@@ -113,13 +127,19 @@ def _normalizar(texto: str) -> str:
     return " ".join(sem_acento.casefold().split())
 
 
+def _padrao_do_termo(termo: str) -> str:
+    """Palavra inteira (com plural em "s"); termo que termina em símbolo ("R$") não
+    exige fronteira depois dele ("R$100")."""
+    normalizado = _normalizar(termo)
+    fim = r"s?(?!\w)" if normalizado[-1].isalnum() else ""
+    return rf"(?<!\w){re.escape(normalizado)}{fim}"
+
+
 def termos_proibidos(texto: str) -> list[str]:
     """Termos de `VOCABULARIO_PROIBIDO` no texto (palavra inteira, sem acento nem caixa)."""
     normalizado = _normalizar(texto)
     return [
-        termo
-        for termo in VOCABULARIO_PROIBIDO
-        if re.search(rf"(?<!\w){re.escape(_normalizar(termo))}s?(?!\w)", normalizado)
+        termo for termo in VOCABULARIO_PROIBIDO if re.search(_padrao_do_termo(termo), normalizado)
     ]
 
 
@@ -386,6 +406,42 @@ def nomes_de_paciente_na_resposta(
     } | nomes_nos_argumentos(mensagens_do_turno)
     return sum(
         1 for nome in nomes if re.search(rf"(?<!\w){re.escape(nome)}(?!\w)", resposta_normalizada)
+    )
+
+
+def nomes_de_profissional_no_panorama(
+    resposta: str, blocos: Sequence[BlocoRelatorio], profissionais: Iterable[str] = ()
+) -> int:
+    """Quantos nomes de profissional a resposta cita quando a rodada trouxe um
+    panorama de enxugamento (sensível de RH: o texto leva só contagens e códigos).
+
+    Confere os nomes do bloco e os da equipe (`profissionais`), palavra a palavra,
+    sem acento nem caixa. Fora dessa rodada, devolve 0. Só a contagem, para o log.
+    """
+    panoramas = [bloco for bloco in blocos if nomes_de_profissionais_no_bloco(bloco)]
+    if not panoramas:
+        return 0
+    nomes = {
+        _normalizar(nome)
+        for nome in [
+            *profissionais,
+            *(n for b in panoramas for n in nomes_de_profissionais_no_bloco(b)),
+        ]
+        if len(_normalizar(nome)) >= 3
+    }
+    resposta_normalizada = _normalizar(resposta)
+    return sum(
+        1 for nome in nomes if re.search(rf"(?<!\w){re.escape(nome)}(?!\w)", resposta_normalizada)
+    )
+
+
+def registrar_nome_de_profissional(quantidade: int) -> None:
+    CONTADORES.resumos_deterministicos += 1
+    logger.warning(
+        "Fundamentação: a resposta do panorama de enxugamento citou %d nome(s) de "
+        "profissional; resumo determinístico (total: %d).",
+        quantidade,
+        CONTADORES.resumos_deterministicos,
     )
 
 

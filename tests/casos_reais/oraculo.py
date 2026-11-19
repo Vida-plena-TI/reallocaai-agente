@@ -536,3 +536,161 @@ def validar_plano(
         if {s[1] for s in das_depois} != especialidades_antes:
             problemas.append("as terapias de um paciente na semana mudariam")
     return problemas
+
+
+# ------------------------------------------------------------ enxugamento
+
+Turno = Literal["manha", "tarde"]
+
+
+def _turno(hora: time) -> Turno:
+    """Turno pelo horário de início: manhã antes do meio-dia."""
+    return "manha" if hora < time(12) else "tarde"
+
+
+def _profissionais_das_colunas(
+    payload: Mapping[str, Any], dias: Sequence[date]
+) -> tuple[
+    dict[tuple[date, int, time], str], dict[tuple[date, int], str], dict[tuple[date, int], str]
+]:
+    grade: dict[tuple[date, int, time], str] = {}
+    profissionais: dict[tuple[date, int], str] = {}
+    rotulos: dict[tuple[date, int], str] = {}
+    for dia in dias:
+        for celula in _celulas(payload, dia):
+            grade[(dia, celula.sala, celula.hora)] = celula.texto
+            profissionais[(dia, celula.sala)] = celula.profissional
+            rotulos[(dia, celula.sala)] = celula.especialidade
+    return grade, profissionais, rotulos
+
+
+def _turnos_da_grade(
+    grade: Mapping[tuple[date, int, time], str],
+    profissionais: Mapping[tuple[date, int], str],
+    rotulos: Mapping[tuple[date, int], str],
+) -> set[tuple[str, date, Turno]]:
+    return {
+        (_normalizar(profissionais[(dia, sala)]), dia, _turno(inicio))
+        for _, _, dia, sala, inicio, _ in _sessoes(grade, rotulos)
+    }
+
+
+def turnos_pagos(payload: Mapping[str, Any], dias: Sequence[date]) -> set[tuple[str, date, Turno]]:
+    """(profissional normalizado, dia, turno) com pelo menos uma sessão começando nele.
+
+    Duas colunas do mesmo profissional no mesmo dia contam um turno só.
+    """
+    grade, profissionais, rotulos = _profissionais_das_colunas(payload, dias)
+    return _turnos_da_grade(grade, profissionais, rotulos)
+
+
+@dataclass(frozen=True)
+class PassoDoCenario:
+    """Um passo de um cenário de enxugamento, como a tela o mostra."""
+
+    paciente: str
+    de: LugarDoPlano
+    para: LugarDoPlano
+    #: Paciente do colega deslocado para abrir espaço: fica com o mesmo profissional.
+    abre_espaco: bool = False
+
+
+@dataclass(frozen=True)
+class ResultadoCenario:
+    problemas: list[str]
+    turnos_antes: set[tuple[str, date, Turno]]
+    turnos_depois: set[tuple[str, date, Turno]]
+
+    @property
+    def liberados(self) -> int:
+        return len(self.turnos_antes - self.turnos_depois)
+
+    @property
+    def novos(self) -> int:
+        return len(self.turnos_depois - self.turnos_antes)
+
+
+def validar_cenario(
+    payload: Mapping[str, Any], dias: Sequence[date], passos: Sequence[PassoDoCenario]
+) -> ResultadoCenario:
+    """Aplica o cenário à grade crua, na ordem dos passos, e confere do zero.
+
+    Cada passo tira a sessão INTEIRA do paciente da origem e a põe no destino, que
+    precisa existir sob o profissional citado, com o mesmo rótulo de terapia e a
+    mesma duração, e estar vago naquele momento (trocar de profissional da mesma
+    terapia vale, menos para quem só abre espaço). No fim: ninguém em dois lugares
+    ao mesmo tempo, sessões por (paciente, terapia, dia) até max(antes, 1), as
+    terapias de cada paciente na semana iguais e nenhum turno novo.
+    """
+    grade, profissionais, rotulos = _profissionais_das_colunas(payload, dias)
+    antes_turnos = _turnos_da_grade(grade, profissionais, rotulos)
+    antes = _sessoes(grade, rotulos)
+    problemas: list[str] = []
+    envolvidos: set[str] = set()
+    for numero, passo in enumerate(passos, 1):
+        de, para = passo.de, passo.para
+        nomes = _nomes_da_celula_texto(passo.paciente)
+        envolvidos.update(nomes)
+        horas = _meias_horas_entre(de.inicio, de.fim)
+        if not nomes or any(
+            not nomes <= _nomes_da_celula_texto(grade.get((de.dia, de.sala, h), "")) for h in horas
+        ):
+            problemas.append(f"passo {numero}: a origem não traz esse paciente")
+            continue
+        texto = grade[(de.dia, de.sala, horas[0])]
+        antes_da_sessao = (datetime.combine(de.dia, de.inicio) - timedelta(minutes=30)).time()
+        if texto in (
+            grade.get((de.dia, de.sala, antes_da_sessao)),
+            grade.get((de.dia, de.sala, de.fim)),
+        ):
+            problemas.append(f"passo {numero}: a origem não é a sessão inteira")
+        if _normalizar(profissionais.get((de.dia, de.sala), "")) != _normalizar(de.profissional):
+            problemas.append(f"passo {numero}: profissional de origem não confere")
+        if _normalizar(profissionais.get((para.dia, para.sala), "")) != _normalizar(
+            para.profissional
+        ):
+            problemas.append(f"passo {numero}: o destino não é desse profissional")
+            continue
+        if len(horas) != len(_meias_horas_entre(para.inicio, para.fim)):
+            problemas.append(f"passo {numero}: muda a duração")
+        if rotulos.get((de.dia, de.sala)) != rotulos.get((para.dia, para.sala)):
+            problemas.append(f"passo {numero}: muda a especialidade")
+        if passo.abre_espaco and _normalizar(de.profissional) != _normalizar(para.profissional):
+            problemas.append(f"passo {numero}: quem abre espaço mudou de profissional")
+        for h in horas:
+            grade[(de.dia, de.sala, h)] = ""
+        for h in _meias_horas_entre(para.inicio, para.fim):
+            if (para.dia, para.sala, h) not in grade:
+                problemas.append(f"passo {numero}: destino fora da grade ou do expediente")
+            elif grade[(para.dia, para.sala, h)]:
+                problemas.append(f"passo {numero}: destino ocupado nesse momento")
+            grade[(para.dia, para.sala, h)] = texto
+
+    depois = _sessoes(grade, rotulos)
+    for nome in envolvidos:
+        das_antes = [s for s in antes if nome in s[0]]
+        das_depois = [s for s in depois if nome in s[0]]
+
+        def cruzamentos(sessoes: list[tuple[frozenset[str], str, date, int, time, time]]) -> int:
+            return sum(
+                1
+                for i, a in enumerate(sessoes)
+                for b in sessoes[i + 1 :]
+                if a[2] == b[2] and a[4] < b[5] and b[4] < a[5]
+            )
+
+        if cruzamentos(das_depois) > cruzamentos(das_antes):
+            problemas.append("um paciente ficaria em dois lugares ao mesmo tempo")
+        contagem_antes = Counter((s[1], s[2]) for s in das_antes)
+        for chave, quantidade in Counter((s[1], s[2]) for s in das_depois).items():
+            if quantidade > max(contagem_antes[chave], 1):
+                problemas.append("um paciente ficaria com duas sessões da mesma terapia no dia")
+        if {s[1] for s in das_depois} != {s[1] for s in das_antes}:
+            problemas.append("as terapias de um paciente na semana mudariam")
+        duracoes = sorted((s[1], len(_meias_horas_entre(s[4], s[5]))) for s in das_antes)
+        if duracoes != sorted((s[1], len(_meias_horas_entre(s[4], s[5]))) for s in das_depois):
+            problemas.append("a duração das sessões de um paciente mudaria")
+    depois_turnos = _turnos_da_grade(grade, profissionais, rotulos)
+    if depois_turnos - antes_turnos:
+        problemas.append("o cenário abre turno que estava vazio")
+    return ResultadoCenario(problemas, antes_turnos, depois_turnos)

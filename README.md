@@ -330,6 +330,32 @@ para log, e a resposta que repetir um nome (do bloco ou do pedido) vira o resumo
 Só pelo chat (`POST /relatorios/gerar` devolve `422`). Nada é alterado na planilha. Contrato em
 [`docs/contrato-blocos-novos.md`](docs/contrato-blocos-novos.md).
 
+### Panorama de enxugamento (tool `planejar_enxugamento`)
+
+Responde "que movimentações eu posso fazer para enxugar a agenda?" ou "e se a X ficar só de
+tarde?": sugere de 3 a 5 cenários que liberam turnos com presença paga (um turno é manhã ou
+tarde de um profissional num dia com pelo menos um atendimento; o turno do atendimento é o do
+horário de início). O motor (`app/engine/enxugamento.py`) é determinístico e trabalha sobre uma
+leitura da semana: nenhum cenário abre turno vazio; cada paciente mantém a terapia e a duração e
+pode mudar de turno (L1), de profissional da mesma terapia (L2, L3), de dia só quando pedido
+(L4), ou ir para o colega com até 2 pacientes dele abrindo espaço (L5, cadeia com a busca da
+realocação); grupo, nome em preto e atendimento fora da grade não se movem. Os cenários saem por
+perfil (menos mudança, mais turnos, equilibrado), cada um com um código opaco (`E-3F2A`) que o
+modelo devolve em `cenarios_ja_vistos` quando pedem mais opções. Todo cenário passa pela
+validação independente da grade final (`app/engine/grade_simulada.py`, a mesma da realocação) e
+por uma recontagem dos turnos pagos. As regras ficam em `app/domain/constants.py`
+(`TURNO_CORTE`, `MAX_PACIENTES_TURNO_CANDIDATO`, `PERMITIR_TROCAR_DIA_ENXUGAMENTO`,
+`MAX_DESLOCADOS_CADEIA`, `MAX_AVALIACOES_ENXUGAMENTO`, pesos das alavancas…).
+
+O bloco é `tabela_generica` com `relatorio: "panorama_enxugamento"`, `periodo: null`, agrupado
+por cenário e turno liberado, e `contem_dados_pacientes: true`. **Sensível de RH:** os nomes de
+pacientes e de profissionais vão só no bloco; o texto que o modelo lê e a resposta só têm
+contagens e códigos, os nomes passados à tool nunca vão para log, e a resposta que citar um nome
+vira o resumo determinístico. O agente não conhece valores (nunca fala em dinheiro), usa
+linguagem neutra ("turno liberado") e só sugere. Só pelo chat (`POST /relatorios/gerar` devolve
+`422`). Nada é alterado na planilha. Contrato em
+[`docs/contrato-blocos-novos.md`](docs/contrato-blocos-novos.md).
+
 ### Relatórios gerais (tools `gerar_relatorio` e `consultar_catalogo`)
 
 Em vez de uma tool fixa por relatório (e uma chamada por dia), o agente responde qualquer
@@ -541,6 +567,10 @@ depois — nenhum destes pontos é um problema em aberto de "esqueceram de fazer
   dois pacientes por opção e só olha a semana lida; não considera a disponibilidade dos
   pacientes nem terapias quinzenais fora da semana. `sugerir_realocacao` continua movendo um
   único atendimento pelo id.
+- **O panorama de enxugamento conta só a semana lida e não conhece valores.** Não considera a
+  disponibilidade dos pacientes, terapias quinzenais fora da semana nem vagas reservadas; o
+  guloso com melhoria local não garante o ótimo (há teto de busca, com aviso). Trocar de
+  profissional ainda não pesa a continuidade terapêutica (contrato trivial hoje).
 - **A fonte de dados atual (Google Sheets) é temporária.** A migração para o Agendador via API
   Gateway ainda depende da documentação dessa API estar disponível.
 - **O modelo de IA de produção ainda não foi decidido.** Enquanto isso, o projeto testa via

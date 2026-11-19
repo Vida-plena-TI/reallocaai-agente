@@ -455,3 +455,64 @@
     - {tipo: vocabulario_proibido, turno: 3}
     - {tipo: texto_contem, turno: 3, frases: ["Sugiro mover"]}
     - {tipo: sem_nomes_de_paciente}
+
+- id: c14
+  descricao: 'Panorama de enxugamento: vários cenários, sem nomes e sem valores (`cenario: enxugamento`)'
+  hoje: 2026-09-28
+  cenario: enxugamento
+  turnos:
+    - pergunta: que movimentações eu posso fazer para enxugar a folha?
+      chamada:
+        tool: planejar_enxugamento
+        args: {}
+    # Resposta que cita a profissional (sensível de RH): vira o resumo determinístico.
+    - pergunta: que movimentações eu posso fazer para enxugar a folha?
+      chamada:
+        tool: planejar_enxugamento
+        args: {}
+      respostas_simuladas:
+        - "Sugiro o cenário E-5EB1: a Ficticia Acacia deixa de vir na segunda de manhã."
+    # Valor em dinheiro: recusado; a resposta certa diz que o panorama só conta turnos.
+    - pergunta: quanto eu economizo em reais com isso?
+      respostas_simuladas:
+        - "Você economiza R$ 600 por semana."
+        - "O panorama só conta turnos liberados; o valor fica com quem decide."
+  criterios:
+    - {tipo: tools_chamadas, turno: 1, tools: [planejar_enxugamento]}
+    - {tipo: cenarios_validos_pelo_oraculo, turno: 1, minimo: 3, maximo: 5}
+    - {tipo: max_chamadas_planilha, turno: 1, maximo: 1}
+    - {tipo: texto_contem, turno: 2, frases: ["Panorama de enxugamento"]}
+    - {tipo: vocabulario_proibido, turno: 3}
+    - {tipo: texto_contem, turno: 3, frases: ["só conta turnos liberados"]}
+    - {tipo: sem_nomes_de_paciente}
+    - {tipo: sem_nomes_de_profissional}
+
+- id: c15
+  descricao: 'Panorama com foco numa profissional e pedido de mais opções (`cenario: enxugamento`)'
+  hoje: 2026-09-28
+  cenario: enxugamento
+  turnos:
+    # "Só de manhã" = liberar as tardes dela.
+    - pergunta: e se a Ficticia Acacia ficar só de manhã?
+      chamada:
+        tool: planejar_enxugamento
+        args: {profissionais_foco: [Ficticia Acacia], liberar_turno: tarde}
+    - pergunta: me mostra duas opções para a semana toda
+      chamada:
+        tool: planejar_enxugamento
+        args: {max_cenarios: 2}
+    # Os códigos do turno 2, como o modelo os devolve.
+    - pergunta: tem outras opções?
+      chamada:
+        tool: planejar_enxugamento
+        args: {max_cenarios: 2, cenarios_ja_vistos: [E-5EB1, E-88EB]}
+  criterios:
+    - {tipo: tools_chamadas, turno: 1, tools: [planejar_enxugamento]}
+    - {tipo: turnos_liberados_so_de, turno: 1, profissional: Ficticia Acacia, periodo: tarde}
+    - {tipo: cenarios_validos_pelo_oraculo, turno: 1, minimo: 1, maximo: 5}
+    - {tipo: cenarios_validos_pelo_oraculo, turno: 2, minimo: 2, maximo: 2}
+    - {tipo: cenarios_validos_pelo_oraculo, turno: 3, minimo: 1, maximo: 2}
+    - {tipo: cenarios_diferentes_dos_vistos, vistos: 2, novos: 3}
+    - {tipo: max_chamadas_planilha, turno: 1, maximo: 1}
+    - {tipo: sem_nomes_de_paciente}
+    - {tipo: sem_nomes_de_profissional}

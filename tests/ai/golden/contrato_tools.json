@@ -886,6 +886,172 @@
   "descricao": "Relatório gerencial de pacientes por plano de saúde (SulAmérica, Klini, Particulares, Care Plus, Unimed), lido pela cor do texto do nome na grade semanal vigente: quantos pacientes e atendimentos na semana cada plano tem, com a lista de nomes na tela.\n\nUse para 'quantos pacientes de cada plano/convênio', 'pacientes da SulAmérica', 'lista de pacientes por plano'. Você recebe só as contagens: NUNCA escreva nomes de pacientes na resposta. Cobre só quem tem sessão na grade desta semana (sem datas). Sessões por convênio e autorizações pendentes -> gerar_relatorio (convenios).",
   "formato_resposta": "content_and_artifact"
  },
+ "planejar_enxugamento": {
+  "argumentos": {
+   "$defs": {
+    "DiaDaSemana": {
+     "enum": [
+      "segunda",
+      "terca",
+      "quarta",
+      "quinta",
+      "sexta",
+      "sabado"
+     ],
+     "title": "DiaDaSemana",
+     "type": "string"
+    },
+    "Especialidade": {
+     "enum": [
+      "terapia_ocupacional",
+      "fonoaudiologia",
+      "psicologia"
+     ],
+     "title": "Especialidade",
+     "type": "string"
+    }
+   },
+   "description": "Sugere um panorama de movimentações que liberam turnos de presença (manhã ou\ntarde) na grade semanal, com vários cenários na tela.\n\nUse quando perguntarem que movimentações dá para fazer para enxugar a agenda,\nreduzir turnos ou concentrar atendimentos, ou \"e se a X ficar só de tarde?\".\nUm turno só fica liberado se todos os pacientes dele forem para turnos que já\nacontecem; ninguém muda de terapia nem de duração. Para mais opções, chame de\nnovo com cenarios_ja_vistos. Você recebe só contagens e códigos: NUNCA escreva\nnomes de pacientes nem de profissionais, nunca fale em valores, salário ou\ndinheiro (só turnos liberados) e nunca diga que moveu, liberou ou economizou:\napenas sugira. Grade semanal: não cite datas.",
+   "properties": {
+    "cenarios_ja_vistos": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Códigos dos cenários já mostrados nesta conversa (ex.: 'E-3F2A'), quando pedirem mais opções.",
+     "title": "Cenarios Ja Vistos"
+    },
+    "dias_semana": {
+     "anyOf": [
+      {
+       "items": {
+        "$ref": "#/$defs/DiaDaSemana"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Só estes dias da semana. Em branco: a semana toda.",
+     "title": "Dias Semana"
+    },
+    "especialidade": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/Especialidade"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Só esta especialidade, quando a pergunta citar uma. Em branco: todas."
+    },
+    "liberar_turno": {
+     "anyOf": [
+      {
+       "enum": [
+        "manha",
+        "tarde"
+       ],
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Com profissionais_foco: o turno que se quer liberar delas (\"ficar só de tarde\" = liberar a manhã). Ignora o limite de pacientes por turno.",
+     "title": "Liberar Turno"
+    },
+    "max_cenarios": {
+     "default": 5,
+     "description": "Quantos cenários mostrar (padrão 5).",
+     "maximum": 5,
+     "minimum": 1,
+     "title": "Max Cenarios",
+     "type": "integer"
+    },
+    "max_pacientes_por_turno": {
+     "default": 4,
+     "description": "Turnos com até este número de pacientes são avaliados (padrão 4).",
+     "maximum": 8,
+     "minimum": 1,
+     "title": "Max Pacientes Por Turno",
+     "type": "integer"
+    },
+    "objetivo": {
+     "default": "equilibrado",
+     "description": "Qual cenário vem primeiro: 'menos_mudanca' (poucas mudanças), 'mais_turnos' (o máximo de turnos liberados) ou 'equilibrado' (padrão).",
+     "enum": [
+      "menos_mudanca",
+      "mais_turnos",
+      "equilibrado"
+     ],
+     "title": "Objetivo",
+     "type": "string"
+    },
+    "permitir_trocar_dia": {
+     "default": false,
+     "description": "Só true quando pedirem para considerar mudar pacientes de dia.",
+     "title": "Permitir Trocar Dia",
+     "type": "boolean"
+    },
+    "permitir_zerar_semana": {
+     "default": true,
+     "description": "False quando pedirem que nenhuma profissional fique sem atendimento na semana.",
+     "title": "Permitir Zerar Semana",
+     "type": "boolean"
+    },
+    "profissionais_foco": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Profissionais em foco, com o nome como foi dito (\"e se a X ficar só de tarde?\"). Só os turnos delas entram como candidatos.",
+     "title": "Profissionais Foco"
+    },
+    "profissionais_preservados": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Profissionais que não devem ter turno liberado nem pacientes mudados, com o nome como foi dito (\"sem mexer na Y\").",
+     "title": "Profissionais Preservados"
+    }
+   },
+   "title": "planejar_enxugamento",
+   "type": "object"
+  },
+  "descricao": "Sugere um panorama de movimentações que liberam turnos de presença (manhã ou\ntarde) na grade semanal, com vários cenários na tela.\n\nUse quando perguntarem que movimentações dá para fazer para enxugar a agenda,\nreduzir turnos ou concentrar atendimentos, ou \"e se a X ficar só de tarde?\".\nUm turno só fica liberado se todos os pacientes dele forem para turnos que já\nacontecem; ninguém muda de terapia nem de duração. Para mais opções, chame de\nnovo com cenarios_ja_vistos. Você recebe só contagens e códigos: NUNCA escreva\nnomes de pacientes nem de profissionais, nunca fale em valores, salário ou\ndinheiro (só turnos liberados) e nunca diga que moveu, liberou ou economizou:\napenas sugira. Grade semanal: não cite datas.",
+  "formato_resposta": "content_and_artifact"
+ },
  "planejar_realocacao": {
   "argumentos": {
    "$defs": {

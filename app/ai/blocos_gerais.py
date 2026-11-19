@@ -21,6 +21,7 @@ from app.ai.relatorios import (
     DIAS_DA_SEMANA,
     RELATORIO_PACIENTES_POR_PLANO,
     RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES,
+    RELATORIO_PANORAMA_ENXUGAMENTO,
     RELATORIO_PLANO_REALOCACAO,
     RELATORIOS_COM_NOMES_DE_PACIENTES,
     AguardandoProfissionalDia,
@@ -1461,7 +1462,7 @@ def nomes_de_pacientes_no_bloco(bloco: BlocoRelatorio) -> list[str]:
     ):
         return []
     nomes = [str(linha["paciente"]) for linha in dados.linhas if linha.get("paciente")]
-    if dados.relatorio == RELATORIO_PLANO_REALOCACAO:
+    if dados.relatorio in (RELATORIO_PLANO_REALOCACAO, RELATORIO_PANORAMA_ENXUGAMENTO):
         # Sessão em grupo deslocada: os nomes vêm juntos ("A / B"). O rótulo do
         # paciente novo sem nome não é nome de paciente.
         nomes = [

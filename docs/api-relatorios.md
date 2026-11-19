@@ -106,10 +106,11 @@ Relatórios prontos:
 Os parâmetros que não se aplicam a um relatório pronto (por exemplo, `metricas` em `convenios`)
 são ignorados, e uma observação vai no `texto`.
 
-`pacientes_por_plano` e `pacientes_por_profissional_nomes` **não** são valores aceitos aqui
-(devolvem `422`): esses relatórios existem só pelo chat. Ver
-[Só pelo chat: pacientes por plano](#só-pelo-chat-pacientes-por-plano) e
-[Só pelo chat: nomes de pacientes por profissional](#só-pelo-chat-nomes-de-pacientes-por-profissional).
+`pacientes_por_plano`, `pacientes_por_profissional_nomes` e `panorama_enxugamento` **não** são
+valores aceitos aqui (devolvem `422`): esses relatórios existem só pelo chat. Ver
+[Só pelo chat: pacientes por plano](#só-pelo-chat-pacientes-por-plano),
+[Só pelo chat: nomes de pacientes por profissional](#só-pelo-chat-nomes-de-pacientes-por-profissional)
+e [Só pelo chat: panorama de enxugamento](#só-pelo-chat-panorama-de-enxugamento).
 
 Resposta `200`:
 
@@ -226,3 +227,27 @@ nem em rota própria). Ela sai só pela tool `listar_pacientes_por_profissional`
   [`contrato-blocos-novos.md`](contrato-blocos-novos.md#campos-opcionais-versão-1)).
 - O relatório de contagem (`pacientes_por_profissional`, tool
   `consultar_pacientes_por_profissional`) continua igual e só traz quantidades.
+
+## Só pelo chat: panorama de enxugamento
+
+O panorama de enxugamento **não é exposto nesta API** (nem em `POST /relatorios/gerar`, que
+devolve `422` para `relatorio: "panorama_enxugamento"`, nem em rota própria). Ele sai só pela
+tool `planejar_enxugamento` do agente (`POST /agenda/chat`), como um bloco `tabela_generica` com
+`relatorio: "panorama_enxugamento"` e `periodo: null` (formato em
+[`contrato-blocos-novos.md`](contrato-blocos-novos.md#panorama-de-enxugamento-relatorio-panorama_enxugamento)).
+
+- **O bloco contém nomes de pacientes e é sensível de RH** (nomes de profissionais nos turnos
+  liberados e nos passos). O texto que o modelo lê e o texto da resposta só têm contagens e os
+  códigos dos cenários (sem nome de paciente nem de profissional); os nomes vão só no bloco. Deve
+  entrar na restrição ao grupo de coordenação (pela igualdade em `dados.relatorio`), e a exibição
+  e a exportação (Excel e PDF) desse bloco precisam de revisão do time do chatbot antes de serem
+  liberadas.
+- Escopo: sugestões sobre a **grade semanal vigente**. Um turno (manhã ou tarde) só aparece como
+  liberado se todos os pacientes dele forem para turnos que já acontecem; nenhum cenário abre
+  turno vazio, ninguém muda de terapia nem de duração. O RealocAI não conhece valores: o
+  panorama conta só turnos liberados, nunca dinheiro.
+- Exibição em seções em dois níveis: `agrupar_por: ["cenario", "turno_liberado"]` e
+  `unidade_grupo: {"singular": "passo", "plural": "passos"}`, com as linhas já contíguas por
+  grupo; o front monta o título de cada grupo no padrão `valor (N unidade)`. As tabelas de
+  exportação continuam planas: **Passos** e **Resumo dos cenários**.
+- O bloco traz `contem_dados_pacientes: true` (campo opcional da versão 1).

@@ -167,6 +167,103 @@ CENARIOS: dict[str, dict[str, dict[str, str]]] = {
             "Sala 2": "KKLLMMNNOO PPQQRRSSSS",
         },
     },
+    # Panorama de enxugamento (c14, c15 e `tests/engine/test_enxugamento.py`). As
+    # profissionais (fictícias) de cada sala estão em `PROFISSIONAIS_DOS_CENARIOS`;
+    # todos os pacientes, em `PECAS_DOS_CENARIOS`, fazem só terapia alimentar ("Nutri" na planilha)
+    # (menos A do `enxugamento_cadeia`). Manhã leve e o que libera cada turno:
+    # - segunda: Acácia com 2 pacientes (A, B) e Bromélia com vagas nos mesmos
+    #   horários -> L2 (e o contrário: C, D vão para as vagas da Acácia);
+    # - terça: só a Acácia, 1 paciente de manhã (E) e 1 à tarde (F) -> L1;
+    # - quarta: Acácia só de manhã (G), Bromélia só à tarde (H) -> L3;
+    # - quinta: Acácia só de manhã (I); a Bromélia está escalada à tarde, mas sem
+    #   ninguém: levar I para lá abriria turno novo, então sem solução (com
+    #   `permitir_trocar_dia`, L4 para outro dia da Acácia);
+    # - sexta: só a Acácia, 1 paciente de manhã (J): sem solução no mesmo dia.
+    "enxugamento": {
+        "Segunda": {
+            "Sala 7": "..AA..BB.. ##########",
+            "Sala 8": "CC..DD.... ##########",
+        },
+        "Terça": {
+            "Sala 7": ".EE....... FF........",
+        },
+        "Quarta": {
+            "Sala 7": "..GG...... ##########",
+            "Sala 8": "########## HH........",
+        },
+        "Quinta": {
+            "Sala 7": "..II...... ##########",
+            "Sala 8": "########## ..........",
+        },
+        "Sexta": {
+            "Sala 7": "JJ........ ##########",
+        },
+    },
+    # Três profissionais da mesma terapia, só na segunda de manhã (liberar
+    # qualquer turno deixa alguém sem atendimento na semana). A Camélia atende
+    # em dois postos ao mesmo tempo (Sala 6 e Sala 9) e está ocupada na Sala 6
+    # das 8:00 às 12:00; a Bromélia está lotada. Acácia e Bromélia só liberam
+    # indo para o posto simultâneo da Camélia (Sala 9); a Camélia não libera: L
+    # (4 h) não cabe em lugar nenhum.
+    "enxugamento_tres": {
+        "Segunda": {
+            "Sala 6": "KKLLLLLLLL ##########",
+            "Sala 9": "MM........ ##########",
+            "Sala 7": "..NN..OO.. ##########",
+            "Sala 8": "QQQQPPRRRR ##########",
+        },
+    },
+    # Turno que só libera com cadeia: A faz terapia alimentar com a Acácia das
+    # 10:00 às 11:00 e psicologia com a Carol das 9:00 às 10:00. A única vaga da
+    # Bromélia é das 9:00 às 10:00: A só vai para ela se B (10:00) for para a vaga
+    # e A ficar no lugar de B.
+    "enxugamento_cadeia": {
+        "Segunda": {
+            "Sala 7": "......AA.. ##########",
+            "Sala 8": "CCDD..BBEE ##########",
+            "Sala 3": "....AA.... ##########",
+        },
+    },
+    # Turnos que não podem ser liberados: sessão em grupo (segunda), nome em preto
+    # (terça) e paciente fixo (quarta, F; os testes o passam nas regras). A
+    # Bromélia tem 1 paciente por manhã e a Acácia tem vagas: esses saem.
+    "enxugamento_presos": {
+        "Segunda": {
+            "Sala 7": "..GG...... ##########",
+            "Sala 8": "CC........ ##########",
+        },
+        "Terça": {
+            "Sala 7": "..PP...... ##########",
+            "Sala 8": "QQ........ ##########",
+        },
+        "Quarta": {
+            "Sala 7": "..FF...... ##########",
+            "Sala 8": "RR........ ##########",
+        },
+    },
+}
+
+#: Profissional de cada sala que muda (ou só existe) num cenário; as demais
+#: salas seguem `PROFISSIONAIS`. Nomes fictícios.
+PROFISSIONAIS_DOS_CENARIOS: dict[str, dict[str, str]] = {
+    "enxugamento": {
+        "Sala 7": "Ficticia Acacia (Nutri)",
+        "Sala 8": "Ficticia Bromelia (Nutri)",
+    },
+    "enxugamento_tres": {
+        "Sala 6": "Ficticia Camelia (Nutri)",
+        "Sala 9": "Ficticia Camelia (Nutri)",
+        "Sala 7": "Ficticia Acacia (Nutri)",
+        "Sala 8": "Ficticia Bromelia (Nutri)",
+    },
+    "enxugamento_cadeia": {
+        "Sala 7": "Ficticia Acacia (Nutri)",
+        "Sala 8": "Ficticia Bromelia (Nutri)",
+    },
+    "enxugamento_presos": {
+        "Sala 7": "Ficticia Acacia (Nutri)",
+        "Sala 8": "Ficticia Bromelia (Nutri)",
+    },
 }
 
 #: Cores de texto usadas nos cenários (as da planilha real).
@@ -237,6 +334,44 @@ PECAS_DOS_CENARIOS: dict[str, dict[str, tuple[tuple[str, str], ...]]] = {
         "R": (("Paciente Ficticio Rubi Alva", AZUL),),
         "S": (("Paciente Ficticio Rubi Estrela", AZUL),),
     },
+    "enxugamento": {
+        "A": (("Paciente Ficticio Aroeira", AZUL),),
+        "B": (("Paciente Ficticio Baoba", AZUL),),
+        "C": (("Paciente Ficticio Cedro", AZUL),),
+        "D": (("Paciente Ficticio Dendezeiro", AZUL),),
+        "E": (("Paciente Ficticio Embauba", AZUL),),
+        "F": (("Paciente Ficticio Figueira", AZUL),),
+        "G": (("Paciente Ficticio Goiabeira", AZUL),),
+        "H": (("Paciente Ficticio Hortela", AZUL),),
+        "I": (("Paciente Ficticio Inga", AZUL),),
+        "J": (("Paciente Ficticio Jatoba", AZUL),),
+    },
+    "enxugamento_tres": {
+        "K": (("Paciente Ficticio Kiwi", AZUL),),
+        "L": (("Paciente Ficticio Louro", AZUL),),
+        "M": (("Paciente Ficticio Mangueira", AZUL),),
+        "N": (("Paciente Ficticio Nogueira", AZUL),),
+        "O": (("Paciente Ficticio Oliveira", AZUL),),
+        "P": (("Paciente Ficticio Pitangueira", AZUL),),
+        "Q": (("Paciente Ficticio Quaresmeira", AZUL),),
+        "R": (("Paciente Ficticio Romanzeira", AZUL),),
+    },
+    "enxugamento_cadeia": {
+        "A": (("Paciente Ficticio Aroeira", AZUL),),
+        "B": (("Paciente Ficticio Baoba", AZUL),),
+        "C": (("Paciente Ficticio Cedro", AZUL),),
+        "D": (("Paciente Ficticio Dendezeiro", AZUL),),
+        "E": (("Paciente Ficticio Embauba", AZUL),),
+    },
+    # G: sessão em grupo; P: nome em preto (aguardando autorização); F: paciente fixo.
+    "enxugamento_presos": {
+        "C": (("Paciente Ficticio Cedro", AZUL),),
+        "G": (("Paciente Ficticio Ipe / Paciente Ficticio Jacaranda", AZUL),),
+        "P": (("Paciente Ficticio Pitangueira", PRETO),),
+        "Q": (("Paciente Ficticio Quaresmeira", AZUL),),
+        "F": (("Paciente Ficticio Figueira", AZUL),),
+        "R": (("Paciente Ficticio Romanzeira", AZUL),),
+    },
 }
 
 #: Letra -> parte fictícia do nome do paciente.
@@ -271,10 +406,12 @@ def valores_da_aba(
     dia: str,
     semana: dict[str, dict[str, str]] = AGENDA,
     pecas: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
+    profissionais: Mapping[str, str] = PROFISSIONAIS,
 ) -> list[list[str]]:
     """Texto das células da aba `dia` ("Segunda", ..., "Sábado"), linha a linha.
 
-    Com `pecas`, o texto de cada letra é o dos seus pedaços.
+    Com `pecas`, o texto de cada letra é o dos seus pedaços; `profissionais` dá o
+    profissional de cada sala.
     """
 
     def texto(marca: str, sala: str) -> str:
@@ -287,7 +424,7 @@ def valores_da_aba(
     linhas: list[list[str]] = []
     for metade, horas in enumerate((HORAS_DA_MANHA, HORAS_DA_TARDE)):
         linhas.append(["", *salas])
-        linhas.append(["", *(PROFISSIONAIS[sala] for sala in salas)])
+        linhas.append(["", *(profissionais[sala] for sala in salas)])
         for posicao, hora in enumerate(horas):
             linhas.append(
                 [hora, *(texto(agenda[sala].split()[metade][posicao], sala) for sala in salas)]
@@ -357,11 +494,27 @@ def payload_da_semana(cenario: str | None = None) -> dict[str, Any]:
     """O que `fetch_sheet_metadata` devolveria para a planilha fictícia inteira
     (a semana padrão, ou a de um dos `CENARIOS`)."""
     semana = AGENDA if cenario is None else CENARIOS[cenario]
-    pecas = PECAS_DOS_CENARIOS.get(cenario or "")
+    return payload_de(
+        semana,
+        {**PROFISSIONAIS, **PROFISSIONAIS_DOS_CENARIOS.get(cenario or "", {})},
+        PECAS_DOS_CENARIOS.get(cenario or ""),
+    )
+
+
+def payload_de(
+    semana: dict[str, dict[str, str]],
+    profissionais: Mapping[str, str],
+    pecas: Mapping[str, tuple[tuple[str, str], ...]] | None = None,
+) -> dict[str, Any]:
+    """O payload de uma semana desenhada no formato de `AGENDA` (com o profissional
+    de cada sala), para os testes que montam a semana na hora (escala)."""
     return {
         "sheets": [
             _payload_da_aba(
-                dia, valores_da_aba(dia, semana, pecas), pecas, _marcas_da_aba(dia, semana)
+                dia,
+                valores_da_aba(dia, semana, pecas, profissionais),
+                pecas,
+                _marcas_da_aba(dia, semana),
             )
             for dia in semana
         ]
