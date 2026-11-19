@@ -248,3 +248,84 @@ MOVER_ATENDIMENTO_FORA_DA_GRADE: Final[bool] = False
 #: Piso de horário para o destino de quem é deslocado (ou o horário de origem
 #: dele, se for mais cedo).
 HORARIO_MINIMO_DESLOCADO: Final[time] = HORARIO_PREFERENCIAL_PADRAO
+
+# ------------------------------------------------------------ enxugamento
+# Regras do panorama de enxugamento (`app.engine.enxugamento`): sugestões de
+# movimentação para reduzir turnos com presença paga. Padrões conservadores:
+# nunca abre turno vazio e, na dúvida, o paciente fica onde está. Valem também
+# `PACIENTES_FIXOS`, `PROFISSIONAIS_FIXOS`, `MOVER_SESSAO_EM_GRUPO`,
+# `MOVER_AGUARDANDO_AUTORIZACAO`, `MOVER_ATENDIMENTO_FORA_DA_GRADE` e
+# `HORARIO_MINIMO_DESLOCADO`.
+
+#: Corte entre os turnos: atendimento que COMEÇA antes dele é da manhã; a partir
+#: dele, da tarde. Mesmo horário da pausa geral, para não divergir do resto da
+#: agenda (`periodo_do_horario`).
+TURNO_CORTE: Final[time] = INICIO_PAUSA
+
+#: Turno com até este número de pacientes distintos (grupo conta todos) é
+#: candidato a ser liberado.
+MAX_PACIENTES_TURNO_CANDIDATO: Final[int] = 4
+
+#: Teto do parâmetro `max_pacientes_por_turno` que o modelo pode pedir.
+TETO_PACIENTES_TURNO_CANDIDATO: Final[int] = 8
+
+#: Máximo de cenários devolvidos num panorama.
+MAX_CENARIOS_ENXUGAMENTO: Final[int] = 5
+
+#: Se um paciente pode ir para outro dia com o mesmo profissional (alavanca L4).
+PERMITIR_TROCAR_DIA_ENXUGAMENTO: Final[bool] = False
+
+#: Se um cenário pode deixar um profissional sem nenhum atendimento na semana
+#: (o bloco sempre avisa quando isso acontece).
+PERMITIR_ZERAR_SEMANA_ENXUGAMENTO: Final[bool] = True
+
+#: Máximo de pacientes do colega deslocados para abrir espaço (alavanca L5).
+MAX_DESLOCADOS_CADEIA: Final[int] = 2
+
+#: Teto global de avaliações (destinos, combinações e cadeias) por panorama; ao
+#: atingi-lo, a busca para e o bloco avisa "busca limitada".
+MAX_AVALIACOES_ENXUGAMENTO: Final[int] = 400_000
+
+#: Melhores destinos guardados por atendimento na busca de um plano.
+MAX_DESTINOS_POR_PACIENTE: Final[int] = 8
+
+#: Planos guardados por turno candidato: o mais barato e o melhor sem trocar de
+#: profissional.
+MAX_PLANOS_POR_CANDIDATO: Final[int] = 2
+
+#: Rodadas de melhoria local (tirar um turno aceito e tentar encaixar dois
+#: recusados) por cenário.
+MAX_ITERACOES_MELHORIA: Final[int] = 6
+
+#: Peso de um turno liberado no perfil "equilibrado", na mesma unidade do custo
+#: dos passos (minutos equivalentes): o turno só entra se o custo for menor.
+PESO_TURNO_EQUILIBRADO: Final[int] = 600
+
+#: Custo fixo de cada passo por alavanca (minutos equivalentes), somado à
+#: diferença de horário. L1: mesmo profissional, outro turno; L2: colega da
+#: mesma terapia, mesmo turno; L3: colega, outro turno; L4: mesmo profissional,
+#: outro dia; L5: cadeia (deslocar pacientes do colega para abrir espaço).
+PESOS_ALAVANCA_ENXUGAMENTO: Final[dict[str, int]] = {
+    "L1": 60,
+    "L2": 120,
+    "L3": 180,
+    "L4": 480,
+    "L5": 300,
+}
+
+#: Se um paciente pode ir para um posto simultâneo do profissional (o
+#: profissional já atende outra pessoa no mesmo horário, noutro posto escalado).
+#: Ligado, o posto livre "puro" vem antes no ranking.
+ENXUGAMENTO_USAR_POSTOS_EXTRAS: Final[bool] = True
+
+#: Custo somado a um passo que usa posto simultâneo (minutos equivalentes).
+PESO_POSTO_EXTRA_ENXUGAMENTO: Final[int] = 90
+
+#: Máximo de minutos de diferença de horário num passo que fica no mesmo turno.
+#: `None`: sem limite.
+MAX_MINUTOS_DESLOCAMENTO_MESMO_TURNO: Final[int | None] = None
+
+# ENXUGAMENTO_TROCA_PROFISSIONAL_COM_CONTINUIDADE (não implementada): quando a
+# continuidade terapêutica deixar de ser um contrato trivial
+# (`app/data_sources/continuidade.py`), trocar de profissional (L2, L3, L5)
+# deve pesar, ou ser proibido, para pacientes com vínculo terapêutico.
