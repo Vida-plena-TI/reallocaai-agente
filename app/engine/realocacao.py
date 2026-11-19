@@ -22,7 +22,9 @@ cada deslocado com especialidade, profissional e duração de origem; (d) a
 contagem de (paciente, especialidade, dia) nunca aumenta além do que já era
 (e só passa de 1 onde já passava); (e) o conjunto de especialidades de cada
 paciente na semana não muda (A novo ganha só a pedida). Opção que falha é
-descartada e contada no log: é rede de segurança, falhar ali é bug.
+descartada e contada no log: é rede de segurança, falhar ali é bug. Os
+índices, a simulação e essa validação moram em `app.engine.grade_simulada`
+(compartilhados com `app.engine.enxugamento`).
 
 Privacidade: os ids de paciente são nomes normalizados e os nomes exibidos
 ficam só no resultado, para o bloco da tela. O log leva só contagens e tempo.
@@ -30,8 +32,8 @@ ficam só no resultado, para o bloco da tela. O log leva só contagens e tempo.
 
 import logging
 import time as relogio
-from collections import Counter, defaultdict
-from collections.abc import Iterable, Iterator, Sequence
+from collections import defaultdict
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import date, time
 from enum import StrEnum
@@ -39,12 +41,7 @@ from typing import Final
 
 from app.domain import Especialidade
 from app.domain.constants import (
-    DURACAO_SLOT_MINUTOS,
-    FIM_PAUSA,
-    HORARIO_ABERTURA,
-    HORARIO_FECHAMENTO,
     HORARIO_MINIMO_DESLOCADO,
-    INICIO_PAUSA,
     MANTER_TURNO_DO_DESLOCADO,
     MAX_CADEIAS_AVALIADAS,
     MAX_DESLOCADOS,
@@ -60,69 +57,32 @@ from app.domain.constants import (
     REALOCACAO_PODE_MUDAR_DE_DIA,
 )
 from app.domain.nomes_profissionais import casar_nome
-from app.engine.fotografia import FotografiaPeriodo, SlotFotografado
+from app.engine.fotografia import FotografiaPeriodo
+from app.engine.grade_simulada import (
+    PASSO,
+    AtendimentoExtra,
+    AtendimentoGrade,
+    ModeloSemana,
+    Movimento,
+    Simulacao,
+    validar_grade_final,
+)
+
+# Reexportado: `Lugar` faz parte do resultado público deste módulo.
+from app.engine.grade_simulada import Lugar as Lugar
+from app.engine.grade_simulada import minutos as _minutos
 
 logger = logging.getLogger(__name__)
 
 #: Rótulo do paciente novo sem nome nas linhas do plano (não é nome de paciente).
 ROTULO_PACIENTE_NOVO: Final[str] = "Paciente novo"
 
-_PASSO: Final[int] = DURACAO_SLOT_MINUTOS
-
-
-def _minutos(hora: time) -> int:
-    return hora.hour * 60 + hora.minute
-
-
-def _hora(minutos: int) -> time:
-    return time(minutos // 60, minutos % 60)
-
-
-#: (profissional, sala, posto, dia, minuto de início do bloco de 30 min).
-Chave = tuple[str, str, int, date, int]
+_PASSO: Final[int] = PASSO
 
 
 class Situacao(StrEnum):
     NOVO = "novo"
     JA_NA_GRADE = "ja_na_grade"
-
-
-@dataclass(frozen=True, slots=True, order=True)
-class Lugar:
-    """N blocos seguidos num posto de um profissional, num dia."""
-
-    data: date
-    inicio: int
-    sala_id: str
-    indice_posto: int
-    profissional_id: str
-    blocos: int
-
-    @property
-    def fim(self) -> int:
-        return self.inicio + self.blocos * _PASSO
-
-    @property
-    def hora_inicio(self) -> time:
-        return _hora(self.inicio)
-
-    @property
-    def hora_fim(self) -> time:
-        return _hora(self.fim)
-
-    @property
-    def manha(self) -> bool:
-        return self.inicio < _minutos(INICIO_PAUSA)
-
-    def chaves(self) -> tuple[Chave, ...]:
-        return tuple(
-            (self.profissional_id, self.sala_id, self.indice_posto, self.data, minuto)
-            for minuto in range(self.inicio, self.fim, _PASSO)
-        )
-
-    def cruza(self, outro: Lugar) -> bool:
-        """Mesmo dia e horários que se sobrepõem (em qualquer posto)."""
-        return self.data == outro.data and self.inicio < outro.fim and outro.inicio < self.fim
 
 
 @dataclass(frozen=True)
@@ -282,143 +242,9 @@ class SemSolucao:
 ResultadoRealocacao = Pergunta | PlanoRealocacao | SemSolucao
 
 
-# ------------------------------------------------------------------ modelo
-
-
-@dataclass(frozen=True, slots=True)
-class _Atendimento:
-    k: int
-    pacientes: tuple[str, ...]
-    especialidade: Especialidade
-    lugar: Lugar
-    #: Chaves de fato ocupadas (iguais a `lugar.chaves()` quando é consistente).
-    chaves: tuple[Chave, ...]
-    aguardando: bool
-    #: Todo bloco numa entrada da grade, num só posto, sem buraco.
-    na_grade: bool
-
-    @property
-    def grupo(self) -> bool:
-        return len(self.pacientes) > 1
-
-
-class _Modelo:
-    """Índices da semana, montados uma vez a partir da fotografia."""
-
-    def __init__(self, foto: FotografiaPeriodo) -> None:
-        self.foto = foto
-        self.oferta: set[Chave] = set()
-        self.oferta_do_dia: dict[tuple[str, date], set[Chave]] = defaultdict(set)
-        self.postos_do_profissional: dict[tuple[str, date, int], int] = Counter()
-        especialidade_por_profissional: dict[str, Especialidade] = {}
-        slots_por_atendimento: dict[tuple[date, str], list[SlotFotografado]] = defaultdict(list)
-        for slot in foto.slots:
-            if slot.profissional_id is not None and slot.na_grade:
-                chave = (
-                    slot.profissional_id,
-                    slot.sala_id,
-                    slot.indice_posto,
-                    slot.data,
-                    _minutos(slot.hora_inicio),
-                )
-                self.oferta.add(chave)
-                self.oferta_do_dia[(slot.profissional_id, slot.data)].add(chave)
-                self.postos_do_profissional[(slot.profissional_id, slot.data, chave[4])] += 1
-                if slot.especialidade is not None:
-                    especialidade_por_profissional.setdefault(
-                        slot.profissional_id, slot.especialidade
-                    )
-            for atendimento_id in slot.atendimento_ids:
-                slots_por_atendimento[(slot.data, atendimento_id)].append(slot)
-        self.especialidade_por_profissional = especialidade_por_profissional
-
-        self.atendimentos: list[_Atendimento] = []
-        for atendimento in foto.atendimentos:
-            dia = atendimento.slots[0].data
-            slots = sorted(
-                slots_por_atendimento.get((dia, atendimento.id), []), key=lambda s: s.hora_inicio
-            )
-            if not slots:
-                continue
-            chaves = tuple(
-                (
-                    atendimento.profissional_id,
-                    s.sala_id,
-                    s.indice_posto,
-                    s.data,
-                    _minutos(s.hora_inicio),
-                )
-                for s in slots
-            )
-            primeiro = chaves[0]
-            lugar = Lugar(
-                data=dia,
-                inicio=primeiro[4],
-                sala_id=primeiro[1],
-                indice_posto=primeiro[2],
-                profissional_id=atendimento.profissional_id,
-                blocos=len(chaves),
-            )
-            consistente = chaves == lugar.chaves() and all(s.na_grade for s in slots)
-            self.atendimentos.append(
-                _Atendimento(
-                    k=len(self.atendimentos),
-                    pacientes=tuple(dict.fromkeys(atendimento.paciente_ids)),
-                    especialidade=slots[0].especialidade or atendimento.especialidade,
-                    lugar=lugar,
-                    chaves=chaves,
-                    aguardando=atendimento.aguardando_autorizacao,
-                    na_grade=consistente,
-                )
-            )
-
-        self.ocupacao: dict[Chave, list[int]] = defaultdict(list)
-        self.do_paciente: dict[str, list[int]] = defaultdict(list)
-        self.contagem: Counter[tuple[str, Especialidade, date]] = Counter()
-        for at in self.atendimentos:
-            for chave in at.chaves:
-                self.ocupacao[chave].append(at.k)
-            for paciente in at.pacientes:
-                self.do_paciente[paciente].append(at.k)
-                self.contagem[(paciente, at.especialidade, at.lugar.data)] += 1
-        self._lugares: dict[tuple[str, int], list[Lugar]] = {}
-
-    def nome_do_paciente(self, paciente_id: str) -> str:
-        paciente = self.foto.pacientes.get(paciente_id)
-        return paciente.nome if paciente is not None else paciente_id
-
-    def profissionais_da(self, especialidade: Especialidade) -> list[str]:
-        return sorted(
-            p for p, e in self.especialidade_por_profissional.items() if e is especialidade
-        )
-
-    def lugares(self, profissional_id: str, blocos: int) -> list[Lugar]:
-        """Todo lugar de `blocos` blocos seguidos na grade escalada do profissional."""
-        chave = (profissional_id, blocos)
-        if chave not in self._lugares:
-            por_posto: dict[tuple[date, str, int], list[int]] = defaultdict(list)
-            for prof, sala, posto, dia, minuto in self.oferta:
-                if prof == profissional_id:
-                    por_posto[(dia, sala, posto)].append(minuto)
-            lugares: list[Lugar] = []
-            for (dia, sala, posto), minutos in por_posto.items():
-                ofertados = set(minutos)
-                for inicio in sorted(ofertados):
-                    if all(inicio + i * _PASSO in ofertados for i in range(blocos)):
-                        lugares.append(Lugar(dia, inicio, sala, posto, profissional_id, blocos))
-            lugares.sort()
-            self._lugares[chave] = lugares
-        return self._lugares[chave]
-
-
-# ---------------------------------------------------------- grade simulada
-
-
-@dataclass(frozen=True, slots=True)
-class _Movimento:
-    #: `None` = o atendimento pedido (A).
-    k: int | None
-    para: Lugar
+_Atendimento = AtendimentoGrade
+_Modelo = ModeloSemana
+_Movimento = Movimento
 
 
 @dataclass(frozen=True)
@@ -431,80 +257,6 @@ class _A:
     blocos: int
     profissionais: tuple[str, ...]
     origem: _Atendimento | None
-
-
-class _Simulacao:
-    """A grade original menos `removidos`, mais os `movimentos` (sem copiar índices)."""
-
-    def __init__(self, modelo: _Modelo, a: _A) -> None:
-        self.modelo = modelo
-        self.a = a
-
-    def _pacientes(self, movimento: _Movimento) -> tuple[str, ...]:
-        if movimento.k is None:
-            return (self.a.paciente_id,) if self.a.paciente_id else ()
-        return self.modelo.atendimentos[movimento.k].pacientes
-
-    def ocupantes(
-        self, lugar: Lugar, removidos: frozenset[int], movimentos: Sequence[_Movimento]
-    ) -> set[int] | None:
-        """Originais que ocupam o lugar; `None` se um movimento já está nele."""
-        chaves = set(lugar.chaves())
-        for movimento in movimentos:
-            if chaves.intersection(movimento.para.chaves()):
-                return None
-        return {
-            k for chave in chaves for k in self.modelo.ocupacao.get(chave, ()) if k not in removidos
-        }
-
-    def paciente_livre(
-        self,
-        pacientes: Iterable[str],
-        lugar: Lugar,
-        removidos: frozenset[int],
-        movimentos: Sequence[_Movimento],
-    ) -> bool:
-        """Nenhum dos pacientes já está noutro lugar no mesmo horário."""
-        for paciente in pacientes:
-            for k in self.modelo.do_paciente.get(paciente, ()):
-                if k not in removidos and self.modelo.atendimentos[k].lugar.cruza(lugar):
-                    return False
-            for movimento in movimentos:
-                if paciente in self._pacientes(movimento) and movimento.para.cruza(lugar):
-                    return False
-        return True
-
-    def contagem_ok(
-        self,
-        pacientes: Iterable[str],
-        especialidade: Especialidade,
-        dia: date,
-        removidos: frozenset[int],
-        movimentos: Sequence[_Movimento],
-    ) -> bool:
-        """(d): a contagem de (paciente, especialidade, dia) não passa de max(antes, 1)."""
-        for paciente in pacientes:
-            antes = self.modelo.contagem[(paciente, especialidade, dia)]
-            depois = antes + 1
-            for k in removidos:
-                at = self.modelo.atendimentos[k]
-                if paciente in at.pacientes and at.especialidade is especialidade:
-                    depois -= at.lugar.data == dia
-            for movimento in movimentos:
-                if (
-                    paciente in self._pacientes(movimento)
-                    and self._especialidade(movimento) is especialidade
-                    and movimento.para.data == dia
-                ):
-                    depois += 1
-            if depois > max(antes, 1):
-                return False
-        return True
-
-    def _especialidade(self, movimento: _Movimento) -> Especialidade:
-        if movimento.k is None:
-            return self.a.especialidade
-        return self.modelo.atendimentos[movimento.k].especialidade
 
 
 # ------------------------------------------------------------------ busca
@@ -531,12 +283,22 @@ class _TetoAtingidoError(Exception):
 
 
 class _Busca:
-    def __init__(self, modelo: _Modelo, a: _A, pedido: PedidoRealocacao, regras: Regras) -> None:
+    def __init__(
+        self,
+        modelo: _Modelo,
+        a: _A,
+        pedido: PedidoRealocacao,
+        regras: Regras,
+        vetar_destino: Callable[[Lugar], bool] | None = None,
+    ) -> None:
+        """`vetar_destino`: lugares que nenhum movimento pode usar (o enxugamento veta
+        os turnos sendo liberados e os que abririam turno novo). `None`: nenhum."""
         self.modelo = modelo
         self.a = a
         self.pedido = pedido
         self.regras = regras
-        self.sim = _Simulacao(modelo, a)
+        self.vetar_destino = vetar_destino
+        self.sim = Simulacao(modelo, a.paciente_id, a.especialidade)
         self.base: frozenset[int] = frozenset({a.origem.k}) if a.origem else frozenset()
         self.cadeias = 0
         self.folhas: list[_Folha] = []
@@ -575,6 +337,8 @@ class _Busca:
                     maximo is not None and lugar.fim > maximo
                 ):
                     continue
+                if self.vetar_destino is not None and self.vetar_destino(lugar):
+                    continue
                 destinos.append(lugar)
         referencia = desejado if desejado is not None else minimo
         destinos.sort(
@@ -612,6 +376,7 @@ class _Busca:
             if lugar != at.lugar
             and lugar.inicio >= piso
             and (regras.pode_mudar_de_dia or lugar.data == at.lugar.data)
+            and (self.vetar_destino is None or not self.vetar_destino(lugar))
         ]
         destinos.sort(key=lambda lugar: (self._custo(at, lugar), lugar))
         self._destinos_cache[at.k] = destinos
@@ -788,102 +553,22 @@ class _Validador:
         self.regras = regras
 
     def valida(self, movimentos: Sequence[_Movimento]) -> bool:
-        modelo, a = self.modelo, self.a
+        a = self.a
         movidos = {m.k: m.para for m in movimentos if m.k is not None}
         destino_a = next(m.para for m in movimentos if m.k is None)
-        removidos = set(movidos) | ({a.origem.k} if a.origem else set())
-
-        # Lugar final de cada atendimento: (pacientes, especialidade, lugar, chaves).
-        finais: list[tuple[tuple[str, ...], Especialidade, Lugar, tuple[Chave, ...]]] = []
-        for at in modelo.atendimentos:
-            if at.k in movidos:
-                lugar = movidos[at.k]
-                finais.append((at.pacientes, at.especialidade, lugar, lugar.chaves()))
-            elif at.k not in removidos:
-                finais.append((at.pacientes, at.especialidade, at.lugar, at.chaves))
-        pacientes_a = (a.paciente_id,) if a.paciente_id else ()
-        finais.append((pacientes_a, a.especialidade, destino_a, destino_a.chaves()))
-
-        tocadas = {c for lugar in [destino_a, *movidos.values()] for c in lugar.chaves()}
-        ocupacao: Counter[Chave] = Counter(c for *_, chaves in finais for c in chaves)
-        # (a) um atendimento por posto e horário, e (c) só na grade escalada.
-        if any(ocupacao[c] != 1 or c not in modelo.oferta for c in tocadas):
-            return False
-        por_profissional: Counter[tuple[str, date, int]] = Counter(
-            (c[0], c[3], c[4]) for *_, chaves in finais for c in chaves
-        )
-        for prof, dia, minuto, *_ in ((c[0], c[3], c[4]) for c in tocadas):
-            if (
-                por_profissional[(prof, dia, minuto)]
-                > modelo.postos_do_profissional[(prof, dia, minuto)]
-            ):
-                return False
-        # (c) expediente e pausa.
-        for c in tocadas:
-            minuto = c[4]
-            if minuto < _minutos(HORARIO_ABERTURA) or minuto + _PASSO > _minutos(
-                HORARIO_FECHAMENTO
-            ):
-                return False
-            if minuto < _minutos(FIM_PAUSA) and minuto + _PASSO > _minutos(INICIO_PAUSA):
-                return False
-        # (c) cada deslocado mantém especialidade, profissional e duração.
-        for k, lugar in movidos.items():
-            at = modelo.atendimentos[k]
-            if lugar.blocos != at.lugar.blocos or lugar == at.lugar:
-                return False
-            if (
-                lugar.profissional_id != at.lugar.profissional_id
-                and not self.regras.permitir_outro_profissional
-            ):
-                return False
-            if modelo.especialidade_por_profissional.get(lugar.profissional_id) not in (
-                None,
-                at.especialidade,
-            ):
-                return False
         if a.origem and destino_a.blocos != a.origem.lugar.blocos:
             return False
-
-        envolvidos = set(pacientes_a)
-        for k in movidos:
-            envolvidos.update(modelo.atendimentos[k].pacientes)
-        lugares_finais: dict[str, list[tuple[Especialidade, Lugar]]] = defaultdict(list)
-        for pacientes, especialidade, lugar, _ in finais:
-            for paciente in pacientes:
-                if paciente in envolvidos:
-                    lugares_finais[paciente].append((especialidade, lugar))
-        for paciente in envolvidos:
-            finais_do_paciente = lugares_finais[paciente]
-            # (b) nenhum paciente em dois lugares ao mesmo tempo (o que já era assim fica).
-            antes_cruzados = self._cruzamentos(
-                [(at.especialidade, at.lugar) for at in self._originais(paciente)]
-            )
-            if self._cruzamentos(finais_do_paciente) > antes_cruzados:
-                return False
-            # (d) contagem por (especialidade, dia) não passa de max(antes, 1).
-            depois = Counter((e, lugar.data) for e, lugar in finais_do_paciente)
-            for (especialidade, dia), quantidade in depois.items():
-                if quantidade > max(modelo.contagem[(paciente, especialidade, dia)], 1):
-                    return False
-            # (e) as especialidades da semana não mudam (A novo ganha só a pedida).
-            antes = {at.especialidade for at in self._originais(paciente)}
-            if paciente == a.paciente_id and a.origem is None:
-                antes = antes | {a.especialidade}
-            if {e for e, _ in finais_do_paciente} != antes:
-                return False
-        return True
-
-    def _originais(self, paciente: str) -> list[_Atendimento]:
-        return [self.modelo.atendimentos[k] for k in self.modelo.do_paciente.get(paciente, ())]
-
-    @staticmethod
-    def _cruzamentos(lugares: Sequence[tuple[Especialidade, Lugar]]) -> int:
-        return sum(
-            1
-            for i, (_, primeiro) in enumerate(lugares)
-            for _, segundo in lugares[i + 1 :]
-            if primeiro.cruza(segundo)
+        return validar_grade_final(
+            self.modelo,
+            movidos,
+            permitir_outro_profissional=self.regras.permitir_outro_profissional,
+            removidos=(a.origem.k,) if a.origem else (),
+            extra=AtendimentoExtra(
+                pacientes=(a.paciente_id,) if a.paciente_id else (),
+                especialidade=a.especialidade,
+                lugar=destino_a,
+                novo=a.origem is None,
+            ),
         )
 
 
