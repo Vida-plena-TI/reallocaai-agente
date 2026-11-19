@@ -841,6 +841,7 @@ _RELATORIOS_COM_NOMES = (
     "pacientes_por_plano",
     "pacientes_por_profissional_nomes",
     "plano_realocacao",
+    "panorama_enxugamento",
 )
 #: Rótulo do pedido de paciente novo sem nome no plano de realocação (não é nome).
 _PACIENTE_NOVO = "Paciente novo"
@@ -1065,6 +1066,153 @@ def _plano_valido_pelo_oraculo(
     return _resultado(c, not invalidas, detalhe or f"{len(opcoes)} opção(ões) válida(s)")
 
 
+# --- panorama de enxugamento (c14, c15) ---------------------------------------
+
+_PANORAMA = "panorama_enxugamento"
+_ROTULO_CENARIO = re.compile(
+    r"^Cenário \d+ \((?P<codigo>E-[0-9A-F]{4})\) · .+ · libera (?P<n>\d+) turnos?$"
+)
+_TURNO_LIBERADO = re.compile(r"^(?P<dia>\S+) (?P<turno>manhã|tarde) · (?P<profissional>.+) · .+$")
+
+
+def _blocos_do_panorama(turnos: Sequence[TurnoObservado]) -> list[dict[str, Any]]:
+    return [
+        bloco for bloco in _blocos_com_nomes(turnos) if bloco["dados"]["relatorio"] == _PANORAMA
+    ]
+
+
+def _cenarios_do_panorama(
+    turnos: Sequence[TurnoObservado],
+) -> dict[str, list[dict[str, Any]]]:
+    """Rótulo do cenário -> linhas (na ordem do bloco)."""
+    cenarios: dict[str, list[dict[str, Any]]] = {}
+    for bloco in _blocos_do_panorama(turnos):
+        for linha in bloco["dados"]["linhas"]:
+            cenarios.setdefault(str(linha["cenario"]), []).append(linha)
+    return cenarios
+
+
+@_sobre_a_saida
+def _cenarios_validos_pelo_oraculo(
+    c: Criterio, turnos: Sequence[TurnoObservado], ctx: Contexto
+) -> ResultadoCriterio:
+    """De `minimo` a `maximo` cenários; cada um, aplicado à grade crua pelo oráculo na
+    ordem dos passos, é válido, não abre turno e libera os turnos que o rótulo diz."""
+    cenarios = _cenarios_do_panorama(turnos)
+    if not cenarios:
+        return _resultado(c, False, "sem panorama de enxugamento")
+    problemas: list[str] = []
+    dias = list(ctx.semana.values())
+    for rotulo, linhas in cenarios.items():
+        achado = _ROTULO_CENARIO.match(rotulo)
+        if achado is None:
+            problemas.append("rótulo de cenário fora do formato")
+            continue
+        passos = []
+        for linha in linhas:
+            de = _lugar_do_plano(str(linha["de"]), ctx.semana)
+            para = _lugar_do_plano(str(linha["para"]), ctx.semana)
+            if de is None or para is None:
+                problemas.append(f"{achado['codigo']}: lugar fora do formato")
+                break
+            passos.append(
+                oraculo.PassoDoCenario(
+                    str(linha["paciente"]),
+                    de,
+                    para,
+                    abre_espaco=str(linha["alavanca"]) == "L5 · abre espaço",
+                )
+            )
+        else:
+            resultado = oraculo.validar_cenario(ctx.payload, dias, passos)
+            problemas.extend(f"{achado['codigo']}: {p}" for p in resultado.problemas)
+            if resultado.liberados != int(achado["n"]):
+                problemas.append(
+                    f"{achado['codigo']}: libera {resultado.liberados}, o rótulo diz {achado['n']}"
+                )
+    quantidade = len(cenarios)
+    if not c.params.get("minimo", 1) <= quantidade <= c.params.get("maximo", 5):
+        problemas.append(f"{quantidade} cenário(s)")
+    return _resultado(
+        c, not problemas, "; ".join(problemas) or f"{quantidade} cenário(s) válido(s)"
+    )
+
+
+@_sobre_a_saida
+def _sem_nomes_de_profissional(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    """Panorama de enxugamento (sensível de RH): nenhum nome de profissional do bloco no
+    texto das tools (o que o modelo lê), na resposta nem no rótulo dos cenários."""
+    blocos = _blocos_do_panorama(turnos)
+    if not blocos:
+        return _resultado(c, False, "sem panorama de enxugamento")
+    nomes = {
+        _normalizar(partes[1])
+        for bloco in blocos
+        for linha in bloco["dados"]["linhas"]
+        for chave in ("turno_liberado", "de", "para")
+        if len(partes := str(linha[chave]).split(" · ")) >= 2
+    }
+    textos = _normalizar(
+        " ".join(
+            [
+                *(t for turno in turnos for t in turno.textos_das_tools),
+                *(turno.resposta or "" for turno in turnos),
+                *(str(linha["cenario"]) for b in blocos for linha in b["dados"]["linhas"]),
+            ]
+        )
+    )
+    citados = sum(1 for nome in nomes if re.search(rf"(?<!\w){re.escape(nome)}(?!\w)", textos))
+    return _resultado(c, citados == 0, f"{citados} nome(s) de profissional no texto")
+
+
+@_sobre_a_saida
+def _turnos_liberados_so_de(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    """Todo turno liberado é da `profissional` (como na planilha), no `periodo` pedido
+    ("manhã" ou "tarde"; `turno` é o índice do turno da conversa)."""
+    cenarios = _cenarios_do_panorama(turnos)
+    if not cenarios:
+        return _resultado(c, False, "sem panorama de enxugamento")
+    fora = {
+        str(linha["turno_liberado"])
+        for linhas in cenarios.values()
+        for linha in linhas
+        if not (achado := _TURNO_LIBERADO.match(str(linha["turno_liberado"])))
+        or _normalizar(achado["profissional"]) != _normalizar(c.params["profissional"])
+        or achado["turno"] != c.params["periodo"]
+    }
+    return _resultado(c, not fora, f"{len(fora)} turno(s) fora do foco")
+
+
+@_sobre_a_saida
+def _cenarios_diferentes_dos_vistos(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    """Os cenários do turno `novos` têm códigos e conjuntos de turnos liberados diferentes
+    dos do turno `vistos`."""
+
+    def cenarios(indice: int) -> dict[str, frozenset[str]]:
+        por_rotulo = _cenarios_do_panorama([turnos[indice - 1]])
+        return {
+            achado["codigo"]: frozenset(str(linha["turno_liberado"]) for linha in linhas)
+            for rotulo, linhas in por_rotulo.items()
+            if (achado := _ROTULO_CENARIO.match(rotulo))
+        }
+
+    vistos, novos = cenarios(c.params["vistos"]), cenarios(c.params["novos"])
+    if not vistos or not novos:
+        return _resultado(c, False, f"{len(vistos)} visto(s), {len(novos)} novo(s)")
+    repetidos = {
+        codigo
+        for codigo, conjunto in novos.items()
+        if codigo in vistos or conjunto in vistos.values()
+    }
+    return _resultado(c, not repetidos, f"{len(novos)} novo(s); {len(repetidos)} repetido(s)")
+
+
 CRITERIOS: dict[
     str, Callable[[Criterio, Sequence[TurnoObservado], Contexto], ResultadoCriterio]
 ] = {
@@ -1095,6 +1243,10 @@ CRITERIOS: dict[
     "pacientes_por_plano_igual_ao_oraculo": _pacientes_por_plano_igual_ao_oraculo,
     "sem_nomes_de_paciente": _sem_nomes_de_paciente,
     "pacientes_por_profissional_igual_ao_oraculo": _pacientes_por_profissional_igual_ao_oraculo,
+    "cenarios_validos_pelo_oraculo": _cenarios_validos_pelo_oraculo,
+    "sem_nomes_de_profissional": _sem_nomes_de_profissional,
+    "turnos_liberados_so_de": _turnos_liberados_so_de,
+    "cenarios_diferentes_dos_vistos": _cenarios_diferentes_dos_vistos,
 }
 
 

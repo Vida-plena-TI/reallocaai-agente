@@ -226,9 +226,10 @@ def avisos_do_panorama(foto: FotografiaPeriodo, panorama: PanoramaEnxugamento) -
     for numero, cenario in enumerate(panorama.cenarios, 1):
         sem_cobertura = len(cenario.resumo.sem_cobertura)
         if sem_cobertura:
+            turnos = _n(sem_cobertura, "turno de terapia ficaria", "turnos de terapia ficariam")
             avisos.append(
-                f"Cenário {numero}: {_n(sem_cobertura, 'turno', 'turnos')} de terapia "
-                "ficaria sem nenhum profissional atendendo, num dia em que hoje tem."
+                f"Cenário {numero}: {turnos} sem nenhum profissional atendendo, num dia em que "
+                "hoje tem."
             )
         sem_presenca = len(cenario.resumo.profissionais_sem_presenca)
         if sem_presenca:

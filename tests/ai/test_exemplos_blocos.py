@@ -65,6 +65,7 @@ def test_so_os_relatorios_da_grade_semanal_tem_periodo_nulo() -> None:
             "tabela_generica_pacientes_por_profissional_nomes.json",
             "tabela_generica_plano_realocacao.json",
             "tabela_generica_plano_realocacao_pergunta.json",
+            "tabela_generica_panorama_enxugamento.json",
         ):
             assert bloco["periodo"] is None
         else:
@@ -144,5 +145,41 @@ def test_exemplos_do_plano_de_realocacao_plano_e_pergunta() -> None:
     assert [t["nome"] for t in plano["tabelas"]] == ["Passos", "Resumo por opção"]
     assert [t["nome"] for t in pergunta["tabelas"]] == ["Candidatas"]
     for tabela in (*plano["tabelas"], *pergunta["tabelas"]):
+        assert len(tabela["nome"]) <= 31
+        assert not set(tabela["nome"]) & set("\\/?*[]:")
+
+
+def test_exemplo_do_panorama_de_enxugamento() -> None:
+    """Agrupado em dois níveis (cenário e turno liberado), com nomes só fictícios;
+    o rótulo do cenário (título do grupo) só tem contagens e o código."""
+    import json
+    import re
+
+    bloco = json.loads(gerar_exemplos()["tabela_generica_panorama_enxugamento.json"])
+    dados = bloco["dados"]
+    assert dados["relatorio"] == "panorama_enxugamento"
+    assert bloco["contem_dados_pacientes"] is True
+    assert bloco["meta"] is None
+    assert dados["agrupar_por"] == ["cenario", "turno_liberado"]
+    assert dados["unidade_grupo"] == {"singular": "passo", "plural": "passos"}
+    assert [c["rotulo"] for c in dados["colunas"]] == [
+        "Cenário", "Turno liberado", "Passo", "Quem", "Terapia", "De", "Para", "Alavanca",
+        "Observação",
+    ]  # fmt: skip
+    nomes = {linha["paciente"] for linha in dados["linhas"]}
+    assert nomes and all(nome.startswith("Paciente Ficticio ") for nome in nomes)
+    for linha in dados["linhas"]:
+        assert re.fullmatch(
+            r"Cenário \d \(E-[0-9A-F]{4}\) · .+ · libera \d turnos?", linha["cenario"]
+        )
+        assert "Ficticia" not in linha["cenario"]
+        assert " · Ficticia " in linha["turno_liberado"]
+    assert {linha["cenario"].split(" · ")[1] for linha in dados["linhas"]} == {
+        "equilibrado",
+        "mais turnos",
+        "menos mudança",
+    }
+    assert [t["nome"] for t in bloco["tabelas"]] == ["Passos", "Resumo dos cenários"]
+    for tabela in bloco["tabelas"]:
         assert len(tabela["nome"]) <= 31
         assert not set(tabela["nome"]) & set("\\/?*[]:")

@@ -25,6 +25,7 @@ COM_NOMES = {
     "tabela_generica_pacientes_por_profissional_nomes.json",
     "tabela_generica_plano_realocacao.json",
     "tabela_generica_plano_realocacao_pergunta.json",
+    "tabela_generica_panorama_enxugamento.json",
 }
 CAMPOS_NOVOS_NO_ENVELOPE = {"contem_dados_pacientes"}
 CAMPOS_NOVOS_EM_DADOS = {"agrupar_por", "unidade_grupo"}
@@ -184,6 +185,7 @@ def test_agrupamento_so_nos_relatorios_agrupados() -> None:
     assert com_agrupamento == {
         "tabela_generica_pacientes_por_profissional_nomes.json",
         "tabela_generica_plano_realocacao.json",
+        "tabela_generica_panorama_enxugamento.json",
     }
 
 

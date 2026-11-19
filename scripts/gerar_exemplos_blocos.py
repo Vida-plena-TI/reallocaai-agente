@@ -103,6 +103,10 @@ VARIANTES_REALOCACAO: dict[str, dict[str, Any]] = {
         "horario_minimo": "08:00",
     },
 }
+#: `planejar_enxugamento` sobre o cenário `enxugamento`: 3 cenários, agrupados por
+#: cenário e turno liberado.
+ARQUIVO_PANORAMA_ENXUGAMENTO = "tabela_generica_panorama_enxugamento.json"
+ARGS_PANORAMA_ENXUGAMENTO: dict[str, Any] = {"max_cenarios": 3}
 ARQUIVO_SCHEMA = "bloco_relatorio.schema.json"
 
 
@@ -161,6 +165,14 @@ def gerar_exemplos() -> dict[str, str]:
         (arquivo, realocacao, "planejar_realocacao", args)
         for arquivo, args in VARIANTES_REALOCACAO.items()
     ]
+    chamadas.append(
+        (
+            ARQUIVO_PANORAMA_ENXUGAMENTO,
+            _tools_do_cenario("enxugamento"),
+            "planejar_enxugamento",
+            ARGS_PANORAMA_ENXUGAMENTO,
+        )
+    )
     arquivos: dict[str, str] = {}
     for arquivo, disponiveis, nome, args in chamadas:
         mensagem = disponiveis[nome].invoke(
