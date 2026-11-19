@@ -155,7 +155,12 @@ CHAMADAS_COM_APELIDO: dict[str, dict[str, Any]] = {
         "duracao_minutos": 30,
         "horario_minimo": "10:00",
     },
+    "planejar_enxugamento": {"profissionais_foco": ["beatriz"], "liberar_turno": "tarde"},
 }
+
+#: Tools cujo `content` nunca traz nome de profissional (sensibilidade de RH): o
+#: nome resolvido aparece só no bloco da tela.
+SEM_NOME_NO_TEXTO = frozenset({"planejar_enxugamento"})
 
 
 def test_toda_tool_com_profissional_esta_coberta() -> None:
@@ -169,6 +174,15 @@ def test_tool_resolve_o_apelido(nome: str) -> None:
         {"type": "tool_call", "name": nome, "id": "t", "args": CHAMADAS_COM_APELIDO[nome]}
     )
     texto = str(resposta.content)
+    if nome in SEM_NOME_NO_TEXTO:
+        assert "Bia" not in texto
+        texto = json.dumps(resposta.artifact, ensure_ascii=False)
     assert "Bia" in texto
-    for falha in ("não existe", "não encontrad", "Nenhuma profissional", "Não há profissional"):
+    for falha in (
+        "não existe",
+        "não encontrad",
+        "Nenhuma profissional",
+        "Não há profissional",
+        "não está na grade",
+    ):
         assert falha not in texto

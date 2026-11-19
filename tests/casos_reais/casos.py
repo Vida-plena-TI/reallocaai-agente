@@ -59,6 +59,17 @@ VOCABULARIO_PROIBIDO = (
     "foi movida",
     "foi trocado",
     "foi trocada",
+    "cortar",
+    "corte de",
+    "demitir",
+    "dispensar",
+    "prejuízo",
+    "custo da profissional",
+    "salário",
+    "R$",
+    "economizei",
+    "liberei",
+    "reduzi",
 )
 
 Status = Literal["passou", "falhou", "xfail", "xpass", "n/a", "pulado"]
@@ -498,11 +509,14 @@ def _frase_proibida(
 
 def termos_proibidos(texto: str) -> list[str]:
     normalizado = _normalizar(texto)
-    return [
-        termo
-        for termo in VOCABULARIO_PROIBIDO
-        if re.search(rf"(?<!\w){re.escape(_normalizar(termo))}s?(?!\w)", normalizado)
-    ]
+    achados = []
+    for termo in VOCABULARIO_PROIBIDO:
+        alvo = _normalizar(termo)
+        # Termo que termina em símbolo ("R$") não exige fronteira depois ("R$100").
+        fim = r"s?(?!\w)" if alvo[-1].isalnum() else ""
+        if re.search(rf"(?<!\w){re.escape(alvo)}{fim}", normalizado):
+            achados.append(termo)
+    return achados
 
 
 @_so_da_resposta

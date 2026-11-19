@@ -59,6 +59,7 @@ from app.ai.textos_profissional import (
     texto_nao_atende,
     texto_sem_vaga,
 )
+from app.ai.tools_enxugamento import criar_tool_planejar_enxugamento
 from app.ai.tools_equipe import criar_tool_consultar_profissionais
 from app.ai.tools_pacientes_plano import criar_tool_pacientes_por_plano
 from app.ai.tools_pacientes_profissional import criar_tool_listar_pacientes_por_profissional
@@ -1354,5 +1355,6 @@ def criar_tools(
         criar_tool_pacientes_por_plano(fonte, data_referencia),
         criar_tool_listar_pacientes_por_profissional(fonte, data_referencia, catalogo),
         criar_tool_planejar_realocacao(fonte, data_referencia, catalogo),
+        criar_tool_planejar_enxugamento(fonte, data_referencia, catalogo),
         *criar_tools_relatorios(fonte, data_referencia),
     ]

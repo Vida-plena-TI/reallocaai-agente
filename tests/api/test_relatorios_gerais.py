@@ -302,3 +302,12 @@ def test_plano_realocacao_nao_e_exposto_na_api(cliente: TestClient) -> None:
 
     assert resposta.status_code == 422
     assert "plano_realocacao" not in RELATORIOS
+
+
+def test_panorama_enxugamento_nao_e_exposto_na_api(cliente: TestClient) -> None:
+    """O panorama de enxugamento leva nomes de pacientes e é sensível de RH: só pelo chat."""
+    resposta = _gerar(cliente, {"relatorio": "panorama_enxugamento"})
+
+    assert resposta.status_code == 422
+    assert "panorama_enxugamento" not in resposta.text
+    assert "panorama_enxugamento" not in RELATORIOS

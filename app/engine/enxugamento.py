@@ -251,6 +251,9 @@ class ResumoCenario:
     #: Ocupação (slots ocupados / escalados) das profissionais que absorvem, nos
     #: dias em que recebem pacientes, depois do cenário. `None`: ninguém absorve.
     ocupacao_absorventes: float | None
+    #: Slots ocupados e escalados dessas profissionais (a razão é a ocupação).
+    slots_ocupados_absorventes: int
+    slots_escalados_absorventes: int
     #: Profissionais (ids) que ficariam sem atendimento na semana.
     profissionais_sem_presenca: tuple[str, ...]
     #: (especialidade, dia, turno) que ficaria sem nenhum profissional atendendo.
@@ -1005,6 +1008,8 @@ def _resumo(
         minutos_medio=round(sum(deslocamentos) / len(deslocamentos), 1) if deslocamentos else 0.0,
         minutos_maximo=max(deslocamentos, default=0),
         ocupacao_absorventes=round(ocupados / escalados, 4) if escalados else None,
+        slots_ocupados_absorventes=ocupados,
+        slots_escalados_absorventes=escalados,
         profissionais_sem_presenca=tuple(sorted(com_presenca_antes - com_presenca_depois)),
         sem_cobertura=tuple(sorted(cobertura(antes) - cobertura(depois))),
     )

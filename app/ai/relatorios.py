@@ -313,11 +313,14 @@ RELATORIO_PACIENTES_POR_PLANO: Final[str] = "pacientes_por_plano"
 RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES: Final[str] = "pacientes_por_profissional_nomes"
 #: Plano de realocação e a pergunta de "qual paciente?" (só pelo chat).
 RELATORIO_PLANO_REALOCACAO: Final[str] = "plano_realocacao"
+#: Panorama de enxugamento (só pelo chat): nomes de pacientes e de profissionais.
+RELATORIO_PANORAMA_ENXUGAMENTO: Final[str] = "panorama_enxugamento"
 RELATORIOS_COM_NOMES_DE_PACIENTES: Final[frozenset[str]] = frozenset(
     {
         RELATORIO_PACIENTES_POR_PLANO,
         RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES,
         RELATORIO_PLANO_REALOCACAO,
+        RELATORIO_PANORAMA_ENXUGAMENTO,
     }
 )
 

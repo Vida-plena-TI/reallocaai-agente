@@ -35,7 +35,9 @@ from pydantic import ValidationError
 from app.ai.catalogo import catalogo_ou_nada
 from app.ai.fundamentacao import (
     nomes_de_paciente_na_resposta,
+    nomes_de_profissional_no_panorama,
     registrar_nome_de_paciente,
+    registrar_nome_de_profissional,
     registrar_nova_geracao,
     registrar_resumo_deterministico,
     resumo_deterministico,
@@ -230,6 +232,15 @@ def perguntar_com_mensagens(
             mensagens,
             blocos,
         )
+    # Panorama de enxugamento (sensível de RH): nome de profissional também vai
+    # direto para o resumo, sem nova geração.
+    if citados := nomes_de_profissional_no_panorama(resposta, blocos, profissionais):
+        registrar_nome_de_profissional(citados)
+        return (
+            resumo_deterministico(blocos, mensagens[len(historico_mensagens) :]),
+            mensagens,
+            blocos,
+        )
     problemas = verificar(
         resposta,
         mensagens[len(historico_mensagens) :],
@@ -248,6 +259,9 @@ def perguntar_com_mensagens(
     turno = refeito[len(historico_mensagens) :]
     if repetidos := nomes_de_paciente_na_resposta(resposta, blocos, turno):
         registrar_nome_de_paciente(repetidos)
+        return resumo_deterministico(blocos, turno), refeito, blocos
+    if citados := nomes_de_profissional_no_panorama(resposta, blocos, profissionais):
+        registrar_nome_de_profissional(citados)
         return resumo_deterministico(blocos, turno), refeito, blocos
     problemas = verificar(
         resposta, turno, historico_mensagens, profissionais, com_tela=agente.com_tela
