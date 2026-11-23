@@ -477,17 +477,22 @@ objetivo pedido):
 | `pacientes_movidos` | `inteiro` | Pacientes distintos com algum passo |
 | `trocam_de_profissional` | `inteiro` | Pacientes que mudam de profissional |
 | `trocam_de_dia` | `inteiro` | Pacientes que mudam de dia |
+| `profissionais_sem_atendimento` (rótulo `"Profissionais sem atendimento"`) | `inteiro` | Profissionais que ficam sem nenhum atendimento na semana no cenário (zeram a semana) |
+| `turnos_sem_profissional` (rótulo `"Turnos sem profissional"`) | `inteiro` | Turnos (dia, turno, terapia) em que a terapia ficaria sem nenhuma profissional atendendo, num dia e turno em que hoje tem atendimento |
 | `passos_iguais_ao_recomendado` | `inteiro` | Passos iguais aos do Cenário 1 (mesmo paciente, mesma origem, mesmo destino); `0` no recomendado |
 | `recomendado` | `texto` | **Booleano JSON** (`true`/`false`, nunca `"Sim"`/`"Não"`): `true` só no Cenário 1. Vem com `formato: "texto"` porque o enum de formatos não tem booleano (regra geral dos booleanos) |
 
 `resumo` (`inteiro`, sem nomes): `"Cenários"`, `"Maior número de turnos liberados"`, `"Turnos com
-presença paga na semana"` e `"Turnos presos por regra"`. `avisos` sempre traz: que a sugestão
-considera só os atendimentos da semana lida, que não considera a disponibilidade dos pacientes,
-que vagas livres podem estar reservadas e que cada mudança precisa ser confirmada com a família e
-feita manualmente na planilha. Conforme o resultado, só com contagens: quantos turnos ficaram
-presos e por quê; por cenário, quantos turnos de terapia ficariam sem profissional num dia em que
-hoje têm e quantas profissionais ficariam sem atendimento na semana; `"Busca limitada: …"` quando
-a busca atinge o teto. Tabela de exportação: **Cenários** (mesmas colunas e linhas de `dados`).
+presença paga na semana"` e `"Turnos presos por regra"`. `avisos` traz **só avisos gerais**
+(nenhum aviso por cenário), nesta ordem: que a sugestão considera só os atendimentos da semana
+lida, que não considera a disponibilidade dos pacientes, que vagas livres podem estar reservadas e
+que cada mudança precisa ser confirmada com a família e feita manualmente na planilha; conforme o
+resultado, só com contagens, quantos turnos ficaram presos por regra e por quê, `"Busca limitada:
+…"` quando a busca atinge o teto e os dias que não puderam ser lidos; por último, a legenda das
+colunas de cobertura: `"Profissionais sem atendimento: ficam sem nenhum paciente na semana. Turnos
+sem profissional: turnos de uma terapia em que ninguém atenderia, num dia em que hoje há
+atendimento."`. Os números por cenário de quem fica sem atendimento e de turnos sem profissional
+estão nas colunas `profissionais_sem_atendimento` e `turnos_sem_profissional`. Tabela de exportação: **Cenários** (mesmas colunas e linhas de `dados`).
 
 **Passos**:
 
@@ -549,6 +554,7 @@ também vem sem bloco.
 
 | Data | Mudança | Compatibilidade |
 | --- | --- | --- |
+| 2026-11-23 | Quadro comparativo do panorama de enxugamento: duas colunas `inteiro` novas, depois de `trocam_de_dia` e antes de `passos_iguais_ao_recomendado`, também na aba **Cenários**: `profissionais_sem_atendimento` (`"Profissionais sem atendimento"`) e `turnos_sem_profissional` (`"Turnos sem profissional"`). Os avisos por cenário (`"Cenário N: … sem atendimento na semana"` e `"Cenário N: … turnos de terapia ficariam sem nenhum profissional …"`) saíram de `avisos`, que fica só com os gerais e uma legenda das duas colunas. O bloco de passos não muda. | Compatível: `versao` continua `1`, schema igual, sem tipo de bloco novo; o front ignora coluna desconhecida e mostra qualquer coluna na tabela. Quem lia os avisos por cenário passa a ler as colunas. |
 | 2026-11-23 | Detalhe de cenário não recomendado: só sai "apenas o que difere do Cenário 1" quando há passos que diferem e passos iguais. Subconjunto do Cenário 1, cenário idêntico ou sem passo igual saem com os passos completos, `titulo: "Passos do Cenário N"` e um aviso que compara com o Cenário 1 (só contagens). O bloco de passos nunca vem sem linhas. | Compatível: mesmo formato e colunas; muda só quais linhas vêm, o título e o aviso nesses casos. |
 | 2026-11-23 | Panorama de enxugamento (`relatorio: "panorama_enxugamento"`) em **dois blocos** `tabela_generica` na mesma resposta, ambos com o mesmo `relatorio` e `contem_dados_pacientes: true`: o **quadro comparativo** (`"Comparativo de cenários"`, uma linha por cenário, só números, `recomendado` booleano, sem `agrupar_por`, aba **Cenários**) e os **passos** dos cenários detalhados (por padrão só o recomendado; `agrupar_por: ["cenario"]` em um nível, aba **Passos**). Colunas dos passos: `alavanca` virou `tipo_de_movimento` (rótulos legíveis); `observacao` vazia no caso padrão. O rótulo do cenário não traz mais o código interno. A aba **Resumo dos cenários** saiu (substituída pelo quadro). Sem tipo de bloco novo, sem mudança de schema. | Quebra só para quem trata o panorama: o chatbot passa a guardar e desenhar os dois blocos (um cartão por bloco) e a aplicar a restrição aos dois pelo `relatorio`. `versao` continua `1`; schema igual. |
 | 2026-11-23 | Campo opcional novo **na resposta do chat** (fora de qualquer bloco): `resposta_sensivel: true` sempre que a rodada usou tool restrita (`planejar_enxugamento`, `planejar_realocacao`, `pacientes_por_plano`, `listar_pacientes_por_profissional` ou `gerar_relatorio` com `agenda_paciente`), com ou sem bloco; ausente nas demais. Só a flag, sem nome nem conteúdo. | Adição opcional: `versao` continua `1`; schema dos blocos igual (o campo não é do bloco). Quem não conhece o campo o ignora; para aplicar o texto fixo fora da coordenação, o chatbot passa a lê-lo. |
