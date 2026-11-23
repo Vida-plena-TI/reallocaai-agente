@@ -730,6 +730,13 @@ def test_sem_codigos_de_cenario() -> None:
 def test_cenario_detalhado() -> None:
     assert _rodar_panorama("cenario_detalhado", [_turno_do_panorama()], turno=1, numero=1).ok
     assert not _rodar_panorama("cenario_detalhado", [_turno_do_panorama()], turno=1, numero=2).ok
+    # Bloco de passos sem linhas nunca passa.
+    comparativo, passos = _panorama()
+    passos["dados"]["linhas"] = []
+    vazio = _rodar_panorama(
+        "cenario_detalhado", [_turno_do_panorama([comparativo, passos])], turno=1, numero=1
+    )
+    assert not vazio.ok and "bloco de passos sem linhas" in vazio.detalhe
 
 
 def test_turnos_liberados_so_de() -> None:

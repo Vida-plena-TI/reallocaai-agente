@@ -242,8 +242,11 @@ tool `planejar_enxugamento` do agente (`POST /agenda/chat`), como **dois blocos*
 2. **Passos** (`"Passos do cenário recomendado"`): os passos do recomendado, agrupados por
    cenário (`agrupar_por: ["cenario"]`, `unidade_grupo: {"singular": "passo", "plural":
    "passos"}`). Quando o usuário pede outro cenário ("quero ver o Cenário 3"), o agente chama a
-   tool de novo e esse bloco mostra só o que difere do Cenário 1, com título e aviso explícitos.
-   Aba de exportação **Passos**.
+   tool de novo e esse bloco mostra só o que difere do Cenário 1, com título e aviso explícitos,
+   quando há passos que diferem e passos iguais; se o cenário for um subconjunto do Cenário 1
+   (ou idêntico a ele), vêm os passos completos, com `"Passos do Cenário N"` e um aviso de
+   quantos passos do Cenário 1 ele faz. O bloco nunca vem sem linhas. Aba de exportação
+   **Passos**.
 
 - **Os dois blocos trazem `contem_dados_pacientes: true`** e a resposta, `resposta_sensivel:
   true`. O bloco de passos contém nomes de pacientes e é sensível de RH (nomes de profissionais

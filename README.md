@@ -353,7 +353,9 @@ só números) e os **passos** do cenário recomendado, agrupados por cenário, c
 em rótulo legível e observação só nas exceções. Para ver outro cenário ("quero ver o Cenário 3"),
 o modelo chama a tool de novo com `detalhar_cenarios` (os mesmos parâmetros regeram os mesmos
 cenários e códigos); o cenário não recomendado mostra só os passos que diferem do Cenário 1, com
-título e aviso que dizem isso. **Sensível de RH:** os nomes de pacientes e de profissionais vão só
+título e aviso que dizem isso, quando há passos que diferem e passos iguais; subconjunto do
+Cenário 1 (ou idêntico a ele) sai com os passos completos e um aviso de quantos passos do
+Cenário 1 ele faz, nunca como bloco vazio. **Sensível de RH:** os nomes de pacientes e de profissionais vão só
 no bloco de passos; o texto que o modelo lê só tem contagens e o mapa "Cenário N = código", e a
 resposta (3 a 4 frases: recomendação com números, o que confirmar e "Quer ver os passos do
 Cenário N?") não pode ter nome nem código: se tiver, vira o resumo determinístico. Os nomes

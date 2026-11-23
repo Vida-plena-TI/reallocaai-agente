@@ -495,7 +495,7 @@ a busca atinge o teto. Tabela de exportação: **Cenários** (mesmas colunas e l
 | --- | --- | --- |
 | `cenario` | `texto` | `"Cenário 1 · equilibrado · libera 3 turnos"`: número, perfil e turnos liberados. **Sem código e sem nome** |
 | `turno_liberado` | `texto` | `"Qua manhã · Profissional · Terapia Alimentar"` |
-| `passo` | `inteiro` | Ordem de execução dentro do cenário inteiro, a partir de 1 (no modo "só o que difere", os números dos passos omitidos ficam de fora) |
+| `passo` | `inteiro` | Ordem de execução dentro do cenário inteiro, a partir de 1 (quando só o que difere aparece, os números dos passos omitidos ficam de fora) |
 | `paciente` (rótulo `"Quem"`) | `texto` | Nome do paciente como na planilha (sessão em grupo: `"A / B"`) |
 | `terapia` | `texto` | Rótulo da especialidade |
 | `de` | `texto` | `"Qua 08:00 às 09:00 · Profissional · Sala 7"` (mesmo formato do plano de realocação) |
@@ -508,17 +508,26 @@ As linhas de cada cenário vêm seguidas, e `dados` traz a dica de exibição ag
 grupo montado pelo front, ex.: `"Cenário 1 · equilibrado · libera 3 turnos (4 passos)"`).
 `resumo` (`inteiro`): com um cenário detalhado, `"Turnos liberados"`, `"Passos"` (linhas do bloco)
 e `"Pacientes movidos"`; com vários, `"Cenários detalhados"` e `"Passos"`. `avisos`: o de
-confirmar cada mudança com a família e na planilha e, no modo "só o que difere", o aviso desse
-modo. Tabela de exportação: **Passos** (mesmas colunas e linhas de `dados`).
+confirmar cada mudança com a família e na planilha e, para cada cenário não recomendado
+detalhado, o aviso que o compara com o Cenário 1 (ver abaixo). Tabela de exportação: **Passos**
+(mesmas colunas e linhas de `dados`). O bloco de passos **nunca vem sem linhas**.
 
 **Detalhe de outro cenário.** Quando o usuário pede ("quero ver o Cenário 3"), o agente chama a
 tool de novo com os mesmos parâmetros e `detalhar_cenarios`; os mesmos parâmetros regeram os
-mesmos cenários. O cenário não recomendado mostra **só os passos que diferem do Cenário 1**
-(comparados por paciente, `de` e `para`), e isso fica explícito: `titulo: "Passos do Cenário 3
-(apenas o que difere do Cenário 1)"` e o aviso `"Mostra só o que difere do Cenário 1; N passos são
-iguais aos dele."` (com vários cenários, cada aviso começa por `"Cenário N: "`, e o título vira,
-por exemplo, `"Passos dos Cenários 1 e 3 (o Cenário 3 só com o que difere do Cenário 1)"`). O
-nome da aba continua **Passos**. Se o cenário pedido não existe mais (os parâmetros mudaram), vem
+mesmos cenários. Os passos do cenário não recomendado são comparados com os do Cenário 1 por
+paciente, `de` e `para`:
+
+| Comparação com o Cenário 1 | Linhas | `titulo` | Aviso |
+| --- | --- | --- | --- |
+| Tem passos que diferem **e** passos iguais | **Só os que diferem** | `"Passos do Cenário 3 (apenas o que difere do Cenário 1)"` | `"Mostra só o que difere do Cenário 1; N passos são iguais aos dele."` |
+| Subconjunto (todos os passos dele estão no Cenário 1) | Todas | `"Passos do Cenário 3"` | `"Este cenário faz K dos M passos do Cenário 1 e deixa de fazer M-K; libera X turnos a menos."` |
+| Idêntico (os mesmos passos) | Todas | `"Passos do Cenário 3"` | `"Este cenário é idêntico ao Cenário 1 (os mesmos M passos)."` |
+| Nenhum passo igual | Todas | `"Passos do Cenário 3"` | `"Nenhum passo deste cenário é igual aos do Cenário 1."` |
+
+O número do passo é sempre o do cenário inteiro. Com vários cenários, cada aviso começa por
+`"Cenário N: "` e o título vira, por exemplo, `"Passos dos Cenários 1 e 3 (o Cenário 3 só com o
+que difere do Cenário 1)"` (sem ressalva quando nenhum deles sai só com o que difere). O nome da
+aba continua **Passos**. Se o cenário pedido não existe mais (os parâmetros mudaram), vem
 só o quadro comparativo, sem bloco de passos.
 
 Nomes das abas de exportação: únicos entre os dois blocos (**Cenários** e **Passos**), com até 31
@@ -540,6 +549,7 @@ também vem sem bloco.
 
 | Data | Mudança | Compatibilidade |
 | --- | --- | --- |
+| 2026-11-23 | Detalhe de cenário não recomendado: só sai "apenas o que difere do Cenário 1" quando há passos que diferem e passos iguais. Subconjunto do Cenário 1, cenário idêntico ou sem passo igual saem com os passos completos, `titulo: "Passos do Cenário N"` e um aviso que compara com o Cenário 1 (só contagens). O bloco de passos nunca vem sem linhas. | Compatível: mesmo formato e colunas; muda só quais linhas vêm, o título e o aviso nesses casos. |
 | 2026-11-23 | Panorama de enxugamento (`relatorio: "panorama_enxugamento"`) em **dois blocos** `tabela_generica` na mesma resposta, ambos com o mesmo `relatorio` e `contem_dados_pacientes: true`: o **quadro comparativo** (`"Comparativo de cenários"`, uma linha por cenário, só números, `recomendado` booleano, sem `agrupar_por`, aba **Cenários**) e os **passos** dos cenários detalhados (por padrão só o recomendado; `agrupar_por: ["cenario"]` em um nível, aba **Passos**). Colunas dos passos: `alavanca` virou `tipo_de_movimento` (rótulos legíveis); `observacao` vazia no caso padrão. O rótulo do cenário não traz mais o código interno. A aba **Resumo dos cenários** saiu (substituída pelo quadro). Sem tipo de bloco novo, sem mudança de schema. | Quebra só para quem trata o panorama: o chatbot passa a guardar e desenhar os dois blocos (um cartão por bloco) e a aplicar a restrição aos dois pelo `relatorio`. `versao` continua `1`; schema igual. |
 | 2026-11-23 | Campo opcional novo **na resposta do chat** (fora de qualquer bloco): `resposta_sensivel: true` sempre que a rodada usou tool restrita (`planejar_enxugamento`, `planejar_realocacao`, `pacientes_por_plano`, `listar_pacientes_por_profissional` ou `gerar_relatorio` com `agenda_paciente`), com ou sem bloco; ausente nas demais. Só a flag, sem nome nem conteúdo. | Adição opcional: `versao` continua `1`; schema dos blocos igual (o campo não é do bloco). Quem não conhece o campo o ignora; para aplicar o texto fixo fora da coordenação, o chatbot passa a lê-lo. |
 | 2026-11-19 | Novo valor de `relatorio` em `tabela_generica`: `"panorama_enxugamento"` (tool `planejar_enxugamento`, só pelo chat), com `periodo` e `meta` `null`, agrupado em dois níveis (`agrupar_por: ["cenario", "turno_liberado"]`, `unidade_grupo: {"singular": "passo", "plural": "passos"}`) e abas de exportação **Passos** e **Resumo dos cenários**. **O bloco contém nomes de pacientes** (`contem_dados_pacientes: true`) **e é sensível de RH** (nomes de profissionais). Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual (usa só campos opcionais que já existem). Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; deve entrar na restrição ao grupo de coordenação; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |

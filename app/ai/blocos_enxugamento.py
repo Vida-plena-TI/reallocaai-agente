@@ -206,6 +206,15 @@ def passos_iguais(cenario: Cenario, recomendado: Cenario) -> int:
     return sum(1 for p in cenario.passos if _chave_do_passo(p) in chaves)
 
 
+def so_o_que_difere(cenario: Cenario, recomendado: Cenario) -> bool:
+    """Se o cenário detalhado mostra só os passos que diferem do recomendado: só quando
+    há passos que diferem E passos iguais. Subconjunto do recomendado, cenário idêntico
+    ou sem nenhum passo igual saem com os passos completos (nunca um bloco vazio)."""
+    if cenario is recomendado:
+        return False
+    return 0 < passos_iguais(cenario, recomendado) < len(cenario.passos)
+
+
 def profissionais_afetadas(cenario: Cenario) -> int:
     """Profissionais distintas em qualquer origem ou destino dos passos."""
     return len({lugar.profissional_id for p in cenario.passos for lugar in (p.de, p.para)})
@@ -232,7 +241,8 @@ def _linhas_do_comparativo(panorama: PanoramaEnxugamento) -> list[dict[str, Valo
 def _linhas_dos_passos(
     foto: FotografiaPeriodo, panorama: PanoramaEnxugamento, detalhados: Sequence[int]
 ) -> list[dict[str, ValorSimples]]:
-    """Linhas contíguas por cenário; o não recomendado só com o que difere do Cenário 1."""
+    """Linhas contíguas por cenário; o não recomendado só com o que difere do Cenário 1
+    quando há passos que diferem e passos iguais (`so_o_que_difere`)."""
     recomendado = panorama.cenarios[0]
     do_recomendado = {_chave_do_passo(p) for p in recomendado.passos}
     linhas: list[dict[str, ValorSimples]] = []
@@ -240,10 +250,11 @@ def _linhas_dos_passos(
         cenario = panorama.cenarios[numero - 1]
         rotulo = _rotulo_do_grupo(numero, cenario)
         sem_presenca = frozenset(cenario.resumo.profissionais_sem_presenca)
+        so_diferentes = so_o_que_difere(cenario, recomendado)
         # A ordem dos passos (por turno liberado) é a da execução manual; o número do
         # passo é o do cenário inteiro, mesmo quando só o que difere aparece.
         for indice, passo in enumerate(cenario.passos, 1):
-            if numero != 1 and _chave_do_passo(passo) in do_recomendado:
+            if so_diferentes and _chave_do_passo(passo) in do_recomendado:
                 continue
             linhas.append(
                 {
@@ -261,17 +272,55 @@ def _linhas_dos_passos(
     return linhas
 
 
-def titulo_dos_passos(detalhados: Sequence[int]) -> str:
-    """Título do bloco de passos; deixa explícito quando só aparece o que difere."""
+def titulo_dos_passos(detalhados: Sequence[int], diferentes: Sequence[int] = ()) -> str:
+    """Título do bloco de passos; `diferentes` são os cenários mostrados só com o que
+    difere do Cenário 1 (o título deixa isso explícito)."""
     outros = [n for n in detalhados if n != 1]
+    diferentes = [n for n in detalhados if n in diferentes]
     if not outros:
         return TITULO_PASSOS_RECOMENDADO
     if len(detalhados) == 1:
-        return f"Passos do Cenário {outros[0]} (apenas o que difere do Cenário 1)"
-    if 1 not in detalhados:
-        return f"Passos dos Cenários {_lista(outros)} (apenas o que difere do Cenário 1)"
-    quais = f"o Cenário {outros[0]}" if len(outros) == 1 else f"os Cenários {_lista(outros)}"
-    return f"Passos dos Cenários {_lista(detalhados)} ({quais} só com o que difere do Cenário 1)"
+        if diferentes:
+            return f"Passos do Cenário {outros[0]} (apenas o que difere do Cenário 1)"
+        return f"Passos do Cenário {outros[0]}"
+    base = f"Passos dos Cenários {_lista(detalhados)}"
+    if not diferentes:
+        return base
+    if diferentes == list(detalhados):
+        return f"{base} (apenas o que difere do Cenário 1)"
+    quais = (
+        f"o Cenário {diferentes[0]}"
+        if len(diferentes) == 1
+        else f"os Cenários {_lista(diferentes)}"
+    )
+    return f"{base} ({quais} só com o que difere do Cenário 1)"
+
+
+def _aviso_do_cenario(cenario: Cenario, recomendado: Cenario) -> str:
+    """Como o cenário detalhado se compara ao Cenário 1, só com contagens."""
+    iguais = passos_iguais(cenario, recomendado)
+    total = len(cenario.passos)
+    if so_o_que_difere(cenario, recomendado):
+        quantos = "1 passo é igual" if iguais == 1 else f"{iguais} passos são iguais"
+        return f"Mostra só o que difere do Cenário 1; {quantos} aos dele."
+    if iguais == 0:
+        return "Nenhum passo deste cenário é igual aos do Cenário 1."
+    do_recomendado = len(recomendado.passos)
+    if iguais == total == do_recomendado:
+        mesmos = "o mesmo passo" if total == 1 else f"os mesmos {total} passos"
+        return f"Este cenário é idêntico ao Cenário 1 ({mesmos})."
+    # Subconjunto do Cenário 1: todos os passos dele estão no recomendado.
+    menos = recomendado.resumo.turnos_liberados - cenario.resumo.turnos_liberados
+    if menos > 0:
+        turnos = f"libera {_n(menos, 'turno', 'turnos')} a menos"
+    elif menos < 0:
+        turnos = f"libera {_n(-menos, 'turno', 'turnos')} a mais"
+    else:
+        turnos = "libera o mesmo número de turnos"
+    return (
+        f"Este cenário faz {total} dos {do_recomendado} passos do Cenário 1 e deixa de fazer "
+        f"{do_recomendado - total}; {turnos}."
+    )
 
 
 def _avisos_dos_passos(panorama: PanoramaEnxugamento, detalhados: Sequence[int]) -> list[str]:
@@ -279,13 +328,8 @@ def _avisos_dos_passos(panorama: PanoramaEnxugamento, detalhados: Sequence[int])
     avisos = []
     outros = [n for n in detalhados if n != 1]
     for numero in outros:
-        iguais = passos_iguais(panorama.cenarios[numero - 1], recomendado)
-        quantos = "1 passo é igual" if iguais == 1 else f"{iguais} passos são iguais"
         prefixo = "" if len(outros) == 1 else f"Cenário {numero}: "
-        nenhum = (
-            " Nenhum passo difere." if iguais == len(panorama.cenarios[numero - 1].passos) else ""
-        )
-        avisos.append(f"{prefixo}Mostra só o que difere do Cenário 1; {quantos} aos dele.{nenhum}")
+        avisos.append(prefixo + _aviso_do_cenario(panorama.cenarios[numero - 1], recomendado))
     avisos.append(AVISO_CONFIRMAR)
     return avisos
 
@@ -499,8 +543,14 @@ def panorama_enxugamento(
             )
         )
         na_tela = f"Na tela: o comparativo dos {quantos} e os passos {mostrados}."
-        if any(n != 1 for n in detalhados):
-            na_tela += " Fora o Cenário 1, só os passos que diferem dele."
+        diferentes = [
+            n for n in detalhados if so_o_que_difere(panorama.cenarios[n - 1], recomendado)
+        ]
+        if diferentes:
+            na_tela += (
+                f" {'Do Cenário' if len(diferentes) == 1 else 'Dos Cenários'} "
+                f"{_lista(diferentes)}, só os passos que diferem do Cenário 1."
+            )
         proximo = next(
             (n for n in range(1, len(panorama.cenarios) + 1) if n not in detalhados), None
         )
@@ -549,7 +599,10 @@ def panorama_enxugamento(
     else:
         resumo = [_inteiro("Cenários detalhados", len(detalhados)), _inteiro("Passos", len(linhas))]
     passos = _tabela_generica(
-        titulo_dos_passos(detalhados),
+        titulo_dos_passos(
+            detalhados,
+            [n for n in detalhados if so_o_que_difere(panorama.cenarios[n - 1], recomendado)],
+        ),
         _avisos_dos_passos(panorama, detalhados),
         resumo,
         COLUNAS_PASSOS,

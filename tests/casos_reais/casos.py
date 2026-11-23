@@ -1158,12 +1158,20 @@ def _recontagem(linhas: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     }
 
 
+def _so_o_que_difere(linha_do_quadro: Mapping[str, Any]) -> bool:
+    """O cenário sai só com os passos que diferem do Cenário 1 quando tem passos que
+    diferem E passos iguais; senão, sai com os passos completos."""
+    iguais = linha_do_quadro["passos_iguais_ao_recomendado"]
+    return not linha_do_quadro["recomendado"] and 0 < iguais < linha_do_quadro["passos"]
+
+
 @_sobre_a_saida
 def _cenarios_validos_pelo_oraculo(
     c: Criterio, turnos: Sequence[TurnoObservado], ctx: Contexto
 ) -> ResultadoCriterio:
     """De `minimo` a `maximo` cenários no quadro comparativo; cada cenário detalhado por
-    inteiro (o recomendado, ou outro sem passo igual ao dele), aplicado à grade crua pelo
+    inteiro (o recomendado, um subconjunto dele, um idêntico ou um sem passo igual ao dele),
+    aplicado à grade crua pelo
     oráculo na ordem dos passos, é válido, não abre turno, libera os turnos que o rótulo
     e o quadro dizem, e confere com a linha do quadro (recontada das linhas). O cenário
     mostrado só com o que difere do Cenário 1 confere na quantidade de passos."""
@@ -1188,7 +1196,7 @@ def _cenarios_validos_pelo_oraculo(
         if linha_do_quadro["turnos_liberados"] != int(achado["n"]):
             problemas.append(f"{nome}: o rótulo e o comparativo não conferem")
         iguais = linha_do_quadro["passos_iguais_ao_recomendado"]
-        if not linha_do_quadro["recomendado"] and iguais:
+        if _so_o_que_difere(linha_do_quadro):
             if len(linhas) != linha_do_quadro["passos"] - iguais:
                 problemas.append(f"{nome}: passos que diferem não conferem com o comparativo")
             continue
@@ -1282,8 +1290,10 @@ def _sem_codigos_de_cenario(
 def _cenario_detalhado(
     c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
 ) -> ResultadoCriterio:
-    """O bloco de passos traz só o Cenário `numero`; fora o recomendado, com o título e o
-    aviso de que mostra só o que difere do Cenário 1, e só esses passos."""
+    """O bloco de passos traz só o Cenário `numero`, nunca sem linhas. Fora o recomendado:
+    com passos que diferem e passos iguais, o título e o aviso de que mostra só o que difere
+    do Cenário 1, e só esses passos; senão (subconjunto ou idêntico ao Cenário 1), os passos
+    completos, com o título sem ressalva e o aviso que compara com o Cenário 1."""
     numero = int(c.params["numero"])
     quadro = _comparativo(turnos)
     blocos = _blocos_de_passos(turnos)
@@ -1300,13 +1310,24 @@ def _cenario_detalhado(
             problemas.append("título do recomendado")
         if len(bloco["dados"]["linhas"]) != linha["passos"]:
             problemas.append("passos do recomendado incompletos")
-    else:
+    elif _so_o_que_difere(linha):
         if bloco["titulo"] != f"Passos do Cenário {numero} (apenas o que difere do Cenário 1)":
             problemas.append("título sem dizer que mostra só o que difere")
         if not any(a.startswith("Mostra só o que difere do Cenário 1;") for a in bloco["avisos"]):
             problemas.append("sem o aviso do que difere")
         if len(bloco["dados"]["linhas"]) != linha["passos"] - linha["passos_iguais_ao_recomendado"]:
             problemas.append("passos que diferem não conferem com o comparativo")
+    else:
+        if bloco["titulo"] != f"Passos do Cenário {numero}":
+            problemas.append("título do cenário completo")
+        if len(bloco["dados"]["linhas"]) != linha["passos"]:
+            problemas.append("passos do cenário incompletos")
+        if linha["passos_iguais_ao_recomendado"] and not any(
+            a.startswith("Este cenário ") for a in bloco["avisos"]
+        ):
+            problemas.append("sem o aviso que compara com o Cenário 1")
+    if not bloco["dados"]["linhas"]:
+        problemas.append("bloco de passos sem linhas")
     return _resultado(c, not problemas, "; ".join(problemas) or f"Cenário {numero} detalhado")
 
 

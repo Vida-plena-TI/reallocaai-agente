@@ -11,6 +11,7 @@ import json
 import logging
 import re
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import date
 from itertools import pairwise
 from typing import Any, cast
@@ -36,6 +37,7 @@ from app.ai.blocos_enxugamento import (
     TITULO_COMPARATIVO,
     TITULO_PASSOS_RECOMENDADO,
     nomes_de_profissionais_no_bloco,
+    panorama_enxugamento,
 )
 from app.ai.blocos_gerais import nomes_de_pacientes_no_bloco
 from app.ai.fundamentacao import (
@@ -49,13 +51,19 @@ from app.ai.relatorios import (
     RELATORIO_PANORAMA_ENXUGAMENTO,
     RELATORIOS_COM_NOMES_DE_PACIENTES,
     BlocoRelatorio,
+    DadosTabelaGenerica,
 )
 from app.ai.tools import criar_tools
 from app.api.sessoes import ArmazenamentoConversas
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource
 from app.data_sources.google_sheets import GoogleSheetsDataSource
 from app.domain import ScheduleDataSource, dias_da_semana_de
-from app.engine.enxugamento import PanoramaEnxugamento, PedidoEnxugamento, planejar_enxugamento
+from app.engine.enxugamento import (
+    Objetivo,
+    PanoramaEnxugamento,
+    PedidoEnxugamento,
+    planejar_enxugamento,
+)
 from app.engine.fotografia import FotografiaPeriodo, fotografar_periodo
 from tests.casos_reais.planilha import PlanilhaContada, payload_da_semana
 from tests.support.fake_chat_model import FakeToolCallingChatModel
@@ -660,3 +668,75 @@ def test_codigo_na_resposta_vira_o_resumo_deterministico(caplog: pytest.LogCaptu
     assert len(blocos) == 2
     registros = _registros(caplog)
     assert "código(s) de cenário" in registros and "E-5EB1" not in registros
+
+
+# --- detalhe de um cenário: só o que difere x passos completos -----------------
+
+
+def _foto_e_panorama() -> tuple[FotografiaPeriodo, PanoramaEnxugamento]:
+    semana = dias_da_semana_de(HOJE)
+    foto = fotografar_periodo(_fonte(), semana[0], semana[-1])
+    return foto, planejar_enxugamento(foto, PedidoEnxugamento())
+
+
+def test_subconjunto_do_recomendado_sai_com_os_passos_completos() -> None:
+    """O Cenário 3 da semana fictícia faz só passos do Cenário 1: nada a mostrar "só do
+    que difere", então saem os passos completos com o aviso de quantos ele faz."""
+    padrao = _invocar({})
+    comparativo, _ = _blocos(padrao)
+    terceiro, primeiro = comparativo["dados"]["linhas"][2], comparativo["dados"]["linhas"][0]
+    assert terceiro["passos_iguais_ao_recomendado"] == terceiro["passos"] == 3
+    assert primeiro["passos"] == 4
+
+    passos = _passos(_invocar({"detalhar_cenarios": [_mapa(str(padrao.content))[3]]}))
+
+    assert passos["titulo"] == "Passos do Cenário 3"
+    assert passos["avisos"][0] == (
+        "Este cenário faz 3 dos 4 passos do Cenário 1 e deixa de fazer 1; libera 1 turno a menos."
+    )
+    assert not any("Mostra só o que difere" in aviso for aviso in passos["avisos"])
+    linhas = passos["dados"]["linhas"]
+    assert len(linhas) == terceiro["passos"]
+    assert {linha["cenario"] for linha in linhas} == {"Cenário 3 · menos mudança · libera 2 turnos"}
+    assert [linha["passo"] for linha in linhas] == [1, 2, 3]
+
+
+def test_diferenca_parcial_continua_so_com_o_que_difere() -> None:
+    passos = _passos(_invocar({"detalhar_cenarios": [_mapa(str(_invocar({}).content))[2]]}))
+
+    assert passos["titulo"] == "Passos do Cenário 2 (apenas o que difere do Cenário 1)"
+    assert (
+        passos["avisos"][0] == "Mostra só o que difere do Cenário 1; 3 passos são iguais aos dele."
+    )
+    # O número do passo é o do cenário inteiro (os iguais ficam de fora).
+    assert [linha["passo"] for linha in passos["dados"]["linhas"]] == [2]
+
+
+def test_cenario_identico_ao_recomendado_sai_com_os_passos_completos() -> None:
+    foto, panorama = _foto_e_panorama()
+    recomendado = panorama.cenarios[0]
+    # Mesmos passos, outro código e outro perfil (o motor não repete cenário; aqui é
+    # montado para testar o bloco).
+    identico = replace(recomendado, codigo="E-FFFF", perfil=Objetivo.MAIS_TURNOS)
+    montado = replace(panorama, cenarios=(recomendado, identico))
+
+    _, blocos = panorama_enxugamento(foto, montado, ["E-FFFF"])
+    passos = blocos[1]
+
+    assert passos.titulo == "Passos do Cenário 2"
+    assert passos.avisos[0] == "Este cenário é idêntico ao Cenário 1 (os mesmos 4 passos)."
+    assert isinstance(passos.dados, DadosTabelaGenerica)
+    assert [linha["passo"] for linha in passos.dados.linhas] == [1, 2, 3, 4]
+    assert blocos[0].dados.linhas[1]["passos_iguais_ao_recomendado"] == 4  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize("cenario", ["enxugamento", "enxugamento_tres", "enxugamento_cadeia"])
+def test_nunca_sai_bloco_de_passos_sem_linhas(cenario: str) -> None:
+    fonte = _fonte(cenario)
+    codigos = list(_mapa(str(_invocar({}, fonte).content)).values())
+    pedidos: list[list[str]] = [[], *([c] for c in codigos), codigos]
+    for pedido in pedidos:
+        mensagem = _invocar({"detalhar_cenarios": pedido} if pedido else {}, fonte)
+        for bloco in _blocos(mensagem):
+            assert bloco["dados"]["linhas"], (cenario, len(pedido), bloco["titulo"])
+            assert not any("Nenhum passo difere" in aviso for aviso in bloco["avisos"])
