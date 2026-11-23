@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import BaseMessage, HumanMessage
 
-from app.ai.agente import criar_agente, perguntar_com_mensagens
+from app.ai.agente import criar_agente, perguntar_com_mensagens, rodada_sensivel
 from app.ai.interpretador import criar_interpretador_configurado
 from app.ai.servico_agenda import consultar_disponibilidade_do_dia, consultar_ocupacao_do_dia
 from app.api.dependencies import (
@@ -172,7 +172,7 @@ def conversar_com_agente(
         interpretador=criar_interpretador_configurado(date.today()),
     )
     try:
-        resposta, _, blocos = perguntar_com_mensagens(
+        resposta, mensagens, blocos = perguntar_com_mensagens(
             agente,
             [*historico, HumanMessage(corpo.mensagem)],
         )
@@ -183,7 +183,12 @@ def conversar_com_agente(
         ) from erro
 
     conversas.registrar_troca(conversa_id, corpo.mensagem, resposta, blocos)
-    return ChatResponse(conversa_id=conversa_id, resposta=resposta, blocos=blocos)
+    return ChatResponse(
+        conversa_id=conversa_id,
+        resposta=resposta,
+        blocos=blocos,
+        resposta_sensivel=True if rodada_sensivel(mensagens) else None,
+    )
 
 
 @router.get(

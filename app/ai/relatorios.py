@@ -4,6 +4,7 @@ Só projeções explícitas dos resultados da engine: nunca texto analisado,
 entidades de pacientes, arquivos ou desenho. IDs de profissionais são opacos.
 """
 
+from collections.abc import Mapping
 from datetime import date
 from hashlib import sha256
 from typing import Annotated, Any, Final, Literal
@@ -323,6 +324,29 @@ RELATORIOS_COM_NOMES_DE_PACIENTES: Final[frozenset[str]] = frozenset(
         RELATORIO_PANORAMA_ENXUGAMENTO,
     }
 )
+#: A tool (só pelo chat) que gera cada relatório de `RELATORIOS_COM_NOMES_DE_PACIENTES`.
+TOOL_DO_RELATORIO_COM_NOMES: Final[dict[str, str]] = {
+    RELATORIO_PACIENTES_POR_PLANO: "pacientes_por_plano",
+    RELATORIO_PACIENTES_POR_PROFISSIONAL_NOMES: "listar_pacientes_por_profissional",
+    RELATORIO_PLANO_REALOCACAO: "planejar_realocacao",
+    RELATORIO_PANORAMA_ENXUGAMENTO: "planejar_enxugamento",
+}
+#: Tools cuja chamada torna a rodada do chat sensível (`resposta_sensivel`), com ou
+#: sem bloco: a pergunta de ambiguidade e o "sem solução" também são restritos.
+TOOLS_RESTRITAS: Final[frozenset[str]] = frozenset(TOOL_DO_RELATORIO_COM_NOMES.values())
+#: `gerar_relatorio` só é restrita com estes relatórios (o bloco traz o nome do paciente).
+TOOL_GERAR_RELATORIO: Final[str] = "gerar_relatorio"
+RELATORIOS_RESTRITOS_DE_GERAR_RELATORIO: Final[frozenset[str]] = frozenset({"agenda_paciente"})
+
+
+def chamada_restrita(nome: str | None, args: Mapping[str, Any] | None) -> bool:
+    """Se a chamada de tool (nome e argumentos) é de uma tool restrita."""
+    if nome in TOOLS_RESTRITAS:
+        return True
+    return (
+        nome == TOOL_GERAR_RELATORIO
+        and (args or {}).get("relatorio") in RELATORIOS_RESTRITOS_DE_GERAR_RELATORIO
+    )
 
 
 def _ausente(valor: Any) -> bool:

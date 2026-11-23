@@ -46,7 +46,7 @@ from app.ai.fundamentacao import (
 from app.ai.interpretador import Interpretador, contexto_para_o_agente, pergunta_das_lacunas
 from app.ai.prompts import prompt_de_sistema, resumo_da_equipe
 from app.ai.rastreamento import desligar_rastreamento_externo
-from app.ai.relatorios import BlocoRelatorio
+from app.ai.relatorios import BlocoRelatorio, chamada_restrita
 from app.ai.tools import DIAS_DA_SEMANA, criar_tools
 from app.config import exigir, get_settings
 from app.data_sources.continuidade import ContinuidadeDataSource
@@ -280,9 +280,9 @@ def _sem(mensagens: list[BaseMessage], retirar: BaseMessage | None) -> list[Base
     return [m for m in mensagens if not (type(m) is type(retirar) and m.content == retirar.content)]
 
 
-def extrair_blocos_do_turno(mensagens: list[BaseMessage]) -> list[BlocoRelatorio]:
-    """Valida artifacts depois da última pergunta, em ordem, com limite de dez."""
-    inicio = next(
+def _inicio_do_turno(mensagens: list[BaseMessage]) -> int:
+    """Índice da primeira mensagem depois da última pergunta do usuário."""
+    return next(
         (
             i + 1
             for i in range(len(mensagens) - 1, -1, -1)
@@ -290,8 +290,27 @@ def extrair_blocos_do_turno(mensagens: list[BaseMessage]) -> list[BlocoRelatorio
         ),
         len(mensagens),
     )
+
+
+def rodada_sensivel(mensagens: list[BaseMessage]) -> bool:
+    """Se o turno atual chamou alguma tool restrita (`TOOLS_RESTRITAS`), com ou sem bloco.
+
+    Decide pelo nome das tools chamadas (e, em `gerar_relatorio`, pelo relatório
+    pedido), nunca pelo bloco: a pergunta de ambiguidade, o panorama sem cenário e
+    a realocação sem solução também são restritos e podem não ter bloco.
+    """
+    return any(
+        chamada_restrita(chamada.get("name"), chamada.get("args"))
+        for mensagem in mensagens[_inicio_do_turno(mensagens) :]
+        if isinstance(mensagem, AIMessage)
+        for chamada in mensagem.tool_calls
+    )
+
+
+def extrair_blocos_do_turno(mensagens: list[BaseMessage]) -> list[BlocoRelatorio]:
+    """Valida artifacts depois da última pergunta, em ordem, com limite de dez."""
     blocos: list[BlocoRelatorio] = []
-    for mensagem in mensagens[inicio:]:
+    for mensagem in mensagens[_inicio_do_turno(mensagens) :]:
         if not isinstance(mensagem, ToolMessage) or mensagem.artifact is None:
             continue
         try:
