@@ -238,7 +238,11 @@ tool `planejar_enxugamento` do agente (`POST /agenda/chat`), como **dois blocos*
 [`contrato-blocos-novos.md`](contrato-blocos-novos.md#panorama-de-enxugamento-relatorio-panorama_enxugamento)):
 
 1. **Quadro comparativo** (`"Comparativo de cenários"`): uma linha por cenário, só números, sem
-   nomes; `recomendado` é booleano JSON. Aba de exportação **Cenários**.
+   nomes; `recomendado` é booleano JSON. Inclui `profissionais_sem_atendimento` (profissionais
+   que zeram a semana no cenário) e `turnos_sem_profissional` (turnos de uma terapia sem nenhuma
+   profissional, num dia e turno em que hoje há atendimento). `avisos` traz só os avisos gerais,
+   terminando com a legenda dessas duas colunas (nenhum aviso por cenário). Aba de exportação
+   **Cenários**, com as mesmas colunas.
 2. **Passos** (`"Passos do cenário recomendado"`): os passos do recomendado, agrupados por
    cenário (`agrupar_por: ["cenario"]`, `unidade_grupo: {"singular": "passo", "plural":
    "passos"}`). Quando o usuário pede outro cenário ("quero ver o Cenário 3"), o agente chama a
@@ -285,9 +289,7 @@ e [`tabela_generica_panorama_enxugamento.json`](exemplos-blocos/tabela_generica_
         "Não considera a disponibilidade dos pacientes.",
         "Vagas livres na grade podem estar reservadas (reuniões, supervisão); confira antes de mudar.",
         "Cada mudança precisa ser confirmada com a família e feita manualmente na planilha.",
-        "Cenário 1: 2 turnos de terapia ficariam sem nenhum profissional atendendo, num dia em que hoje tem.",
-        "Cenário 2: 2 turnos de terapia ficariam sem nenhum profissional atendendo, num dia em que hoje tem.",
-        "Cenário 3: 1 turno de terapia ficaria sem nenhum profissional atendendo, num dia em que hoje tem."
+        "Profissionais sem atendimento: ficam sem nenhum paciente na semana. Turnos sem profissional: turnos de uma terapia em que ninguém atenderia, num dia em que hoje há atendimento."
       ],
       "resumo": [
         {"rotulo": "Cenários", "valor": 3, "formato": "inteiro", "exibicao": "3"},
@@ -308,13 +310,15 @@ e [`tabela_generica_panorama_enxugamento.json`](exemplos-blocos/tabela_generica_
           {"chave": "pacientes_movidos", "rotulo": "Pacientes movidos", "formato": "inteiro"},
           {"chave": "trocam_de_profissional", "rotulo": "Trocam de profissional", "formato": "inteiro"},
           {"chave": "trocam_de_dia", "rotulo": "Trocam de dia", "formato": "inteiro"},
+          {"chave": "profissionais_sem_atendimento", "rotulo": "Profissionais sem atendimento", "formato": "inteiro"},
+          {"chave": "turnos_sem_profissional", "rotulo": "Turnos sem profissional", "formato": "inteiro"},
           {"chave": "passos_iguais_ao_recomendado", "rotulo": "Passos iguais ao recomendado", "formato": "inteiro"},
           {"chave": "recomendado", "rotulo": "Recomendado", "formato": "texto"}
         ],
         "linhas": [
-          {"cenario": "Cenário 1 · equilibrado", "turnos_liberados": 3, "passos": 4, "profissionais_afetadas": 2, "pacientes_movidos": 4, "trocam_de_profissional": 3, "trocam_de_dia": 0, "passos_iguais_ao_recomendado": 0, "recomendado": true},
-          {"cenario": "Cenário 2 · mais turnos", "turnos_liberados": 3, "passos": 4, "profissionais_afetadas": 2, "pacientes_movidos": 4, "trocam_de_profissional": 3, "trocam_de_dia": 0, "passos_iguais_ao_recomendado": 3, "recomendado": false},
-          {"cenario": "Cenário 3 · menos mudança", "turnos_liberados": 2, "passos": 3, "profissionais_afetadas": 2, "pacientes_movidos": 3, "trocam_de_profissional": 2, "trocam_de_dia": 0, "passos_iguais_ao_recomendado": 3, "recomendado": false}
+          {"cenario": "Cenário 1 · equilibrado", "turnos_liberados": 3, "passos": 4, "profissionais_afetadas": 2, "pacientes_movidos": 4, "trocam_de_profissional": 3, "trocam_de_dia": 0, "profissionais_sem_atendimento": 0, "turnos_sem_profissional": 2, "passos_iguais_ao_recomendado": 0, "recomendado": true},
+          {"cenario": "Cenário 2 · mais turnos", "turnos_liberados": 3, "passos": 4, "profissionais_afetadas": 2, "pacientes_movidos": 4, "trocam_de_profissional": 3, "trocam_de_dia": 0, "profissionais_sem_atendimento": 0, "turnos_sem_profissional": 2, "passos_iguais_ao_recomendado": 3, "recomendado": false},
+          {"cenario": "Cenário 3 · menos mudança", "turnos_liberados": 2, "passos": 3, "profissionais_afetadas": 2, "pacientes_movidos": 3, "trocam_de_profissional": 2, "trocam_de_dia": 0, "profissionais_sem_atendimento": 0, "turnos_sem_profissional": 1, "passos_iguais_ao_recomendado": 3, "recomendado": false}
         ],
         "total": {},
         "linhas_omitidas": 0
@@ -330,13 +334,15 @@ e [`tabela_generica_panorama_enxugamento.json`](exemplos-blocos/tabela_generica_
             {"chave": "pacientes_movidos", "rotulo": "Pacientes movidos", "formato": "inteiro"},
             {"chave": "trocam_de_profissional", "rotulo": "Trocam de profissional", "formato": "inteiro"},
             {"chave": "trocam_de_dia", "rotulo": "Trocam de dia", "formato": "inteiro"},
+            {"chave": "profissionais_sem_atendimento", "rotulo": "Profissionais sem atendimento", "formato": "inteiro"},
+            {"chave": "turnos_sem_profissional", "rotulo": "Turnos sem profissional", "formato": "inteiro"},
             {"chave": "passos_iguais_ao_recomendado", "rotulo": "Passos iguais ao recomendado", "formato": "inteiro"},
             {"chave": "recomendado", "rotulo": "Recomendado", "formato": "texto"}
           ],
           "linhas": [
-            {"cenario": "Cenário 1 · equilibrado", "turnos_liberados": 3, "passos": 4, "profissionais_afetadas": 2, "pacientes_movidos": 4, "trocam_de_profissional": 3, "trocam_de_dia": 0, "passos_iguais_ao_recomendado": 0, "recomendado": true},
-            {"cenario": "Cenário 2 · mais turnos", "turnos_liberados": 3, "passos": 4, "profissionais_afetadas": 2, "pacientes_movidos": 4, "trocam_de_profissional": 3, "trocam_de_dia": 0, "passos_iguais_ao_recomendado": 3, "recomendado": false},
-            {"cenario": "Cenário 3 · menos mudança", "turnos_liberados": 2, "passos": 3, "profissionais_afetadas": 2, "pacientes_movidos": 3, "trocam_de_profissional": 2, "trocam_de_dia": 0, "passos_iguais_ao_recomendado": 3, "recomendado": false}
+            {"cenario": "Cenário 1 · equilibrado", "turnos_liberados": 3, "passos": 4, "profissionais_afetadas": 2, "pacientes_movidos": 4, "trocam_de_profissional": 3, "trocam_de_dia": 0, "profissionais_sem_atendimento": 0, "turnos_sem_profissional": 2, "passos_iguais_ao_recomendado": 0, "recomendado": true},
+            {"cenario": "Cenário 2 · mais turnos", "turnos_liberados": 3, "passos": 4, "profissionais_afetadas": 2, "pacientes_movidos": 4, "trocam_de_profissional": 3, "trocam_de_dia": 0, "profissionais_sem_atendimento": 0, "turnos_sem_profissional": 2, "passos_iguais_ao_recomendado": 3, "recomendado": false},
+            {"cenario": "Cenário 3 · menos mudança", "turnos_liberados": 2, "passos": 3, "profissionais_afetadas": 2, "pacientes_movidos": 3, "trocam_de_profissional": 2, "trocam_de_dia": 0, "profissionais_sem_atendimento": 0, "turnos_sem_profissional": 1, "passos_iguais_ao_recomendado": 3, "recomendado": false}
           ]
         }
       ],

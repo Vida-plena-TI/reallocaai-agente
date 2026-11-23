@@ -77,6 +77,9 @@ def _conferir(payload: dict[str, Any], foto: FotografiaPeriodo, cenario: Cenario
     assert resultado.novos == 0 == cenario.resumo.turnos_novos
     assert resultado.liberados == cenario.resumo.turnos_liberados >= len(cenario.turnos_liberados)
     assert resultado.liberados - resultado.novos >= 0
+    # As colunas de cobertura do quadro, recontadas na grade crua.
+    assert resultado.profissionais_sem_atendimento == len(cenario.resumo.profissionais_sem_presenca)
+    assert resultado.turnos_sem_profissional == len(cenario.resumo.sem_cobertura)
     for passo in cenario.passos:
         assert passo.para.blocos == passo.de.blocos
         assert passo.alavanca is not Alavanca.L4 or passo.outro_dia

@@ -22,7 +22,7 @@ import re
 import unicodedata
 from collections import Counter
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from typing import Any, Literal
 
@@ -600,6 +600,8 @@ class ResultadoCenario:
     problemas: list[str]
     turnos_antes: set[tuple[str, date, Turno]]
     turnos_depois: set[tuple[str, date, Turno]]
+    #: Rótulo de terapia (normalizado) de cada profissional (normalizado) da grade.
+    terapias: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def liberados(self) -> int:
@@ -608,6 +610,23 @@ class ResultadoCenario:
     @property
     def novos(self) -> int:
         return len(self.turnos_depois - self.turnos_antes)
+
+    @property
+    def profissionais_sem_atendimento(self) -> int:
+        """Profissionais com sessão antes e nenhuma depois, na semana inteira."""
+        return len({t[0] for t in self.turnos_antes} - {t[0] for t in self.turnos_depois})
+
+    def _cobertura(self, turnos: set[tuple[str, date, Turno]]) -> set[tuple[str, date, Turno]]:
+        return {
+            (terapia, dia, turno)
+            for profissional, dia, turno in turnos
+            if (terapia := self.terapias.get(profissional))
+        }
+
+    @property
+    def turnos_sem_profissional(self) -> int:
+        """(terapia, dia, turno) com sessão antes e sem nenhuma profissional depois."""
+        return len(self._cobertura(self.turnos_antes) - self._cobertura(self.turnos_depois))
 
 
 def validar_cenario(
@@ -620,7 +639,9 @@ def validar_cenario(
     mesma duração, e estar vago naquele momento (trocar de profissional da mesma
     terapia vale, menos para quem só abre espaço). No fim: ninguém em dois lugares
     ao mesmo tempo, sessões por (paciente, terapia, dia) até max(antes, 1), as
-    terapias de cada paciente na semana iguais e nenhum turno novo.
+    terapias de cada paciente na semana iguais e nenhum turno novo. Também reconta,
+    da grade antes e depois, quem fica sem atendimento na semana e os turnos de uma
+    terapia que ficam sem nenhuma profissional (`ResultadoCenario`).
     """
     grade, profissionais, rotulos = _profissionais_das_colunas(payload, dias)
     antes_turnos = _turnos_da_grade(grade, profissionais, rotulos)
@@ -693,4 +714,9 @@ def validar_cenario(
     depois_turnos = _turnos_da_grade(grade, profissionais, rotulos)
     if depois_turnos - antes_turnos:
         problemas.append("o cenário abre turno que estava vazio")
-    return ResultadoCenario(problemas, antes_turnos, depois_turnos)
+    # A terapia de cada profissional: o primeiro rótulo entre parênteses dela na semana.
+    terapias: dict[str, str] = {}
+    for (dia, sala), profissional in sorted(profissionais.items()):
+        if rotulo := _normalizar(rotulos.get((dia, sala), "")):
+            terapias.setdefault(_normalizar(profissional), rotulo)
+    return ResultadoCenario(problemas, antes_turnos, depois_turnos, terapias)
