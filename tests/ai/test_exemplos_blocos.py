@@ -197,3 +197,28 @@ def test_exemplo_do_panorama_de_enxugamento() -> None:
     for aba in abas:
         assert len(aba) <= 31
         assert not set(aba) & set("\\/?*[]:")
+
+
+def test_resposta_do_panorama_na_doc_da_api_acompanha_os_exemplos() -> None:
+    """O exemplo da resposta completa (dois blocos) em docs/api-relatorios.md traz os
+    blocos versionados, na ordem da tool, e o resumo determinístico deles."""
+    import json
+    import re
+
+    from app.ai.blocos_enxugamento import resumo_do_panorama
+    from app.ai.relatorios import BlocoRelatorio
+
+    doc = (DIRETORIO.parent / "api-relatorios.md").read_text(encoding="utf-8")
+    achado = re.search(r"<!-- exemplo-resposta-panorama -->\n```json\n(.*?)\n```", doc, re.S)
+    assert achado is not None
+    resposta = json.loads(achado[1])
+    exemplos = gerar_exemplos()
+    blocos = [
+        json.loads(exemplos["tabela_generica_panorama_enxugamento_comparativo.json"]),
+        json.loads(exemplos["tabela_generica_panorama_enxugamento.json"]),
+    ]
+    assert resposta["blocos"] == blocos
+    assert resposta["resposta_sensivel"] is True
+    assert resposta["resposta"] == resumo_do_panorama(
+        [BlocoRelatorio.model_validate(b) for b in blocos]
+    )

@@ -347,11 +347,17 @@ por uma recontagem dos turnos pagos. As regras ficam em `app/domain/constants.py
 (`TURNO_CORTE`, `MAX_PACIENTES_TURNO_CANDIDATO`, `PERMITIR_TROCAR_DIA_ENXUGAMENTO`,
 `MAX_DESLOCADOS_CADEIA`, `MAX_AVALIACOES_ENXUGAMENTO`, pesos das alavancas…).
 
-O bloco é `tabela_generica` com `relatorio: "panorama_enxugamento"`, `periodo: null`, agrupado
-por cenário e turno liberado, e `contem_dados_pacientes: true`. **Sensível de RH:** os nomes de
-pacientes e de profissionais vão só no bloco; o texto que o modelo lê e a resposta só têm
-contagens e códigos, os nomes passados à tool nunca vão para log, e a resposta que citar um nome
-vira o resumo determinístico. O agente não conhece valores (nunca fala em dinheiro), usa
+A resposta traz **dois blocos** `tabela_generica`, ambos com `relatorio: "panorama_enxugamento"`,
+`periodo: null` e `contem_dados_pacientes: true`: o **quadro comparativo** (uma linha por cenário,
+só números) e os **passos** do cenário recomendado, agrupados por cenário, com o tipo de movimento
+em rótulo legível e observação só nas exceções. Para ver outro cenário ("quero ver o Cenário 3"),
+o modelo chama a tool de novo com `detalhar_cenarios` (os mesmos parâmetros regeram os mesmos
+cenários e códigos); o cenário não recomendado mostra só os passos que diferem do Cenário 1, com
+título e aviso que dizem isso. **Sensível de RH:** os nomes de pacientes e de profissionais vão só
+no bloco de passos; o texto que o modelo lê só tem contagens e o mapa "Cenário N = código", e a
+resposta (3 a 4 frases: recomendação com números, o que confirmar e "Quer ver os passos do
+Cenário N?") não pode ter nome nem código: se tiver, vira o resumo determinístico. Os nomes
+passados à tool nunca vão para log. O agente não conhece valores (nunca fala em dinheiro), usa
 linguagem neutra ("turno liberado") e só sugere. Só pelo chat (`POST /relatorios/gerar` devolve
 `422`). Nada é alterado na planilha. Contrato em
 [`docs/contrato-blocos-novos.md`](docs/contrato-blocos-novos.md).
