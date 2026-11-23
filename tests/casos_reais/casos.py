@@ -1173,7 +1173,8 @@ def _cenarios_validos_pelo_oraculo(
     inteiro (o recomendado, um subconjunto dele, um idêntico ou um sem passo igual ao dele),
     aplicado à grade crua pelo
     oráculo na ordem dos passos, é válido, não abre turno, libera os turnos que o rótulo
-    e o quadro dizem, e confere com a linha do quadro (recontada das linhas). O cenário
+    e o quadro dizem, e confere com a linha do quadro (recontada das linhas; quem fica sem
+    atendimento e os turnos sem profissional, recontados pelo oráculo). O cenário
     mostrado só com o que difere do Cenário 1 confere na quantidade de passos."""
     quadro = _comparativo(turnos)
     if not quadro:
@@ -1222,7 +1223,10 @@ def _cenarios_validos_pelo_oraculo(
                 problemas.append(
                     f"{nome}: libera {resultado.liberados}, o rótulo diz {achado['n']}"
                 )
-            recontado = _recontagem(linhas)
+            recontado = _recontagem(linhas) | {
+                "profissionais_sem_atendimento": resultado.profissionais_sem_atendimento,
+                "turnos_sem_profissional": resultado.turnos_sem_profissional,
+            }
             diferentes = sorted(k for k, v in recontado.items() if linha_do_quadro[k] != v)
             if diferentes:
                 problemas.append(f"{nome}: comparativo difere em {', '.join(diferentes)}")

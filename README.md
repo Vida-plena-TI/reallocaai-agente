@@ -349,7 +349,10 @@ por uma recontagem dos turnos pagos. As regras ficam em `app/domain/constants.py
 
 A resposta traz **dois blocos** `tabela_generica`, ambos com `relatorio: "panorama_enxugamento"`,
 `periodo: null` e `contem_dados_pacientes: true`: o **quadro comparativo** (uma linha por cenário,
-só números) e os **passos** do cenário recomendado, agrupados por cenário, com o tipo de movimento
+só números, inclusive quantas profissionais ficam sem atendimento na semana e quantos turnos de
+uma terapia ficam sem profissional, nas colunas `profissionais_sem_atendimento` e
+`turnos_sem_profissional`; os avisos do quadro são só os gerais, com a legenda dessas colunas) e
+os **passos** do cenário recomendado, agrupados por cenário, com o tipo de movimento
 em rótulo legível e observação só nas exceções. Para ver outro cenário ("quero ver o Cenário 3"),
 o modelo chama a tool de novo com `detalhar_cenarios` (os mesmos parâmetros regeram os mesmos
 cenários e códigos); o cenário não recomendado mostra só os passos que diferem do Cenário 1, com

@@ -29,7 +29,9 @@ from app.ai.agente import criar_agente, perguntar_com_mensagens
 from app.ai.blocos_enxugamento import (
     ABA_CENARIOS,
     ABA_PASSOS,
+    AVISO_BUSCA_LIMITADA,
     AVISO_CONFIRMAR,
+    AVISO_LEGENDA_COBERTURA,
     AVISOS_PANORAMA,
     OBSERVACAO_ABRE_ESPACO,
     OBSERVACAO_SEM_PRESENCA,
@@ -65,6 +67,8 @@ from app.engine.enxugamento import (
     planejar_enxugamento,
 )
 from app.engine.fotografia import FotografiaPeriodo, fotografar_periodo
+from app.engine.grade_simulada import Lugar
+from tests.casos_reais import oraculo
 from tests.casos_reais.planilha import PlanilhaContada, payload_da_semana
 from tests.support.fake_chat_model import FakeToolCallingChatModel
 
@@ -145,7 +149,8 @@ def test_texto_so_com_contagens_e_dois_blocos_com_os_nomes() -> None:
     assert "agrupar_por" not in comparativo["dados"]
     assert [c["chave"] for c in comparativo["dados"]["colunas"]] == [
         "cenario", "turnos_liberados", "passos", "profissionais_afetadas", "pacientes_movidos",
-        "trocam_de_profissional", "trocam_de_dia", "passos_iguais_ao_recomendado", "recomendado",
+        "trocam_de_profissional", "trocam_de_dia", "profissionais_sem_atendimento",
+        "turnos_sem_profissional", "passos_iguais_ao_recomendado", "recomendado",
     ]  # fmt: skip
     dados = passos["dados"]
     assert dados["agrupar_por"] == ["cenario"]
@@ -167,6 +172,7 @@ def test_texto_so_com_contagens_e_dois_blocos_com_os_nomes() -> None:
     assert all(_sem_nomes(json.dumps(item, ensure_ascii=False)) for item in passos["resumo"])
     assert _sem_nomes(" ".join(passos["avisos"]))
     assert set(AVISOS_PANORAMA) <= set(comparativo["avisos"])
+    assert AVISO_LEGENDA_COBERTURA in comparativo["avisos"]
     assert AVISO_CONFIRMAR in passos["avisos"]
     validado = BlocoRelatorio.model_validate(passos)
     assert "Paciente Ficticio Aroeira" in nomes_de_pacientes_no_bloco(validado)
@@ -208,13 +214,57 @@ def test_cenarios_ja_vistos_pela_tool() -> None:
     assert novos and novos.isdisjoint(vistos)
 
 
-def test_aviso_de_quem_fica_sem_atendimento_na_semana() -> None:
+def test_quem_fica_sem_atendimento_na_semana_vai_na_coluna() -> None:
     mensagem = _invocar({}, _fonte("enxugamento_tres"))
     comparativo, passos = _blocos(mensagem)
-    assert any("sem atendimento na semana" in aviso for aviso in comparativo["avisos"])
+    linhas = comparativo["dados"]["linhas"]
+    assert [linha["profissionais_sem_atendimento"] for linha in linhas] == [1, 1]
+    assert [linha["turnos_sem_profissional"] for linha in linhas] == [0, 0]
+    # A observação do passo continua (no bloco restrito); o aviso por cenário, não.
     assert any(
         OBSERVACAO_SEM_PRESENCA in linha["observacao"] for linha in passos["dados"]["linhas"]
     )
+    assert "1 profissional sem atendimento na semana" in str(mensagem.content)
+    assert _sem_nomes(str(mensagem.content))
+
+
+#: Avisos por cenário que saíram do quadro (viraram as colunas de cobertura).
+_AVISO_POR_CENARIO = re.compile(r"^Cenário \d+:|sem atendimento na semana|ficariam? sem nenhum")
+
+
+@pytest.mark.parametrize(
+    ("cenario", "args"),
+    [
+        ("enxugamento", {}),
+        ("enxugamento", {"permitir_trocar_dia": True}),
+        ("enxugamento_tres", {}),
+        ("enxugamento_cadeia", {}),
+        ("enxugamento_presos", {}),
+    ],
+    ids=["padrao", "trocar-dia", "tres", "cadeia", "presos"],
+)
+def test_avisos_so_os_gerais_e_a_legenda(cenario: str, args: dict[str, Any]) -> None:
+    mensagem = _invocar(args, _fonte(cenario))
+    comparativo, passos = _blocos(mensagem)
+    avisos = comparativo["avisos"]
+    gerais = list(AVISOS_PANORAMA)
+    assert avisos[: len(gerais)] == gerais
+    assert avisos[-1] == AVISO_LEGENDA_COBERTURA
+    # Entre os fixos e a legenda, só os turnos presos por regra, a busca limitada e os
+    # dias não lidos (quando houver).
+    for aviso in avisos[len(gerais) : -1]:
+        assert (
+            "por regra: " in aviso
+            or aviso == AVISO_BUSCA_LIMITADA
+            or aviso.startswith("Não foi possível ler: ")
+        ), aviso
+    assert any("por regra: " in aviso for aviso in avisos) is (cenario == "enxugamento_presos")
+    assert not any(_AVISO_POR_CENARIO.search(aviso) for aviso in avisos)
+    # Passos: só o confirmar com a família (e o da comparação, quando há).
+    assert passos["avisos"] == [AVISO_CONFIRMAR]
+    assert not any(_AVISO_POR_CENARIO.search(aviso) for aviso in passos["avisos"])
+    # A legenda e os números saem também no texto do modelo, sem nomes.
+    assert AVISO_LEGENDA_COBERTURA in str(mensagem.content)
     assert _sem_nomes(str(mensagem.content))
 
 
@@ -460,13 +510,49 @@ def test_resposta_so_com_contagens_passa(caplog: pytest.LogCaptureFixture) -> No
 # --- quadro comparativo, detalhe por cenário e texto de abertura ---------------
 
 
-def _recontar(foto: FotografiaPeriodo, panorama: PanoramaEnxugamento) -> list[dict[str, Any]]:
+def _lugar_no_oraculo(foto: FotografiaPeriodo, lugar: Lugar) -> oraculo.LugarDoPlano:
+    return oraculo.LugarDoPlano(
+        dia=lugar.data,
+        inicio=lugar.hora_inicio,
+        fim=lugar.hora_fim,
+        profissional=foto.nome_profissional(lugar.profissional_id),
+        sala=int(foto.nome_sala(lugar.sala_id).split()[-1]),
+    )
+
+
+def _no_oraculo(
+    payload: dict[str, Any], foto: FotografiaPeriodo, passos: Any
+) -> oraculo.ResultadoCenario:
+    """O cenário aplicado à grade crua pelo oráculo (independente do motor)."""
+    resultado = oraculo.validar_cenario(
+        payload,
+        dias_da_semana_de(HOJE),
+        [
+            oraculo.PassoDoCenario(
+                paciente=p.paciente,
+                de=_lugar_no_oraculo(foto, p.de),
+                para=_lugar_no_oraculo(foto, p.para),
+                abre_espaco=p.abre_espaco,
+            )
+            for p in passos
+        ],
+    )
+    assert resultado.problemas == []
+    return resultado
+
+
+def _recontar(
+    foto: FotografiaPeriodo, panorama: PanoramaEnxugamento, cenario_da_semana: str = CENARIO
+) -> list[dict[str, Any]]:
     """Recontagem independente do quadro, direto dos passos do motor (pelos nomes, que são
-    únicos na semana fictícia, e pelos lugares)."""
+    únicos na semana fictícia, e pelos lugares); as colunas de cobertura, pelo oráculo
+    na grade crua."""
+    payload = payload_da_semana(cenario_da_semana)
     recomendado = {(p.paciente, p.de, p.para) for p in panorama.cenarios[0].passos}
     linhas = []
     for numero, cenario in enumerate(panorama.cenarios, 1):
         passos = cenario.passos
+        pelo_oraculo = _no_oraculo(payload, foto, passos)
         linhas.append(
             {
                 "turnos_liberados": len(cenario.turnos_liberados),
@@ -480,6 +566,8 @@ def _recontar(foto: FotografiaPeriodo, panorama: PanoramaEnxugamento) -> list[di
                     {p.paciente for p in passos if p.de.profissional_id != p.para.profissional_id}
                 ),
                 "trocam_de_dia": len({p.paciente for p in passos if p.de.data != p.para.data}),
+                "profissionais_sem_atendimento": pelo_oraculo.profissionais_sem_atendimento,
+                "turnos_sem_profissional": pelo_oraculo.turnos_sem_profissional,
                 "passos_iguais_ao_recomendado": 0
                 if numero == 1
                 else sum((p.paciente, p.de, p.para) in recomendado for p in passos),
@@ -510,6 +598,56 @@ def test_quadro_confere_com_a_recontagem() -> None:
             if chave not in ("cenario", "recomendado"):
                 assert type(valor) is int, chave
     assert [linha["recomendado"] for linha in linhas] == [True, False, False, False, False]
+    assert [linha["turnos_sem_profissional"] for linha in linhas] == [2, 2, 1, 1, 1]
+    assert [linha["profissionais_sem_atendimento"] for linha in linhas] == [0, 0, 0, 0, 0]
+    # A aba "Cenários" (Excel) leva as mesmas colunas e linhas, com inteiros como inteiros.
+    (aba,) = comparativo["tabelas"]
+    assert aba["nome"] == ABA_CENARIOS
+    assert aba["colunas"] == comparativo["dados"]["colunas"]
+    assert aba["linhas"] == linhas
+    formatos = {c["chave"]: c["formato"] for c in aba["colunas"]}
+    assert formatos["profissionais_sem_atendimento"] == "inteiro"
+    assert formatos["turnos_sem_profissional"] == "inteiro"
+
+
+@pytest.mark.parametrize(
+    ("cenario", "pedido"),
+    [
+        ("enxugamento", PedidoEnxugamento()),
+        ("enxugamento", PedidoEnxugamento(permitir_trocar_dia=True)),
+        ("enxugamento_tres", PedidoEnxugamento()),
+        ("enxugamento_cadeia", PedidoEnxugamento()),
+        ("enxugamento_presos", PedidoEnxugamento()),
+    ],
+    ids=["padrao", "trocar-dia", "zera-a-semana", "cadeia", "presos"],
+)
+def test_colunas_de_cobertura_conferem_com_o_oraculo(
+    cenario: str, pedido: PedidoEnxugamento
+) -> None:
+    """Quem fica sem atendimento na semana e os turnos de terapia sem profissional,
+    recontados pelo oráculo na grade crua; `enxugamento_tres` zera a semana de uma
+    profissional e `enxugamento` deixa turnos de terapia sem ninguém."""
+    semana = dias_da_semana_de(HOJE)
+    foto = fotografar_periodo(_fonte(cenario), semana[0], semana[-1])
+    panorama = planejar_enxugamento(foto, pedido)
+    _, blocos = panorama_enxugamento(foto, panorama)
+    linhas = blocos[0].dados.linhas  # type: ignore[union-attr]
+    payload = payload_da_semana(cenario)
+    recontado = [
+        (r.profissionais_sem_atendimento, r.turnos_sem_profissional)
+        for r in (_no_oraculo(payload, foto, c.passos) for c in panorama.cenarios)
+    ]
+    assert [
+        (linha["profissionais_sem_atendimento"], linha["turnos_sem_profissional"])
+        for linha in linhas
+    ] == recontado
+    for linha in linhas:
+        assert type(linha["profissionais_sem_atendimento"]) is int
+        assert type(linha["turnos_sem_profissional"]) is int
+    if cenario == "enxugamento_tres":
+        assert all(sem >= 1 for sem, _ in recontado)
+    if cenario == "enxugamento" and not pedido.permitir_trocar_dia:
+        assert all(turnos >= 1 for _, turnos in recontado)
 
 
 def test_por_padrao_so_o_recomendado_e_detalhado() -> None:

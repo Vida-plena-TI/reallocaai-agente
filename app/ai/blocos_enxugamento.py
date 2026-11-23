@@ -63,6 +63,8 @@ COLUNAS_COMPARATIVO: Final[list[tuple[str, str, Formato]]] = [
     ("pacientes_movidos", "Pacientes movidos", "inteiro"),
     ("trocam_de_profissional", "Trocam de profissional", "inteiro"),
     ("trocam_de_dia", "Trocam de dia", "inteiro"),
+    ("profissionais_sem_atendimento", "Profissionais sem atendimento", "inteiro"),
+    ("turnos_sem_profissional", "Turnos sem profissional", "inteiro"),
     ("passos_iguais_ao_recomendado", "Passos iguais ao recomendado", "inteiro"),
     ("recomendado", "Recomendado", "texto"),
 ]
@@ -94,6 +96,13 @@ AVISOS_PANORAMA: Final[tuple[str, ...]] = (
     "Não considera a disponibilidade dos pacientes.",
     "Vagas livres na grade podem estar reservadas (reuniões, supervisão); confira antes de mudar.",
     AVISO_CONFIRMAR,
+)
+#: Legenda das colunas de cobertura do quadro (um aviso geral, no lugar dos avisos
+#: por cenário).
+AVISO_LEGENDA_COBERTURA: Final[str] = (
+    "Profissionais sem atendimento: ficam sem nenhum paciente na semana. Turnos sem "
+    "profissional: turnos de uma terapia em que ninguém atenderia, num dia em que hoje há "
+    "atendimento."
 )
 AVISO_BUSCA_LIMITADA: Final[str] = (
     "Busca limitada: havia combinações demais e nem todas foram avaliadas; pode existir "
@@ -220,6 +229,16 @@ def profissionais_afetadas(cenario: Cenario) -> int:
     return len({lugar.profissional_id for p in cenario.passos for lugar in (p.de, p.para)})
 
 
+def profissionais_sem_atendimento(cenario: Cenario) -> int:
+    """Profissionais que ficam sem nenhum atendimento na semana (zeram a semana)."""
+    return len(cenario.resumo.profissionais_sem_presenca)
+
+
+def turnos_sem_profissional(cenario: Cenario) -> int:
+    """(dia, turno, terapia) com atendimento hoje que ficaria sem nenhuma profissional."""
+    return len(cenario.resumo.sem_cobertura)
+
+
 def _linhas_do_comparativo(panorama: PanoramaEnxugamento) -> list[dict[str, ValorSimples]]:
     recomendado = panorama.cenarios[0]
     return [
@@ -231,6 +250,8 @@ def _linhas_do_comparativo(panorama: PanoramaEnxugamento) -> list[dict[str, Valo
             "pacientes_movidos": cenario.resumo.pacientes_movidos,
             "trocam_de_profissional": cenario.resumo.pacientes_trocam_profissional,
             "trocam_de_dia": cenario.resumo.pacientes_trocam_dia,
+            "profissionais_sem_atendimento": profissionais_sem_atendimento(cenario),
+            "turnos_sem_profissional": turnos_sem_profissional(cenario),
             "passos_iguais_ao_recomendado": passos_iguais(cenario, recomendado),
             "recomendado": numero == 1,
         }
@@ -344,7 +365,8 @@ def _presos(presos: dict[MotivoPreso, int] | Counter[MotivoPreso]) -> str:
 
 
 def avisos_do_panorama(foto: FotografiaPeriodo, panorama: PanoramaEnxugamento) -> list[str]:
-    """Avisos fixos e os do resultado, só com contagens (sem nomes)."""
+    """Avisos gerais, só com contagens (sem nomes). Os números por cenário (quem fica
+    sem atendimento, turnos sem profissional) são colunas do quadro, com uma legenda aqui."""
     avisos = list(AVISOS_PANORAMA)
     presos = sum(panorama.presos.values())
     if presos:
@@ -352,25 +374,14 @@ def avisos_do_panorama(foto: FotografiaPeriodo, panorama: PanoramaEnxugamento) -
             presos, "turno leve não pode ser liberado", "turnos leves não podem ser liberados"
         )
         avisos.append(f"{leves} por regra: {_presos(dict(panorama.presos))}.")
-    for numero, cenario in enumerate(panorama.cenarios, 1):
-        sem_cobertura = len(cenario.resumo.sem_cobertura)
-        if sem_cobertura:
-            turnos = _n(sem_cobertura, "turno de terapia ficaria", "turnos de terapia ficariam")
-            avisos.append(
-                f"Cenário {numero}: {turnos} sem nenhum profissional atendendo, num dia em que "
-                "hoje tem."
-            )
-        sem_presenca = len(cenario.resumo.profissionais_sem_presenca)
-        if sem_presenca:
-            avisos.append(
-                f"Cenário {numero}: este cenário deixa "
-                f"{_n(sem_presenca, 'profissional', 'profissionais')} sem atendimento na semana."
-            )
     if panorama.estatistica.busca_limitada:
         avisos.append(AVISO_BUSCA_LIMITADA)
     if foto.dias_nao_lidos:
         dias = ", ".join(_DIAS_CURTOS[d.weekday()] for d in sorted(set(foto.dias_nao_lidos)))
         avisos.append(f"Não foi possível ler: {dias}; a sugestão não considera esses dias.")
+    if panorama.cenarios:
+        # A legenda das colunas do quadro, por último.
+        avisos.append(AVISO_LEGENDA_COBERTURA)
     return avisos
 
 
@@ -404,6 +415,9 @@ def _descricao_do_cenario(numero: int, cenario: Cenario, recomendado: Cenario) -
         f"({r.pacientes_trocam_profissional} de profissional, {r.pacientes_trocam_dia} de dia, "
         f"{r.pacientes_trocam_turno} de turno); "
         f"{_n(profissionais_afetadas(cenario), 'profissional afetada', 'profissionais afetadas')}"
+        f"; {_n(profissionais_sem_atendimento(cenario), 'profissional', 'profissionais')} "
+        "sem atendimento na semana; "
+        f"{_n(turnos_sem_profissional(cenario), 'turno', 'turnos')} sem profissional"
         f"; deslocamento médio de {str(r.minutos_medio).replace('.', ',')} min e máximo de "
         f"{r.minutos_maximo} min{ocupacao}{iguais}."
     )

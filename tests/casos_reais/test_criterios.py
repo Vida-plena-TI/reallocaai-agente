@@ -706,6 +706,14 @@ def test_cenarios_validos_pelo_oraculo_reprova_destino_ocupado_rotulo_e_quadro_e
     resultado = _rodar_panorama("cenarios_validos_pelo_oraculo", [turno])
     assert not resultado.ok and "comparativo difere em pacientes_movidos" in resultado.detalhe
 
+    # As colunas de cobertura são recontadas pelo oráculo na grade crua.
+    for chave in ("profissionais_sem_atendimento", "turnos_sem_profissional"):
+        comparativo, passos = _panorama()
+        comparativo["dados"]["linhas"][0][chave] += 1
+        turno = _turno_do_panorama([comparativo, passos])
+        resultado = _rodar_panorama("cenarios_validos_pelo_oraculo", [turno])
+        assert not resultado.ok and f"comparativo difere em {chave}" in resultado.detalhe
+
 
 def test_sem_nomes_de_profissional() -> None:
     limpo = _turno_do_panorama(resposta="Sugiro o Cenário 1.")
