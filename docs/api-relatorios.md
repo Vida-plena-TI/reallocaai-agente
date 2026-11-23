@@ -251,3 +251,42 @@ tool `planejar_enxugamento` do agente (`POST /agenda/chat`), como um bloco `tabe
   grupo; o front monta o título de cada grupo no padrão `valor (N unidade)`. As tabelas de
   exportação continuam planas: **Passos** e **Resumo dos cenários**.
 - O bloco traz `contem_dados_pacientes: true` (campo opcional da versão 1).
+
+## Resposta do chat: `resposta_sensivel`
+
+`POST /agenda/chat` devolve `conversa_id`, `resposta` (o texto) e `blocos`. Desde 2026-11-23 há
+também o campo opcional **`resposta_sensivel`**, no nível da resposta (ao lado do texto e dos
+blocos, nunca dentro de um bloco), para o chatbot trocar o texto pelo texto fixo quando o usuário
+não é do grupo da coordenação.
+
+- **Semântica:** `true` sempre que a rodada (o turno atual) usou uma tool restrita, **com ou sem
+  bloco**; ausente nas demais respostas (nunca `false` nem `null`). Tools restritas
+  (`TOOLS_RESTRITAS` em `app/ai/relatorios.py`): `planejar_enxugamento`, `planejar_realocacao`,
+  `pacientes_por_plano`, `listar_pacientes_por_profissional` e `gerar_relatorio` com
+  `relatorio: "agenda_paciente"`.
+- **Sem bloco também conta:** o panorama sem cenário (só contagens), a pergunta de profissional
+  ambígua do enxugamento, a realocação que pergunta o que falta ou não encontra opção, os
+  pacientes por plano ou por profissional sem resultado e a agenda de um paciente que não está na
+  agenda trazem `resposta_sensivel: true` mesmo com `blocos: []`.
+- A decisão é pelo nome das tools chamadas no turno, não pelo bloco. Uma tool restrita de um
+  turno anterior da mesma conversa não marca o turno atual.
+- O campo carrega só a flag: nenhum nome nem conteúdo. Os blocos não mudaram (o bloco com nomes
+  continua com `contem_dados_pacientes: true`), e `GET /agenda/chat/{conversa_id}` não traz o
+  campo.
+- Campo opcional da versão 1 (regra em
+  [`contrato-blocos-novos.md`](contrato-blocos-novos.md#campos-opcionais-versão-1)): o cliente
+  ignora campo que não conhece.
+
+Exemplo (panorama de enxugamento sem cenário, sem bloco):
+
+```json
+{
+  "conversa_id": "3f1c…",
+  "resposta": "Não encontrei movimentação que libere turno sem abrir outro, mantendo a terapia e a duração de cada paciente.",
+  "blocos": [],
+  "resposta_sensivel": true
+}
+```
+
+Numa pergunta de disponibilidade, encaixe, plano semanal, profissionais ou numa conversa sem
+tool, o campo não aparece.

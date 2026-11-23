@@ -6,8 +6,9 @@ detalhe interno do domínio mudar.
 """
 
 from datetime import date
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, WithJsonSchema, field_validator
 
 from app.ai.relatorios import BlocoRelatorio
 from app.ai.tools_relatorios import ArgsGerarRelatorio
@@ -88,6 +89,23 @@ class ChatResponse(BaseModel):
             "Sempre presente; vazio quando não houver relatório. O RealocAI não gera arquivos."
         ),
     )
+    # Opcional (adição de 2026-11-23, versão 1): `true` sempre que a rodada chamou
+    # uma tool restrita (`TOOLS_RESTRITAS`), com ou sem bloco; ausente nas demais
+    # (nunca `false` nem `null`). Só a flag: nenhum nome nem conteúdo.
+    resposta_sensivel: Annotated[
+        Literal[True] | None,
+        WithJsonSchema(
+            {
+                "const": True,
+                "type": "boolean",
+                "description": (
+                    "Opcional. Presente (e true) sempre que a rodada usou uma tool restrita "
+                    "(planejamento de realocação ou de enxugamento, ou relatório com nomes de "
+                    "pacientes), com ou sem bloco. Ausente nas demais respostas."
+                ),
+            }
+        ),
+    ] = Field(default=None, exclude_if=lambda valor: valor is None)
 
 
 class MensagemHistoricoResponse(BaseModel):
