@@ -911,7 +911,7 @@
      "type": "string"
     }
    },
-   "description": "Sugere um panorama de movimentações que liberam turnos de presença (manhã ou\ntarde) na grade semanal, com vários cenários na tela.\n\nUse quando perguntarem que movimentações dá para fazer para enxugar a agenda,\nreduzir turnos ou concentrar atendimentos, ou \"e se a X ficar só de tarde?\".\nUm turno só fica liberado se todos os pacientes dele forem para turnos que já\nacontecem; ninguém muda de terapia nem de duração. Para mais opções, chame de\nnovo com cenarios_ja_vistos. Você recebe só contagens e códigos: NUNCA escreva\nnomes de pacientes nem de profissionais, nunca fale em valores, salário ou\ndinheiro (só turnos liberados) e nunca diga que moveu, liberou ou economizou:\napenas sugira. Grade semanal: não cite datas.",
+   "description": "Sugere um panorama de movimentações que liberam turnos de presença (manhã ou\ntarde) na grade semanal, com vários cenários na tela.\n\nUse quando perguntarem que movimentações dá para fazer para enxugar a agenda,\nreduzir turnos ou concentrar atendimentos, ou \"e se a X ficar só de tarde?\".\nUm turno só fica liberado se todos os pacientes dele forem para turnos que já\nacontecem; ninguém muda de terapia nem de duração. A tela mostra o comparativo e\nos passos do recomendado; para ver outro cenário, chame de novo com\ndetalhar_cenarios, e para mais opções, com cenarios_ja_vistos. Você recebe só\ncontagens e códigos: NUNCA escreva nomes de pacientes nem de profissionais nem\ncódigos de cenário, nunca fale em valores, salário ou dinheiro (só turnos\nliberados) e nunca diga que moveu, liberou ou economizou: apenas sugira. Grade\nsemanal: não cite datas.",
    "properties": {
     "cenarios_ja_vistos": {
      "anyOf": [
@@ -928,6 +928,22 @@
      "default": null,
      "description": "Códigos dos cenários já mostrados nesta conversa (ex.: 'E-3F2A'), quando pedirem mais opções.",
      "title": "Cenarios Ja Vistos"
+    },
+    "detalhar_cenarios": {
+     "anyOf": [
+      {
+       "items": {
+        "type": "string"
+       },
+       "type": "array"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "description": "Códigos dos cenários cujos passos mostrar, quando pedirem para ver um cenário (\"quero ver o Cenário 3\"): use o código do mapa \"Cenário N = código\" e repita os demais parâmetros da chamada anterior. Em branco: só os passos do recomendado.",
+     "title": "Detalhar Cenarios"
     },
     "dias_semana": {
      "anyOf": [
@@ -1049,7 +1065,7 @@
    "title": "planejar_enxugamento",
    "type": "object"
   },
-  "descricao": "Sugere um panorama de movimentações que liberam turnos de presença (manhã ou\ntarde) na grade semanal, com vários cenários na tela.\n\nUse quando perguntarem que movimentações dá para fazer para enxugar a agenda,\nreduzir turnos ou concentrar atendimentos, ou \"e se a X ficar só de tarde?\".\nUm turno só fica liberado se todos os pacientes dele forem para turnos que já\nacontecem; ninguém muda de terapia nem de duração. Para mais opções, chame de\nnovo com cenarios_ja_vistos. Você recebe só contagens e códigos: NUNCA escreva\nnomes de pacientes nem de profissionais, nunca fale em valores, salário ou\ndinheiro (só turnos liberados) e nunca diga que moveu, liberou ou economizou:\napenas sugira. Grade semanal: não cite datas.",
+  "descricao": "Sugere um panorama de movimentações que liberam turnos de presença (manhã ou\ntarde) na grade semanal, com vários cenários na tela.\n\nUse quando perguntarem que movimentações dá para fazer para enxugar a agenda,\nreduzir turnos ou concentrar atendimentos, ou \"e se a X ficar só de tarde?\".\nUm turno só fica liberado se todos os pacientes dele forem para turnos que já\nacontecem; ninguém muda de terapia nem de duração. A tela mostra o comparativo e\nos passos do recomendado; para ver outro cenário, chame de novo com\ndetalhar_cenarios, e para mais opções, com cenarios_ja_vistos. Você recebe só\ncontagens e códigos: NUNCA escreva nomes de pacientes nem de profissionais nem\ncódigos de cenário, nunca fale em valores, salário ou dinheiro (só turnos\nliberados) e nunca diga que moveu, liberou ou economizou: apenas sugira. Grade\nsemanal: não cite datas.",
   "formato_resposta": "content_and_artifact"
  },
  "planejar_realocacao": {

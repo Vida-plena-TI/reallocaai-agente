@@ -12,6 +12,7 @@ horários, salas, contagens e o termo encontrado — nunca o texto da resposta
 nem nomes de pacientes.
 """
 
+import json
 import re
 import unicodedata
 from collections import Counter
@@ -968,7 +969,8 @@ def _sem_nomes_de_paciente(
         _normalizar(parte)
         for bloco in blocos
         for linha in bloco["dados"]["linhas"]
-        for parte in str(linha["paciente"]).split(" / ")
+        # O quadro comparativo do panorama tem a marca, mas não tem a coluna `paciente`.
+        for parte in str(linha.get("paciente") or "").split(" / ")
         if parte.strip() and parte.strip() != _PACIENTE_NOVO
     }
     textos = _normalizar(
@@ -1069,10 +1071,13 @@ def _plano_valido_pelo_oraculo(
 # --- panorama de enxugamento (c14, c15) ---------------------------------------
 
 _PANORAMA = "panorama_enxugamento"
-_ROTULO_CENARIO = re.compile(
-    r"^Cenário \d+ \((?P<codigo>E-[0-9A-F]{4})\) · .+ · libera (?P<n>\d+) turnos?$"
-)
+#: Título do grupo no bloco de passos: sem código e sem nomes.
+_ROTULO_CENARIO = re.compile(r"^Cenário (?P<numero>\d+) · [^·]+ · libera (?P<n>\d+) turnos?$")
 _TURNO_LIBERADO = re.compile(r"^(?P<dia>\S+) (?P<turno>manhã|tarde) · (?P<profissional>.+) · .+$")
+#: O mapa que só o texto da tool (o que o modelo lê) traz.
+_MAPA_DE_CODIGOS = re.compile(r"Cenário (\d+) = (E-[0-9A-F]{4})")
+_CODIGO_DE_CENARIO = re.compile(r"(?<![\w-])E-[0-9A-F]{4}(?![\w-])", re.IGNORECASE)
+_ABRE_ESPACO = "para abrir espaço"
 
 
 def _blocos_do_panorama(turnos: Sequence[TurnoObservado]) -> list[dict[str, Any]]:
@@ -1081,26 +1086,93 @@ def _blocos_do_panorama(turnos: Sequence[TurnoObservado]) -> list[dict[str, Any]
     ]
 
 
+def _chaves(bloco: Mapping[str, Any]) -> set[str]:
+    return {str(coluna["chave"]) for coluna in bloco["dados"]["colunas"]}
+
+
+def _comparativo(turnos: Sequence[TurnoObservado]) -> dict[int, dict[str, Any]]:
+    """Número do cenário -> linha do quadro comparativo (o primeiro bloco)."""
+    return {
+        int(achado[1]): linha
+        for bloco in _blocos_do_panorama(turnos)
+        if "recomendado" in _chaves(bloco)
+        for linha in bloco["dados"]["linhas"]
+        if (achado := re.match(r"Cenário (\d+) · ", str(linha["cenario"])))
+    }
+
+
+def _blocos_de_passos(turnos: Sequence[TurnoObservado]) -> list[dict[str, Any]]:
+    return [bloco for bloco in _blocos_do_panorama(turnos) if "passo" in _chaves(bloco)]
+
+
 def _cenarios_do_panorama(
     turnos: Sequence[TurnoObservado],
 ) -> dict[str, list[dict[str, Any]]]:
-    """Rótulo do cenário -> linhas (na ordem do bloco)."""
+    """Rótulo do cenário -> linhas do bloco de passos (na ordem do bloco)."""
     cenarios: dict[str, list[dict[str, Any]]] = {}
-    for bloco in _blocos_do_panorama(turnos):
+    for bloco in _blocos_de_passos(turnos):
         for linha in bloco["dados"]["linhas"]:
             cenarios.setdefault(str(linha["cenario"]), []).append(linha)
     return cenarios
+
+
+def _codigos(turno: TurnoObservado) -> dict[int, str]:
+    """`Cenário N = código`, do texto da tool."""
+    return {
+        int(numero): codigo
+        for texto in turno.textos_das_tools
+        for numero, codigo in _MAPA_DE_CODIGOS.findall(texto)
+    }
+
+
+def _profissional_do_lugar(texto: str) -> str:
+    partes = texto.split(" · ")
+    return _normalizar(partes[1]) if len(partes) >= 2 else ""
+
+
+def _recontagem(linhas: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    """O quadro recontado das linhas de passos (independente do motor)."""
+
+    def pacientes(linha: Mapping[str, Any]) -> set[str]:
+        return {p.strip() for p in str(linha["paciente"]).split(" / ") if p.strip()}
+
+    return {
+        "passos": len(linhas),
+        "pacientes_movidos": len(set().union(*(pacientes(x) for x in linhas))),
+        "profissionais_afetadas": len(
+            {_profissional_do_lugar(str(x[chave])) for x in linhas for chave in ("de", "para")}
+        ),
+        "trocam_de_profissional": len(
+            set().union(
+                *(
+                    pacientes(x)
+                    for x in linhas
+                    if _profissional_do_lugar(str(x["de"]))
+                    != _profissional_do_lugar(str(x["para"]))
+                )
+            )
+        ),
+        "trocam_de_dia": len(
+            set().union(*(pacientes(x) for x in linhas if str(x["de"])[:3] != str(x["para"])[:3]))
+        ),
+    }
 
 
 @_sobre_a_saida
 def _cenarios_validos_pelo_oraculo(
     c: Criterio, turnos: Sequence[TurnoObservado], ctx: Contexto
 ) -> ResultadoCriterio:
-    """De `minimo` a `maximo` cenários; cada um, aplicado à grade crua pelo oráculo na
-    ordem dos passos, é válido, não abre turno e libera os turnos que o rótulo diz."""
+    """De `minimo` a `maximo` cenários no quadro comparativo; cada cenário detalhado por
+    inteiro (o recomendado, ou outro sem passo igual ao dele), aplicado à grade crua pelo
+    oráculo na ordem dos passos, é válido, não abre turno, libera os turnos que o rótulo
+    e o quadro dizem, e confere com a linha do quadro (recontada das linhas). O cenário
+    mostrado só com o que difere do Cenário 1 confere na quantidade de passos."""
+    quadro = _comparativo(turnos)
+    if not quadro:
+        return _resultado(c, False, "sem panorama de enxugamento")
     cenarios = _cenarios_do_panorama(turnos)
     if not cenarios:
-        return _resultado(c, False, "sem panorama de enxugamento")
+        return _resultado(c, False, "sem passos do panorama")
     problemas: list[str] = []
     dias = list(ctx.semana.values())
     for rotulo, linhas in cenarios.items():
@@ -1108,29 +1180,45 @@ def _cenarios_validos_pelo_oraculo(
         if achado is None:
             problemas.append("rótulo de cenário fora do formato")
             continue
+        nome = f"Cenário {achado['numero']}"
+        linha_do_quadro = quadro.get(int(achado["numero"]))
+        if linha_do_quadro is None:
+            problemas.append(f"{nome}: fora do comparativo")
+            continue
+        if linha_do_quadro["turnos_liberados"] != int(achado["n"]):
+            problemas.append(f"{nome}: o rótulo e o comparativo não conferem")
+        iguais = linha_do_quadro["passos_iguais_ao_recomendado"]
+        if not linha_do_quadro["recomendado"] and iguais:
+            if len(linhas) != linha_do_quadro["passos"] - iguais:
+                problemas.append(f"{nome}: passos que diferem não conferem com o comparativo")
+            continue
         passos = []
         for linha in linhas:
             de = _lugar_do_plano(str(linha["de"]), ctx.semana)
             para = _lugar_do_plano(str(linha["para"]), ctx.semana)
             if de is None or para is None:
-                problemas.append(f"{achado['codigo']}: lugar fora do formato")
+                problemas.append(f"{nome}: lugar fora do formato")
                 break
             passos.append(
                 oraculo.PassoDoCenario(
                     str(linha["paciente"]),
                     de,
                     para,
-                    abre_espaco=str(linha["alavanca"]) == "L5 · abre espaço",
+                    abre_espaco=_ABRE_ESPACO in str(linha["observacao"]),
                 )
             )
         else:
             resultado = oraculo.validar_cenario(ctx.payload, dias, passos)
-            problemas.extend(f"{achado['codigo']}: {p}" for p in resultado.problemas)
+            problemas.extend(f"{nome}: {p}" for p in resultado.problemas)
             if resultado.liberados != int(achado["n"]):
                 problemas.append(
-                    f"{achado['codigo']}: libera {resultado.liberados}, o rótulo diz {achado['n']}"
+                    f"{nome}: libera {resultado.liberados}, o rótulo diz {achado['n']}"
                 )
-    quantidade = len(cenarios)
+            recontado = _recontagem(linhas)
+            diferentes = sorted(k for k, v in recontado.items() if linha_do_quadro[k] != v)
+            if diferentes:
+                problemas.append(f"{nome}: comparativo difere em {', '.join(diferentes)}")
+    quantidade = len(quadro)
     if not c.params.get("minimo", 1) <= quantidade <= c.params.get("maximo", 5):
         problemas.append(f"{quantidade} cenário(s)")
     return _resultado(
@@ -1143,7 +1231,8 @@ def _sem_nomes_de_profissional(
     c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
 ) -> ResultadoCriterio:
     """Panorama de enxugamento (sensível de RH): nenhum nome de profissional do bloco no
-    texto das tools (o que o modelo lê), na resposta nem no rótulo dos cenários."""
+    texto das tools (o que o modelo lê), na resposta, no rótulo dos cenários nem no quadro
+    comparativo."""
     blocos = _blocos_do_panorama(turnos)
     if not blocos:
         return _resultado(c, False, "sem panorama de enxugamento")
@@ -1152,7 +1241,7 @@ def _sem_nomes_de_profissional(
         for bloco in blocos
         for linha in bloco["dados"]["linhas"]
         for chave in ("turno_liberado", "de", "para")
-        if len(partes := str(linha[chave]).split(" · ")) >= 2
+        if len(partes := str(linha.get(chave) or "").split(" · ")) >= 2
     }
     textos = _normalizar(
         " ".join(
@@ -1160,6 +1249,7 @@ def _sem_nomes_de_profissional(
                 *(t for turno in turnos for t in turno.textos_das_tools),
                 *(turno.resposta or "" for turno in turnos),
                 *(str(linha["cenario"]) for b in blocos for linha in b["dados"]["linhas"]),
+                *(json.dumps(b, ensure_ascii=False) for b in blocos if "recomendado" in _chaves(b)),
             ]
         )
     )
@@ -1168,11 +1258,64 @@ def _sem_nomes_de_profissional(
 
 
 @_sobre_a_saida
+def _sem_codigos_de_cenario(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    """Os códigos opacos (`E-3F2A`) ficam só no texto da tool: nenhum em bloco algum nem
+    na resposta."""
+    if not _blocos_do_panorama(turnos):
+        return _resultado(c, False, "sem panorama de enxugamento")
+    nos_blocos = sum(
+        len(_CODIGO_DE_CENARIO.findall(json.dumps(bloco, ensure_ascii=False)))
+        for turno in turnos
+        for bloco in turno.blocos
+    )
+    na_resposta = sum(len(_CODIGO_DE_CENARIO.findall(turno.resposta or "")) for turno in turnos)
+    return _resultado(
+        c,
+        nos_blocos == 0 and na_resposta == 0,
+        f"{nos_blocos} código(s) nos blocos, {na_resposta} na resposta",
+    )
+
+
+@_sobre_a_saida
+def _cenario_detalhado(
+    c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
+) -> ResultadoCriterio:
+    """O bloco de passos traz só o Cenário `numero`; fora o recomendado, com o título e o
+    aviso de que mostra só o que difere do Cenário 1, e só esses passos."""
+    numero = int(c.params["numero"])
+    quadro = _comparativo(turnos)
+    blocos = _blocos_de_passos(turnos)
+    if not quadro or len(blocos) != 1 or numero not in quadro:
+        return _resultado(c, False, f"{len(blocos)} bloco(s) de passos")
+    bloco = blocos[0]
+    grupos = {str(linha["cenario"]).split(" · ")[0] for linha in bloco["dados"]["linhas"]}
+    problemas = []
+    if grupos - {f"Cenário {numero}"}:
+        problemas.append(f"{len(grupos)} cenário(s) nos passos")
+    linha = quadro[numero]
+    if numero == 1:
+        if bloco["titulo"] != "Passos do cenário recomendado":
+            problemas.append("título do recomendado")
+        if len(bloco["dados"]["linhas"]) != linha["passos"]:
+            problemas.append("passos do recomendado incompletos")
+    else:
+        if bloco["titulo"] != f"Passos do Cenário {numero} (apenas o que difere do Cenário 1)":
+            problemas.append("título sem dizer que mostra só o que difere")
+        if not any(a.startswith("Mostra só o que difere do Cenário 1;") for a in bloco["avisos"]):
+            problemas.append("sem o aviso do que difere")
+        if len(bloco["dados"]["linhas"]) != linha["passos"] - linha["passos_iguais_ao_recomendado"]:
+            problemas.append("passos que diferem não conferem com o comparativo")
+    return _resultado(c, not problemas, "; ".join(problemas) or f"Cenário {numero} detalhado")
+
+
+@_sobre_a_saida
 def _turnos_liberados_so_de(
     c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
 ) -> ResultadoCriterio:
-    """Todo turno liberado é da `profissional` (como na planilha), no `periodo` pedido
-    ("manhã" ou "tarde"; `turno` é o índice do turno da conversa)."""
+    """Todo turno liberado (nos passos detalhados) é da `profissional` (como na planilha),
+    no `periodo` pedido ("manhã" ou "tarde"; `turno` é o índice do turno da conversa)."""
     cenarios = _cenarios_do_panorama(turnos)
     if not cenarios:
         return _resultado(c, False, "sem panorama de enxugamento")
@@ -1191,26 +1334,26 @@ def _turnos_liberados_so_de(
 def _cenarios_diferentes_dos_vistos(
     c: Criterio, turnos: Sequence[TurnoObservado], _: Contexto
 ) -> ResultadoCriterio:
-    """Os cenários do turno `novos` têm códigos e conjuntos de turnos liberados diferentes
-    dos do turno `vistos`."""
+    """Os cenários do turno `novos` têm códigos (do mapa no texto da tool) diferentes dos
+    do turno `vistos`, e o recomendado detalhado libera outro conjunto de turnos."""
 
-    def cenarios(indice: int) -> dict[str, frozenset[str]]:
-        por_rotulo = _cenarios_do_panorama([turnos[indice - 1]])
+    def conjuntos(indice: int) -> set[frozenset[str]]:
         return {
-            achado["codigo"]: frozenset(str(linha["turno_liberado"]) for linha in linhas)
-            for rotulo, linhas in por_rotulo.items()
-            if (achado := _ROTULO_CENARIO.match(rotulo))
+            frozenset(str(linha["turno_liberado"]) for linha in linhas)
+            for linhas in _cenarios_do_panorama([turnos[indice - 1]]).values()
         }
 
-    vistos, novos = cenarios(c.params["vistos"]), cenarios(c.params["novos"])
+    vistos = _codigos(turnos[c.params["vistos"] - 1])
+    novos = _codigos(turnos[c.params["novos"] - 1])
     if not vistos or not novos:
         return _resultado(c, False, f"{len(vistos)} visto(s), {len(novos)} novo(s)")
-    repetidos = {
-        codigo
-        for codigo, conjunto in novos.items()
-        if codigo in vistos or conjunto in vistos.values()
-    }
-    return _resultado(c, not repetidos, f"{len(novos)} novo(s); {len(repetidos)} repetido(s)")
+    repetidos = set(novos.values()) & set(vistos.values())
+    repetidos_na_tela = conjuntos(c.params["novos"]) & conjuntos(c.params["vistos"])
+    return _resultado(
+        c,
+        not repetidos and not repetidos_na_tela,
+        f"{len(novos)} novo(s); {len(repetidos) + len(repetidos_na_tela)} repetido(s)",
+    )
 
 
 CRITERIOS: dict[
@@ -1247,6 +1390,8 @@ CRITERIOS: dict[
     "sem_nomes_de_profissional": _sem_nomes_de_profissional,
     "turnos_liberados_so_de": _turnos_liberados_so_de,
     "cenarios_diferentes_dos_vistos": _cenarios_diferentes_dos_vistos,
+    "sem_codigos_de_cenario": _sem_codigos_de_cenario,
+    "cenario_detalhado": _cenario_detalhado,
 }
 
 

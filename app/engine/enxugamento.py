@@ -243,6 +243,8 @@ class PassoEnxugamento:
 class ResumoCenario:
     turnos_liberados: int
     turnos_novos: int
+    #: Pacientes distintos com algum passo no cenário (pelos ids, não pelos nomes).
+    pacientes_movidos: int
     pacientes_trocam_profissional: int
     pacientes_trocam_turno: int
     pacientes_trocam_dia: int
@@ -962,8 +964,10 @@ def _resumo(
     depois: frozenset[TurnoPago],
 ) -> ResumoCenario:
     trocam: dict[str, set[str]] = {"prof": set(), "turno": set(), "dia": set()}
+    movidos_ids: set[str] = set()
     for k, passo in passos:
         pacientes = modelo.atendimentos[k].pacientes
+        movidos_ids.update(pacientes)
         if passo.outro_profissional:
             trocam["prof"].update(pacientes)
         if passo.outro_turno:
@@ -1002,6 +1006,7 @@ def _resumo(
     return ResumoCenario(
         turnos_liberados=len(antes - depois),
         turnos_novos=len(depois - antes),
+        pacientes_movidos=len(movidos_ids),
         pacientes_trocam_profissional=len(trocam["prof"]),
         pacientes_trocam_turno=len(trocam["turno"]),
         pacientes_trocam_dia=len(trocam["dia"]),

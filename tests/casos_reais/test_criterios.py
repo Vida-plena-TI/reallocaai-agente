@@ -638,23 +638,37 @@ def test_sem_nomes_ignora_o_rotulo_do_paciente_novo() -> None:
 
 
 # --- panorama de enxugamento (c14, c15) ---------------------------------------
-#: O bloco do exemplo versionado (semana fictícia `enxugamento`, 3 cenários).
-_EXEMPLO_PANORAMA = (
-    Path(__file__).resolve().parents[2]
-    / "docs"
-    / "exemplos-blocos"
-    / "tabela_generica_panorama_enxugamento.json"
-)
+#: Os dois blocos do exemplo versionado (semana fictícia `enxugamento`, 3 cenários): o
+#: quadro comparativo e os passos do recomendado.
+_EXEMPLOS = Path(__file__).resolve().parents[2] / "docs" / "exemplos-blocos"
+_EXEMPLO_COMPARATIVO = _EXEMPLOS / "tabela_generica_panorama_enxugamento_comparativo.json"
+_EXEMPLO_PASSOS = _EXEMPLOS / "tabela_generica_panorama_enxugamento.json"
+#: O mapa que só o texto da tool traz (os códigos do exemplo, com `max_cenarios: 3`).
+_MAPA = "Cenário 1 = E-5EB1; Cenário 2 = E-88EB; Cenário 3 = E-9DD6."
 _CONTEXTO_ENXUGAMENTO = Contexto(
     payload_da_semana("enxugamento"),
     Caso("t", "teste", date(2026, 9, 28), (), ()).semana,
 )
 
 
-def _panorama() -> dict[str, Any]:
+def _ler(caminho: Path) -> dict[str, Any]:
     import json
 
-    return cast(dict[str, Any], json.loads(_EXEMPLO_PANORAMA.read_text(encoding="utf-8")))
+    return cast(dict[str, Any], json.loads(caminho.read_text(encoding="utf-8")))
+
+
+def _panorama() -> list[dict[str, Any]]:
+    return [_ler(_EXEMPLO_COMPARATIVO), _ler(_EXEMPLO_PASSOS)]
+
+
+def _turno_do_panorama(
+    blocos: list[dict[str, Any]] | None = None, resposta: str | None = None
+) -> TurnoObservado:
+    return TurnoObservado(
+        textos_das_tools=[f"Códigos dos cenários: {_MAPA}"],
+        blocos=_panorama() if blocos is None else blocos,
+        resposta=resposta,
+    )
 
 
 def _rodar_panorama(tipo: str, turnos: list[TurnoObservado], **params: object) -> ResultadoCriterio:
@@ -662,61 +676,86 @@ def _rodar_panorama(tipo: str, turnos: list[TurnoObservado], **params: object) -
 
 
 def test_cenarios_validos_pelo_oraculo_aprova_o_exemplo() -> None:
-    turno = TurnoObservado(blocos=[_panorama()])
+    turno = _turno_do_panorama()
     resultado = _rodar_panorama("cenarios_validos_pelo_oraculo", [turno], minimo=3, maximo=5)
     assert resultado.ok, resultado.detalhe
     assert not _rodar_panorama("cenarios_validos_pelo_oraculo", [turno], minimo=4).ok
+    # Sem o quadro comparativo, não há como contar os cenários.
+    sem_quadro = _turno_do_panorama([_ler(_EXEMPLO_PASSOS)])
+    assert not _rodar_panorama("cenarios_validos_pelo_oraculo", [sem_quadro]).ok
 
 
-def test_cenarios_validos_pelo_oraculo_reprova_destino_ocupado_e_rotulo_errado() -> None:
-    bloco = _panorama()
-    primeira = bloco["dados"]["linhas"][0]
+def test_cenarios_validos_pelo_oraculo_reprova_destino_ocupado_rotulo_e_quadro_errados() -> None:
+    comparativo, passos = _panorama()
+    primeira = passos["dados"]["linhas"][0]
     # Ter 11:00 está livre na Acácia; Ter 08:00 já é dela (o próprio paciente da manhã).
     primeira["para"] = primeira["para"].replace("11:00 às 12:00", "07:30 às 08:30")
-    turno = TurnoObservado(blocos=[bloco])
+    turno = _turno_do_panorama([comparativo, passos])
     assert not _rodar_panorama("cenarios_validos_pelo_oraculo", [turno]).ok
 
-    bloco = _panorama()
-    rotulo = bloco["dados"]["linhas"][0]["cenario"]
-    for linha in bloco["dados"]["linhas"]:
-        if linha["cenario"] == rotulo:
-            linha["cenario"] = rotulo.replace("libera 3 turnos", "libera 4 turnos")
-    resultado = _rodar_panorama("cenarios_validos_pelo_oraculo", [TurnoObservado(blocos=[bloco])])
+    comparativo, passos = _panorama()
+    for linha in passos["dados"]["linhas"]:
+        linha["cenario"] = linha["cenario"].replace("libera 3 turnos", "libera 4 turnos")
+    turno = _turno_do_panorama([comparativo, passos])
+    resultado = _rodar_panorama("cenarios_validos_pelo_oraculo", [turno])
     assert not resultado.ok and "o rótulo diz 4" in resultado.detalhe
+
+    comparativo, passos = _panorama()
+    comparativo["dados"]["linhas"][0]["pacientes_movidos"] += 1
+    turno = _turno_do_panorama([comparativo, passos])
+    resultado = _rodar_panorama("cenarios_validos_pelo_oraculo", [turno])
+    assert not resultado.ok and "comparativo difere em pacientes_movidos" in resultado.detalhe
 
 
 def test_sem_nomes_de_profissional() -> None:
-    limpo = TurnoObservado(blocos=[_panorama()], resposta="Sugiro o cenário E-5EB1.")
+    limpo = _turno_do_panorama(resposta="Sugiro o Cenário 1.")
     assert _rodar_panorama("sem_nomes_de_profissional", [limpo]).ok
-    vazou = TurnoObservado(blocos=[_panorama()], resposta="Sugiro tirar a Ficticia Acacia.")
+    vazou = _turno_do_panorama(resposta="Sugiro tirar a Ficticia Acacia.")
     resultado = _rodar_panorama("sem_nomes_de_profissional", [vazou])
     assert not resultado.ok and resultado.detalhe == "1 nome(s) de profissional no texto"
     assert not _rodar_panorama("sem_nomes_de_profissional", [TurnoObservado()]).ok
 
 
+def test_sem_codigos_de_cenario() -> None:
+    assert _rodar_panorama("sem_codigos_de_cenario", [_turno_do_panorama()]).ok
+    na_resposta = _turno_do_panorama(resposta="Sugiro o cenário E-5EB1.")
+    resultado = _rodar_panorama("sem_codigos_de_cenario", [na_resposta])
+    assert not resultado.ok and resultado.detalhe == "0 código(s) nos blocos, 1 na resposta"
+    comparativo, passos = _panorama()
+    passos["dados"]["linhas"][0]["cenario"] += " (E-5EB1)"
+    no_bloco = _turno_do_panorama([comparativo, passos])
+    assert not _rodar_panorama("sem_codigos_de_cenario", [no_bloco]).ok
+
+
+def test_cenario_detalhado() -> None:
+    assert _rodar_panorama("cenario_detalhado", [_turno_do_panorama()], turno=1, numero=1).ok
+    assert not _rodar_panorama("cenario_detalhado", [_turno_do_panorama()], turno=1, numero=2).ok
+
+
 def test_turnos_liberados_so_de() -> None:
-    turno = TurnoObservado(blocos=[_panorama()])
-    # O exemplo libera turnos de manhã e de tarde, e da Bromélia também.
+    turno = _turno_do_panorama()
+    # O recomendado do exemplo libera turnos de manhã e de tarde, e da Bromélia também.
     assert not _rodar_panorama(
         "turnos_liberados_so_de", [turno], profissional="Ficticia Acacia", periodo="tarde"
     ).ok
-    bloco = _panorama()
-    bloco["dados"]["linhas"] = [
+    comparativo, passos = _panorama()
+    passos["dados"]["linhas"] = [
         linha
-        for linha in bloco["dados"]["linhas"]
+        for linha in passos["dados"]["linhas"]
         if linha["turno_liberado"].startswith("Ter tarde · Ficticia Acacia")
     ]
     assert _rodar_panorama(
         "turnos_liberados_so_de",
-        [TurnoObservado(blocos=[bloco])],
+        [_turno_do_panorama([comparativo, passos])],
         profissional="Ficticia Acacia",
         periodo="tarde",
     ).ok
 
 
 def test_cenarios_diferentes_dos_vistos() -> None:
-    mesmo = [TurnoObservado(blocos=[_panorama()]), TurnoObservado(blocos=[_panorama()])]
+    mesmo = [_turno_do_panorama(), _turno_do_panorama()]
     resultado = _rodar_panorama("cenarios_diferentes_dos_vistos", mesmo, vistos=1, novos=2)
-    assert not resultado.ok and "3 repetido(s)" in resultado.detalhe
-    so_um = [TurnoObservado(blocos=[_panorama()]), TurnoObservado()]
+    assert not resultado.ok and "repetido(s)" in resultado.detalhe
+    assert "0 repetido(s)" not in resultado.detalhe
+    so_um = [_turno_do_panorama(), TurnoObservado()]
     assert not _rodar_panorama("cenarios_diferentes_dos_vistos", so_um, vistos=1, novos=2).ok

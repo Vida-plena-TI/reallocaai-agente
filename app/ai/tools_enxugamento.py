@@ -7,10 +7,12 @@ argumentos e o texto/bloco (`app.ai.blocos_enxugamento`).
 Privacidade e sensibilidade de RH: os argumentos `profissionais_foco` e
 `profissionais_preservados` são nomes. Eles nunca vão para o log (só
 contagens, o tipo do resultado e o tempo), nem para o `content` (que o
-modelo lê: só contagens e códigos de cenário), nem para mensagens de erro
+modelo lê: só contagens e o mapa "Cenário N = código"), nem para mensagens de erro
 (só o tipo); "profissional não encontrada" não repete o nome dito. Os nomes
-de pacientes e de profissionais vão só no bloco da tela, protegido por
-`RELATORIOS_COM_NOMES_DE_PACIENTES`, e a guarda de texto
+de pacientes e de profissionais vão só no bloco de passos da tela, protegido por
+`RELATORIOS_COM_NOMES_DE_PACIENTES`. O artifact é uma LISTA com dois blocos (o
+quadro comparativo e os passos; só o quadro quando o cenário pedido em
+`detalhar_cenarios` não existe; vazia sem cenário), e a guarda de texto
 (`app.ai.fundamentacao.nomes_de_profissional_no_panorama`) troca pelo resumo
 determinístico qualquer resposta desta rodada que cite um nome.
 """
@@ -127,6 +129,14 @@ class ArgsPlanejarEnxugamento(BaseModel):
             "mais opções."
         ),
     )
+    detalhar_cenarios: list[str] | None = Field(
+        default=None,
+        description=(
+            'Códigos dos cenários cujos passos mostrar, quando pedirem para ver um cenário ("quero '
+            'ver o Cenário 3"): use o código do mapa "Cenário N = código" e repita os demais '
+            "parâmetros da chamada anterior. Em branco: só os passos do recomendado."
+        ),
+    )
 
 
 def _data(semana: list[date], dia: str) -> date | None:
@@ -168,8 +178,8 @@ def executar_planejar_enxugamento(
     data_referencia: date,
     args: dict[str, Any],
     regras: RegrasEnxugamento | None = None,
-) -> tuple[str, dict[str, Any] | None]:
-    """Texto (só contagens e códigos) e bloco (em JSON, com os nomes) do panorama."""
+) -> tuple[str, list[dict[str, Any]] | None]:
+    """Texto (só contagens e o mapa dos códigos) e blocos (em JSON) do panorama."""
     comeco = relogio.perf_counter()
     semana = dias_da_semana_de(data_referencia)
     foto = fotografar_periodo(fonte, semana[0], semana[-1])
@@ -201,19 +211,22 @@ def executar_planejar_enxugamento(
         cenarios_ja_vistos=tuple(str(c) for c in args.get("cenarios_ja_vistos") or []),
     )
     panorama = planejar_enxugamento(foto, pedido, regras)
-    texto, bloco = blocos_enxugamento.panorama_enxugamento(foto, panorama)
+    detalhar = tuple(str(c) for c in args.get("detalhar_cenarios") or [])
+    texto, blocos = blocos_enxugamento.panorama_enxugamento(foto, panorama, detalhar)
     logger.info(
-        "%s: %d cenário(s), %d passo(s), %d foco, %d preservada(s), %d dia(s) não lido(s), "
-        "em %.2fs",
+        "%s: %d cenário(s), %d passo(s), %d bloco(s), %d a detalhar, %d foco, %d preservada(s), "
+        "%d dia(s) não lido(s), em %.2fs",
         NOME_DA_TOOL,
         len(panorama.cenarios),
         sum(len(c.passos) for c in panorama.cenarios),
+        len(blocos),
+        len(detalhar),
         len(foco),
         len(preservados),
         len(foto.dias_nao_lidos),
         relogio.perf_counter() - comeco,
     )
-    return texto, bloco.model_dump(mode="json") if bloco is not None else None
+    return texto, [bloco.model_dump(mode="json") for bloco in blocos] or None
 
 
 def criar_tool_planejar_enxugamento(
@@ -238,18 +251,20 @@ def criar_tool_planejar_enxugamento(
     )
 
     @tool(NOME_DA_TOOL, args_schema=args_schema, response_format="content_and_artifact")
-    def planejar_enxugamento_tool(**kwargs: Any) -> tuple[str, dict[str, Any] | None]:
+    def planejar_enxugamento_tool(**kwargs: Any) -> tuple[str, list[dict[str, Any]] | None]:
         """Sugere um panorama de movimentações que liberam turnos de presença (manhã ou
         tarde) na grade semanal, com vários cenários na tela.
 
         Use quando perguntarem que movimentações dá para fazer para enxugar a agenda,
         reduzir turnos ou concentrar atendimentos, ou "e se a X ficar só de tarde?".
         Um turno só fica liberado se todos os pacientes dele forem para turnos que já
-        acontecem; ninguém muda de terapia nem de duração. Para mais opções, chame de
-        novo com cenarios_ja_vistos. Você recebe só contagens e códigos: NUNCA escreva
-        nomes de pacientes nem de profissionais, nunca fale em valores, salário ou
-        dinheiro (só turnos liberados) e nunca diga que moveu, liberou ou economizou:
-        apenas sugira. Grade semanal: não cite datas.
+        acontecem; ninguém muda de terapia nem de duração. A tela mostra o comparativo e
+        os passos do recomendado; para ver outro cenário, chame de novo com
+        detalhar_cenarios, e para mais opções, com cenarios_ja_vistos. Você recebe só
+        contagens e códigos: NUNCA escreva nomes de pacientes nem de profissionais nem
+        códigos de cenário, nunca fale em valores, salário ou dinheiro (só turnos
+        liberados) e nunca diga que moveu, liberou ou economizou: apenas sugira. Grade
+        semanal: não cite datas.
         """
         argumentos = dict(kwargs)
         if argumentos.get("especialidade") is not None:

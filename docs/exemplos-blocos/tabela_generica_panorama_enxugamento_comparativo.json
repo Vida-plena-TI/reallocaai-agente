@@ -1,0 +1,222 @@
+{
+  "versao": 1,
+  "tipo": "tabela_generica",
+  "titulo": "Comparativo de cenários",
+  "periodo": null,
+  "meta": null,
+  "parcial": false,
+  "dias_nao_lidos": [],
+  "avisos": [
+    "Sugestão: considera apenas os atendimentos presentes na semana lida (terapias quinzenais ou fora desta semana não aparecem).",
+    "Não considera a disponibilidade dos pacientes.",
+    "Vagas livres na grade podem estar reservadas (reuniões, supervisão); confira antes de mudar.",
+    "Cada mudança precisa ser confirmada com a família e feita manualmente na planilha.",
+    "Cenário 1: 2 turnos de terapia ficariam sem nenhum profissional atendendo, num dia em que hoje tem.",
+    "Cenário 2: 2 turnos de terapia ficariam sem nenhum profissional atendendo, num dia em que hoje tem.",
+    "Cenário 3: 1 turno de terapia ficaria sem nenhum profissional atendendo, num dia em que hoje tem."
+  ],
+  "resumo": [
+    {
+      "rotulo": "Cenários",
+      "valor": 3,
+      "formato": "inteiro",
+      "exibicao": "3"
+    },
+    {
+      "rotulo": "Maior número de turnos liberados",
+      "valor": 3,
+      "formato": "inteiro",
+      "exibicao": "3"
+    },
+    {
+      "rotulo": "Turnos com presença paga na semana",
+      "valor": 8,
+      "formato": "inteiro",
+      "exibicao": "8"
+    },
+    {
+      "rotulo": "Turnos presos por regra",
+      "valor": 0,
+      "formato": "inteiro",
+      "exibicao": "0"
+    }
+  ],
+  "dados": {
+    "tipo": "tabela_generica",
+    "relatorio": "panorama_enxugamento",
+    "dimensoes": [],
+    "metricas": [],
+    "colunas": [
+      {
+        "chave": "cenario",
+        "rotulo": "Cenário",
+        "formato": "texto"
+      },
+      {
+        "chave": "turnos_liberados",
+        "rotulo": "Turnos liberados",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "passos",
+        "rotulo": "Passos",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "profissionais_afetadas",
+        "rotulo": "Profissionais afetadas",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "pacientes_movidos",
+        "rotulo": "Pacientes movidos",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "trocam_de_profissional",
+        "rotulo": "Trocam de profissional",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "trocam_de_dia",
+        "rotulo": "Trocam de dia",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "passos_iguais_ao_recomendado",
+        "rotulo": "Passos iguais ao recomendado",
+        "formato": "inteiro"
+      },
+      {
+        "chave": "recomendado",
+        "rotulo": "Recomendado",
+        "formato": "texto"
+      }
+    ],
+    "linhas": [
+      {
+        "cenario": "Cenário 1 · equilibrado",
+        "turnos_liberados": 3,
+        "passos": 4,
+        "profissionais_afetadas": 2,
+        "pacientes_movidos": 4,
+        "trocam_de_profissional": 3,
+        "trocam_de_dia": 0,
+        "passos_iguais_ao_recomendado": 0,
+        "recomendado": true
+      },
+      {
+        "cenario": "Cenário 2 · mais turnos",
+        "turnos_liberados": 3,
+        "passos": 4,
+        "profissionais_afetadas": 2,
+        "pacientes_movidos": 4,
+        "trocam_de_profissional": 3,
+        "trocam_de_dia": 0,
+        "passos_iguais_ao_recomendado": 3,
+        "recomendado": false
+      },
+      {
+        "cenario": "Cenário 3 · menos mudança",
+        "turnos_liberados": 2,
+        "passos": 3,
+        "profissionais_afetadas": 2,
+        "pacientes_movidos": 3,
+        "trocam_de_profissional": 2,
+        "trocam_de_dia": 0,
+        "passos_iguais_ao_recomendado": 3,
+        "recomendado": false
+      }
+    ],
+    "total": {},
+    "linhas_omitidas": 0
+  },
+  "tabelas": [
+    {
+      "nome": "Cenários",
+      "colunas": [
+        {
+          "chave": "cenario",
+          "rotulo": "Cenário",
+          "formato": "texto"
+        },
+        {
+          "chave": "turnos_liberados",
+          "rotulo": "Turnos liberados",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "passos",
+          "rotulo": "Passos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "profissionais_afetadas",
+          "rotulo": "Profissionais afetadas",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "pacientes_movidos",
+          "rotulo": "Pacientes movidos",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "trocam_de_profissional",
+          "rotulo": "Trocam de profissional",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "trocam_de_dia",
+          "rotulo": "Trocam de dia",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "passos_iguais_ao_recomendado",
+          "rotulo": "Passos iguais ao recomendado",
+          "formato": "inteiro"
+        },
+        {
+          "chave": "recomendado",
+          "rotulo": "Recomendado",
+          "formato": "texto"
+        }
+      ],
+      "linhas": [
+        {
+          "cenario": "Cenário 1 · equilibrado",
+          "turnos_liberados": 3,
+          "passos": 4,
+          "profissionais_afetadas": 2,
+          "pacientes_movidos": 4,
+          "trocam_de_profissional": 3,
+          "trocam_de_dia": 0,
+          "passos_iguais_ao_recomendado": 0,
+          "recomendado": true
+        },
+        {
+          "cenario": "Cenário 2 · mais turnos",
+          "turnos_liberados": 3,
+          "passos": 4,
+          "profissionais_afetadas": 2,
+          "pacientes_movidos": 4,
+          "trocam_de_profissional": 3,
+          "trocam_de_dia": 0,
+          "passos_iguais_ao_recomendado": 3,
+          "recomendado": false
+        },
+        {
+          "cenario": "Cenário 3 · menos mudança",
+          "turnos_liberados": 2,
+          "passos": 3,
+          "profissionais_afetadas": 2,
+          "pacientes_movidos": 3,
+          "trocam_de_profissional": 2,
+          "trocam_de_dia": 0,
+          "passos_iguais_ao_recomendado": 3,
+          "recomendado": false
+        }
+      ]
+    }
+  ],
+  "contem_dados_pacientes": true
+}

@@ -30,7 +30,7 @@ from tests.support.agenda_clinica import fonte_clinica  # noqa: E402
 from tests.support.agenda_semanal import SEGUNDA, SEXTA  # noqa: E402
 from tests.support.relatorios import fonte_relatorios  # noqa: E402
 
-from app.ai.relatorios import BlocoRelatorio  # noqa: E402
+from app.ai.relatorios import BlocoRelatorio, artefatos_de_blocos  # noqa: E402
 from app.ai.tools import criar_tools  # noqa: E402
 from app.data_sources.continuidade import SemHistoricoContinuidadeDataSource  # noqa: E402
 from app.data_sources.google_sheets import GoogleSheetsDataSource  # noqa: E402
@@ -103,8 +103,9 @@ VARIANTES_REALOCACAO: dict[str, dict[str, Any]] = {
         "horario_minimo": "08:00",
     },
 }
-#: `planejar_enxugamento` sobre o cenário `enxugamento`: 3 cenários, agrupados por
-#: cenário e turno liberado.
+#: `planejar_enxugamento` sobre o cenário `enxugamento`: 3 cenários. A tool manda dois
+#: blocos na mesma resposta: o quadro comparativo e os passos do recomendado.
+ARQUIVO_PANORAMA_ENXUGAMENTO_COMPARATIVO = "tabela_generica_panorama_enxugamento_comparativo.json"
 ARQUIVO_PANORAMA_ENXUGAMENTO = "tabela_generica_panorama_enxugamento.json"
 ARGS_PANORAMA_ENXUGAMENTO: dict[str, Any] = {"max_cenarios": 3}
 ARQUIVO_SCHEMA = "bloco_relatorio.schema.json"
@@ -137,7 +138,10 @@ def gerar_exemplos() -> dict[str, str]:
         t.name: t
         for t in criar_tools(fonte_clinica(), SemHistoricoContinuidadeDataSource(), SEGUNDA)
     }
-    chamadas = [(arquivo, tools, nome, args) for arquivo, (nome, args) in VARIANTES.items()]
+    #: Destino: um arquivo, ou um por bloco quando a tool manda mais de um.
+    chamadas: list[tuple[str | tuple[str, ...], dict[str, Any], str, dict[str, Any]]] = [
+        (arquivo, tools, nome, args) for arquivo, (nome, args) in VARIANTES.items()
+    ]
     chamadas += [
         (arquivo, gerais, "gerar_relatorio", args) for arquivo, args in VARIANTES_GERAIS.items()
     ]
@@ -167,19 +171,24 @@ def gerar_exemplos() -> dict[str, str]:
     ]
     chamadas.append(
         (
-            ARQUIVO_PANORAMA_ENXUGAMENTO,
+            (ARQUIVO_PANORAMA_ENXUGAMENTO_COMPARATIVO, ARQUIVO_PANORAMA_ENXUGAMENTO),
             _tools_do_cenario("enxugamento"),
             "planejar_enxugamento",
             ARGS_PANORAMA_ENXUGAMENTO,
         )
     )
     arquivos: dict[str, str] = {}
-    for arquivo, disponiveis, nome, args in chamadas:
+    for destino, disponiveis, nome, args in chamadas:
         mensagem = disponiveis[nome].invoke(
             {"name": nome, "args": args, "id": "c1", "type": "tool_call"}
         )
-        bloco = BlocoRelatorio.model_validate(mensagem.artifact)
-        arquivos[arquivo] = _serializar(bloco.model_dump(mode="json"))
+        # Um arquivo por bloco, na ordem em que a tool os manda.
+        nomes = (destino,) if isinstance(destino, str) else destino
+        artefatos = artefatos_de_blocos(mensagem.artifact)
+        assert len(artefatos) == len(nomes), nome
+        for arquivo, artefato in zip(nomes, artefatos, strict=True):
+            bloco = BlocoRelatorio.model_validate(artefato)
+            arquivos[arquivo] = _serializar(bloco.model_dump(mode="json"))
     arquivos[ARQUIVO_SCHEMA] = _serializar(BlocoRelatorio.model_json_schema())
     return arquivos
 
