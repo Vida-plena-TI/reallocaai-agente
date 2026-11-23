@@ -63,7 +63,8 @@ def test_http_true_sem_bloco_e_ausente_nas_demais(client: TestClient) -> None:
 
 
 def test_http_bloco_identico_ao_da_tool(client: TestClient) -> None:
-    """A flag não muda o corpo dos blocos: o bloco do chat é o artifact da tool."""
+    """A flag não muda o corpo dos blocos: os blocos do chat são o artifact da tool (o
+    panorama manda dois: o quadro comparativo e os passos, ambos com nomes protegidos)."""
     tools = {
         t.name: t
         for t in criar_tools(
@@ -76,11 +77,14 @@ def test_http_bloco_identico_ao_da_tool(client: TestClient) -> None:
     corpo = _post(client, lambda: _planilha("enxugamento"), "planejar_enxugamento", {})
 
     assert corpo["resposta_sensivel"] is True
-    assert len(corpo["blocos"]) == 1
-    assert "resposta_sensivel" not in corpo["blocos"][0]
-    assert corpo["blocos"][0] == BlocoRelatorio.model_validate(direto.artifact).model_dump(
-        mode="json"
-    )
+    assert len(corpo["blocos"]) == 2
+    assert all("resposta_sensivel" not in bloco for bloco in corpo["blocos"])
+    assert all(bloco["contem_dados_pacientes"] is True for bloco in corpo["blocos"])
+    assert all(bloco["dados"]["relatorio"] == "panorama_enxugamento" for bloco in corpo["blocos"])
+    assert corpo["blocos"] == [
+        BlocoRelatorio.model_validate(artefato).model_dump(mode="json")
+        for artefato in direto.artifact
+    ]
 
 
 def test_openapi_declara_o_campo_opcional_so_true(client: TestClient) -> None:

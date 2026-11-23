@@ -66,6 +66,7 @@ def test_so_os_relatorios_da_grade_semanal_tem_periodo_nulo() -> None:
             "tabela_generica_plano_realocacao.json",
             "tabela_generica_plano_realocacao_pergunta.json",
             "tabela_generica_panorama_enxugamento.json",
+            "tabela_generica_panorama_enxugamento_comparativo.json",
         ):
             assert bloco["periodo"] is None
         else:
@@ -150,36 +151,74 @@ def test_exemplos_do_plano_de_realocacao_plano_e_pergunta() -> None:
 
 
 def test_exemplo_do_panorama_de_enxugamento() -> None:
-    """Agrupado em dois níveis (cenário e turno liberado), com nomes só fictícios;
-    o rótulo do cenário (título do grupo) só tem contagens e o código."""
+    """Dois blocos com o mesmo `relatorio`: o quadro comparativo (só números) e os passos
+    do recomendado, agrupados por cenário, com nomes só fictícios e nenhum código."""
     import json
     import re
 
-    bloco = json.loads(gerar_exemplos()["tabela_generica_panorama_enxugamento.json"])
+    exemplos = gerar_exemplos()
+    comparativo = json.loads(exemplos["tabela_generica_panorama_enxugamento_comparativo.json"])
+    bloco = json.loads(exemplos["tabela_generica_panorama_enxugamento.json"])
+    for exemplo in (comparativo, bloco):
+        assert exemplo["dados"]["relatorio"] == "panorama_enxugamento"
+        assert exemplo["contem_dados_pacientes"] is True
+        assert exemplo["meta"] is None and exemplo["periodo"] is None
+        texto = json.dumps(exemplo, ensure_ascii=False)
+        assert re.search(r"E-[0-9A-F]{4}", texto) is None
+    assert comparativo["titulo"] == "Comparativo de cenários"
+    assert "agrupar_por" not in comparativo["dados"]
+    assert "Ficticia" not in json.dumps(comparativo, ensure_ascii=False)
+    assert [linha["cenario"] for linha in comparativo["dados"]["linhas"]] == [
+        "Cenário 1 · equilibrado",
+        "Cenário 2 · mais turnos",
+        "Cenário 3 · menos mudança",
+    ]
+    assert [linha["recomendado"] for linha in comparativo["dados"]["linhas"]] == [
+        True,
+        False,
+        False,
+    ]
+
     dados = bloco["dados"]
-    assert dados["relatorio"] == "panorama_enxugamento"
-    assert bloco["contem_dados_pacientes"] is True
-    assert bloco["meta"] is None
-    assert dados["agrupar_por"] == ["cenario", "turno_liberado"]
+    assert bloco["titulo"] == "Passos do cenário recomendado"
+    assert dados["agrupar_por"] == ["cenario"]
     assert dados["unidade_grupo"] == {"singular": "passo", "plural": "passos"}
     assert [c["rotulo"] for c in dados["colunas"]] == [
-        "Cenário", "Turno liberado", "Passo", "Quem", "Terapia", "De", "Para", "Alavanca",
-        "Observação",
+        "Cenário", "Turno liberado", "Passo", "Quem", "Terapia", "De", "Para",
+        "Tipo de movimento", "Observação",
     ]  # fmt: skip
     nomes = {linha["paciente"] for linha in dados["linhas"]}
     assert nomes and all(nome.startswith("Paciente Ficticio ") for nome in nomes)
     for linha in dados["linhas"]:
-        assert re.fullmatch(
-            r"Cenário \d \(E-[0-9A-F]{4}\) · .+ · libera \d turnos?", linha["cenario"]
-        )
-        assert "Ficticia" not in linha["cenario"]
+        assert linha["cenario"] == "Cenário 1 · equilibrado · libera 3 turnos"
         assert " · Ficticia " in linha["turno_liberado"]
-    assert {linha["cenario"].split(" · ")[1] for linha in dados["linhas"]} == {
-        "equilibrado",
-        "mais turnos",
-        "menos mudança",
-    }
-    assert [t["nome"] for t in bloco["tabelas"]] == ["Passos", "Resumo dos cenários"]
-    for tabela in bloco["tabelas"]:
-        assert len(tabela["nome"]) <= 31
-        assert not set(tabela["nome"]) & set("\\/?*[]:")
+    abas = [t["nome"] for exemplo in (comparativo, bloco) for t in exemplo["tabelas"]]
+    assert abas == ["Cenários", "Passos"]
+    for aba in abas:
+        assert len(aba) <= 31
+        assert not set(aba) & set("\\/?*[]:")
+
+
+def test_resposta_do_panorama_na_doc_da_api_acompanha_os_exemplos() -> None:
+    """O exemplo da resposta completa (dois blocos) em docs/api-relatorios.md traz os
+    blocos versionados, na ordem da tool, e o resumo determinístico deles."""
+    import json
+    import re
+
+    from app.ai.blocos_enxugamento import resumo_do_panorama
+    from app.ai.relatorios import BlocoRelatorio
+
+    doc = (DIRETORIO.parent / "api-relatorios.md").read_text(encoding="utf-8")
+    achado = re.search(r"<!-- exemplo-resposta-panorama -->\n```json\n(.*?)\n```", doc, re.S)
+    assert achado is not None
+    resposta = json.loads(achado[1])
+    exemplos = gerar_exemplos()
+    blocos = [
+        json.loads(exemplos["tabela_generica_panorama_enxugamento_comparativo.json"]),
+        json.loads(exemplos["tabela_generica_panorama_enxugamento.json"]),
+    ]
+    assert resposta["blocos"] == blocos
+    assert resposta["resposta_sensivel"] is True
+    assert resposta["resposta"] == resumo_do_panorama(
+        [BlocoRelatorio.model_validate(b) for b in blocos]
+    )

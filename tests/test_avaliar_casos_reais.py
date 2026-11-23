@@ -54,7 +54,7 @@ def test_llm_sem_confirmar_so_estima(
     )
     saida = capsys.readouterr().out
     assert codigo == 0
-    assert "Estimativa: 15 caso(s), 32 turno(s)" in saida
+    assert "Estimativa: 15 caso(s), 34 turno(s)" in saida
     assert "Nada foi chamado" in saida
     assert list(tmp_path.iterdir()) == []
 

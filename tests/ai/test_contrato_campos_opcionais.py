@@ -18,7 +18,9 @@ from pydantic import ValidationError
 from app.ai.relatorios import BlocoRelatorio, DadosTabelaGenerica
 from scripts.gerar_exemplos_blocos import ARQUIVO_SCHEMA, DIRETORIO, gerar_exemplos
 
-#: Exemplos cujo bloco traz nomes de pacientes.
+#: Exemplos cujo bloco sai marcado com `contem_dados_pacientes` (relatórios com nomes de
+#: pacientes; o quadro comparativo do panorama não traz nomes, mas tem o mesmo
+#: `relatorio` do bloco de passos e sai marcado, para a restrição cobrir os dois).
 COM_NOMES = {
     "agenda_paciente.json",
     "tabela_generica_pacientes_por_plano.json",
@@ -26,6 +28,7 @@ COM_NOMES = {
     "tabela_generica_plano_realocacao.json",
     "tabela_generica_plano_realocacao_pergunta.json",
     "tabela_generica_panorama_enxugamento.json",
+    "tabela_generica_panorama_enxugamento_comparativo.json",
 }
 CAMPOS_NOVOS_NO_ENVELOPE = {"contem_dados_pacientes"}
 CAMPOS_NOVOS_EM_DADOS = {"agrupar_por", "unidade_grupo"}

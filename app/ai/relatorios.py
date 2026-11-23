@@ -339,6 +339,14 @@ TOOL_GERAR_RELATORIO: Final[str] = "gerar_relatorio"
 RELATORIOS_RESTRITOS_DE_GERAR_RELATORIO: Final[frozenset[str]] = frozenset({"agenda_paciente"})
 
 
+def artefatos_de_blocos(artifact: Any) -> list[Any]:
+    """Os blocos (ainda sem validar) do artifact de uma tool: um bloco ou uma lista deles
+    (o panorama de enxugamento manda dois blocos na mesma resposta)."""
+    if artifact is None:
+        return []
+    return list(artifact) if isinstance(artifact, list) else [artifact]
+
+
 def chamada_restrita(nome: str | None, args: Mapping[str, Any] | None) -> bool:
     """Se a chamada de tool (nome e argumentos) é de uma tool restrita."""
     if nome in TOOLS_RESTRITAS:

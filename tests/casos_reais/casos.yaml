@@ -481,14 +481,17 @@
     - {tipo: tools_chamadas, turno: 1, tools: [planejar_enxugamento]}
     - {tipo: cenarios_validos_pelo_oraculo, turno: 1, minimo: 3, maximo: 5}
     - {tipo: max_chamadas_planilha, turno: 1, maximo: 1}
-    - {tipo: texto_contem, turno: 2, frases: ["Panorama de enxugamento"]}
+    - {tipo: cenario_detalhado, turno: 1, numero: 1}
+    # O resumo determinístico: recomendação, confirmação e a pergunta pelo número.
+    - {tipo: texto_contem, turno: 2, frases: ["Sugiro o Cenário 1", "Quer ver os passos do Cenário 2?"]}
     - {tipo: vocabulario_proibido, turno: 3}
     - {tipo: texto_contem, turno: 3, frases: ["só conta turnos liberados"]}
     - {tipo: sem_nomes_de_paciente}
     - {tipo: sem_nomes_de_profissional}
+    - {tipo: sem_codigos_de_cenario}
 
 - id: c15
-  descricao: 'Panorama com foco numa profissional e pedido de mais opções (`cenario: enxugamento`)'
+  descricao: 'Panorama com foco numa profissional, pedido de mais opções e detalhe de cenários (`cenario: enxugamento`)'
   hoje: 2026-09-28
   cenario: enxugamento
   turnos:
@@ -506,6 +509,17 @@
       chamada:
         tool: planejar_enxugamento
         args: {max_cenarios: 2, cenarios_ja_vistos: [E-5EB1, E-88EB]}
+    # "Cenário 2" do turno 2, pelo código do mapa: só o que difere do Cenário 1.
+    - pergunta: quero ver o Cenário 2
+      chamada:
+        tool: planejar_enxugamento
+        args: {max_cenarios: 2, detalhar_cenarios: [E-88EB]}
+    # Cenário 3 (com 3 cenários) é subconjunto do Cenário 1: passos completos e o aviso
+    # de quantos passos do Cenário 1 ele faz, nunca um bloco vazio.
+    - pergunta: e o Cenário 3?
+      chamada:
+        tool: planejar_enxugamento
+        args: {max_cenarios: 3, detalhar_cenarios: [E-9DD6]}
   criterios:
     - {tipo: tools_chamadas, turno: 1, tools: [planejar_enxugamento]}
     - {tipo: turnos_liberados_so_de, turno: 1, profissional: Ficticia Acacia, periodo: tarde}
@@ -513,6 +527,11 @@
     - {tipo: cenarios_validos_pelo_oraculo, turno: 2, minimo: 2, maximo: 2}
     - {tipo: cenarios_validos_pelo_oraculo, turno: 3, minimo: 1, maximo: 2}
     - {tipo: cenarios_diferentes_dos_vistos, vistos: 2, novos: 3}
+    - {tipo: cenarios_validos_pelo_oraculo, turno: 4, minimo: 2, maximo: 2}
+    - {tipo: cenario_detalhado, turno: 4, numero: 2}
+    - {tipo: cenarios_validos_pelo_oraculo, turno: 5, minimo: 3, maximo: 3}
+    - {tipo: cenario_detalhado, turno: 5, numero: 3}
     - {tipo: max_chamadas_planilha, turno: 1, maximo: 1}
     - {tipo: sem_nomes_de_paciente}
     - {tipo: sem_nomes_de_profissional}
+    - {tipo: sem_codigos_de_cenario}

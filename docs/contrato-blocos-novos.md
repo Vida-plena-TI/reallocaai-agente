@@ -190,7 +190,7 @@ Relatórios `ranking_ocupacao`, `comparativo_dias`, `salas_ociosas`,
 #### Exibição agrupada (`agrupar_por` e `unidade_grupo`)
 
 Opcional; hoje em `pacientes_por_profissional_nomes`, no plano de realocação
-(`plano_realocacao`) e no panorama de enxugamento (`panorama_enxugamento`, em dois níveis).
+(`plano_realocacao`) e nos passos do panorama de enxugamento (`panorama_enxugamento`).
 As linhas já vêm **contíguas por grupo**, na ordem desejada: o front **não reordena**. Ele junta as linhas consecutivas com os
 mesmos valores nas colunas de `agrupar_por`, monta o título do grupo no formato
 `valor (N unidade)` (os valores dessas colunas e, entre parênteses, a contagem de linhas com
@@ -435,67 +435,113 @@ Vem da tool `planejar_enxugamento` (só pelo chat; **não** existe em `POST /rel
 que responde `422` para esse valor). Sugere vários cenários de movimentação que liberam turnos
 com presença paga (um turno é um par profissional e dia, de manhã ou à tarde, com pelo menos um
 atendimento), na grade semanal vigente. Usa o mesmo tipo `tabela_generica`, sem tipo novo de
-bloco. `periodo` e `meta` são `null`, `dimensoes` e `metricas` vêm vazias, `total` é `{}`,
-`linhas_omitidas` é `0` e `contem_dados_pacientes` é `true`.
+bloco.
 
-> **Atenção: este bloco contém nomes de pacientes (coluna `paciente`) e é sensível de RH**
-> (nomes de profissionais em `turno_liberado`, `de` e `para`). Os nomes nunca vão para o modelo
-> nem para log: só para o bloco; o texto da resposta traz só contagens e os códigos dos
-> cenários. Deve ficar restrito ao grupo de coordenação, e o time do chatbot precisa revisar como
-> o bloco sai na tela, no Excel e no PDF antes de liberar a exportação dele.
+**Dois blocos na mesma resposta** (desde 2026-11-23), nesta ordem, os dois com
+`dados.relatorio: "panorama_enxugamento"` (o mesmo valor, para a restrição por grupo cobrir os
+dois), `periodo` e `meta` `null`, `dimensoes` e `metricas` vazias, `total` `{}`,
+`linhas_omitidas` `0` e **`contem_dados_pacientes: true` nos dois** (a resposta do chat vem com
+`resposta_sensivel: true`). O chatbot desenha um cartão por bloco:
+
+1. **Quadro comparativo** (`titulo: "Comparativo de cenários"`): uma linha por cenário, só
+   números, sem nome de paciente nem de profissional, sem `agrupar_por`. Exemplo em
+   [`exemplos-blocos/tabela_generica_panorama_enxugamento_comparativo.json`](exemplos-blocos/tabela_generica_panorama_enxugamento_comparativo.json).
+2. **Passos** (`titulo: "Passos do cenário recomendado"`): os passos dos cenários detalhados
+   (por padrão, só o recomendado), agrupados por cenário. Exemplo (nomes fictícios) em
+   [`exemplos-blocos/tabela_generica_panorama_enxugamento.json`](exemplos-blocos/tabela_generica_panorama_enxugamento.json).
+
+> **Atenção: o bloco de passos contém nomes de pacientes (coluna `paciente`) e é sensível de
+> RH** (nomes de profissionais em `turno_liberado`, `de` e `para`). Os nomes nunca vão para o
+> modelo nem para log: só para o bloco. O texto da resposta traz só contagens e o número dos
+> cenários ("Cenário 2"); os códigos internos dos cenários não aparecem em bloco algum nem no
+> texto. Os dois blocos devem ficar restritos ao grupo de coordenação.
 
 Regras da sugestão (determinística, sem LLM): nenhum cenário abre turno que estava vazio (todo
 destino fica num turno que já acontece); cada paciente mantém a **mesma terapia e a mesma
 duração**, e pode mudar de turno, de profissional da mesma terapia ou, só quando pedido, de dia
-(cada passo diz qual alavanca usou); quem é deslocado só para abrir espaço fica com o mesmo
+(cada passo diz o tipo de movimento); quem é deslocado só para abrir espaço fica com o mesmo
 profissional; sessão em grupo, atendimento aguardando autorização (nome em preto) e atendimento
 fora da grade não se movem (o turno fica "preso" e entra só como contagem nos avisos); ninguém
 fica em dois lugares ao mesmo tempo nem ganha uma segunda sessão da mesma terapia no dia. Nada é
-alterado na planilha: é só sugestão. Não há valores em dinheiro em lugar nenhum do bloco.
+alterado na planilha: é só sugestão. Não há valores em dinheiro em lugar nenhum dos blocos.
 
-`titulo`: `"Panorama de enxugamento (grade semanal vigente)"`. Exemplo (nomes fictícios, 3
-cenários) em
-[`exemplos-blocos/tabela_generica_panorama_enxugamento.json`](exemplos-blocos/tabela_generica_panorama_enxugamento.json).
+**Quadro comparativo**, ordenado pelo número do cenário (o Cenário 1 é o recomendado para o
+objetivo pedido):
 
 | Coluna | Formato | Valores |
 | --- | --- | --- |
-| `cenario` | `texto` | `"Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos"`: número, código opaco, perfil (`equilibrado`, `mais turnos`, `menos mudança`) e turnos liberados. **Nunca traz nome** |
+| `cenario` | `texto` | `"Cenário 1 · equilibrado"`: número e perfil (`equilibrado`, `mais turnos`, `menos mudança`). **Sem código e sem nome** |
+| `turnos_liberados` | `inteiro` | Turnos com presença paga que o cenário libera por semana |
+| `passos` | `inteiro` | Passos do cenário inteiro |
+| `profissionais_afetadas` | `inteiro` | Profissionais distintas em qualquer `de` ou `para` dos passos |
+| `pacientes_movidos` | `inteiro` | Pacientes distintos com algum passo |
+| `trocam_de_profissional` | `inteiro` | Pacientes que mudam de profissional |
+| `trocam_de_dia` | `inteiro` | Pacientes que mudam de dia |
+| `passos_iguais_ao_recomendado` | `inteiro` | Passos iguais aos do Cenário 1 (mesmo paciente, mesma origem, mesmo destino); `0` no recomendado |
+| `recomendado` | `texto` | **Booleano JSON** (`true`/`false`, nunca `"Sim"`/`"Não"`): `true` só no Cenário 1. Vem com `formato: "texto"` porque o enum de formatos não tem booleano (regra geral dos booleanos) |
+
+`resumo` (`inteiro`, sem nomes): `"Cenários"`, `"Maior número de turnos liberados"`, `"Turnos com
+presença paga na semana"` e `"Turnos presos por regra"`. `avisos` sempre traz: que a sugestão
+considera só os atendimentos da semana lida, que não considera a disponibilidade dos pacientes,
+que vagas livres podem estar reservadas e que cada mudança precisa ser confirmada com a família e
+feita manualmente na planilha. Conforme o resultado, só com contagens: quantos turnos ficaram
+presos e por quê; por cenário, quantos turnos de terapia ficariam sem profissional num dia em que
+hoje têm e quantas profissionais ficariam sem atendimento na semana; `"Busca limitada: …"` quando
+a busca atinge o teto. Tabela de exportação: **Cenários** (mesmas colunas e linhas de `dados`).
+
+**Passos**:
+
+| Coluna | Formato | Valores |
+| --- | --- | --- |
+| `cenario` | `texto` | `"Cenário 1 · equilibrado · libera 3 turnos"`: número, perfil e turnos liberados. **Sem código e sem nome** |
 | `turno_liberado` | `texto` | `"Qua manhã · Profissional · Terapia Alimentar"` |
-| `passo` | `inteiro` | Ordem de execução dentro do cenário, a partir de 1 |
+| `passo` | `inteiro` | Ordem de execução dentro do cenário inteiro, a partir de 1 (quando só o que difere aparece, os números dos passos omitidos ficam de fora) |
 | `paciente` (rótulo `"Quem"`) | `texto` | Nome do paciente como na planilha (sessão em grupo: `"A / B"`) |
 | `terapia` | `texto` | Rótulo da especialidade |
 | `de` | `texto` | `"Qua 08:00 às 09:00 · Profissional · Sala 7"` (mesmo formato do plano de realocação) |
 | `para` | `texto` | Mesmo formato de `de` |
-| `alavanca` | `texto` | `"L1 · outro turno"`, `"L2 · outro profissional"`, `"L3 · outro profissional e turno"`, `"L4 · outro dia"`, `"L5 · cadeia, outro profissional"` ou `"L5 · abre espaço"` |
-| `observacao` | `texto` | `"mesma terapia e profissional"` ou `"mesma terapia; outro profissional — confirmar"`, mais `"; outra sala"`, `"; posto simultâneo da profissional"` e `"; esta profissional fica sem atendimento na semana"` quando for o caso |
+| `tipo_de_movimento` | `texto` | `"Mesmo profissional · outro turno"`, `"Outra profissional da mesma terapia · mesmo turno"`, `"Outra profissional da mesma terapia · outro turno"`, `"Mesmo profissional · outro dia"` ou `"Abre espaço deslocando outro paciente"` |
+| `observacao` | `texto` | **Vazia (`""`) no caso padrão.** Só as exceções, separadas por `"; "`: `"deslocado para abrir espaço, com a mesma profissional"`, `"outra sala"` (mesma profissional em outra sala), `"posto simultâneo da profissional"`, `"deixa a profissional sem atendimento na semana"` |
 
-As linhas vêm contíguas por cenário e, dentro dele, por turno liberado, e `dados` traz a dica de
-exibição agrupada em **dois níveis**: `agrupar_por: ["cenario", "turno_liberado"]` e
-`unidade_grupo: {"singular": "passo", "plural": "passos"}` (o mesmo mecanismo de
-`pacientes_por_profissional_nomes`; título do grupo montado pelo front, ex.:
-`"Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos (4 passos)"`). O primeiro cenário é o
-recomendado para o objetivo pedido. `resumo` (`inteiro`, sem nomes): `"Cenários"`, `"Maior
-número de turnos liberados"`, `"Turnos com presença paga na semana"` e `"Turnos presos por
-regra"`. Tabelas de exportação: **Passos** (mesmas colunas e linhas de `dados`) e **Resumo dos
-cenários** (`cenario`, `codigo`, `perfil`, `turnos_liberados`, `turnos_novos` (sempre 0),
-`trocam_profissional`, `trocam_turno`, `trocam_dia` (pacientes), `minutos_medio` (`decimal`),
-`minutos_maximo`, `ocupacao_absorventes` (`percentual`, fração; `null` quando ninguém absorve),
-`sem_presenca` e `sem_cobertura`).
+As linhas de cada cenário vêm seguidas, e `dados` traz a dica de exibição agrupada em **um nível**:
+`agrupar_por: ["cenario"]` e `unidade_grupo: {"singular": "passo", "plural": "passos"}` (título do
+grupo montado pelo front, ex.: `"Cenário 1 · equilibrado · libera 3 turnos (4 passos)"`).
+`resumo` (`inteiro`): com um cenário detalhado, `"Turnos liberados"`, `"Passos"` (linhas do bloco)
+e `"Pacientes movidos"`; com vários, `"Cenários detalhados"` e `"Passos"`. `avisos`: o de
+confirmar cada mudança com a família e na planilha e, para cada cenário não recomendado
+detalhado, o aviso que o compara com o Cenário 1 (ver abaixo). Tabela de exportação: **Passos**
+(mesmas colunas e linhas de `dados`). O bloco de passos **nunca vem sem linhas**.
 
-`avisos` sempre traz: que a sugestão considera só os atendimentos da semana lida, que não
-considera a disponibilidade dos pacientes, que vagas livres podem estar reservadas e que cada
-mudança precisa ser confirmada com a família e feita manualmente na planilha. Conforme o
-resultado, só com contagens: quantos turnos ficaram presos e por quê; por cenário, quantos turnos
-de terapia ficariam sem profissional num dia em que hoje têm e quantas profissionais ficariam sem
-atendimento na semana; `"Busca limitada: …"` quando a busca atinge o teto. Sem nenhum cenário, a
-tool não manda bloco (só o texto). A pergunta de profissional ambígua também vem sem bloco.
+**Detalhe de outro cenário.** Quando o usuário pede ("quero ver o Cenário 3"), o agente chama a
+tool de novo com os mesmos parâmetros e `detalhar_cenarios`; os mesmos parâmetros regeram os
+mesmos cenários. Os passos do cenário não recomendado são comparados com os do Cenário 1 por
+paciente, `de` e `para`:
+
+| Comparação com o Cenário 1 | Linhas | `titulo` | Aviso |
+| --- | --- | --- | --- |
+| Tem passos que diferem **e** passos iguais | **Só os que diferem** | `"Passos do Cenário 3 (apenas o que difere do Cenário 1)"` | `"Mostra só o que difere do Cenário 1; N passos são iguais aos dele."` |
+| Subconjunto (todos os passos dele estão no Cenário 1) | Todas | `"Passos do Cenário 3"` | `"Este cenário faz K dos M passos do Cenário 1 e deixa de fazer M-K; libera X turnos a menos."` |
+| Idêntico (os mesmos passos) | Todas | `"Passos do Cenário 3"` | `"Este cenário é idêntico ao Cenário 1 (os mesmos M passos)."` |
+| Nenhum passo igual | Todas | `"Passos do Cenário 3"` | `"Nenhum passo deste cenário é igual aos do Cenário 1."` |
+
+O número do passo é sempre o do cenário inteiro. Com vários cenários, cada aviso começa por
+`"Cenário N: "` e o título vira, por exemplo, `"Passos dos Cenários 1 e 3 (o Cenário 3 só com o
+que difere do Cenário 1)"` (sem ressalva quando nenhum deles sai só com o que difere). O nome da
+aba continua **Passos**. Se o cenário pedido não existe mais (os parâmetros mudaram), vem
+só o quadro comparativo, sem bloco de passos.
+
+Nomes das abas de exportação: únicos entre os dois blocos (**Cenários** e **Passos**), com até 31
+caracteres e sem `\ / ? * [ ] :`. Cada tabela respeita o limite de 5 000 linhas.
+
+Sem nenhum cenário, a tool não manda bloco (só o texto). A pergunta de profissional ambígua
+também vem sem bloco.
 
 ## Campos opcionais (versão 1)
 
 | Campo | Onde | Desde | Quando sai |
 | --- | --- | --- | --- |
 | `contem_dados_pacientes` | envelope | 2026-11-10 | Sempre `true`, só nos blocos com nomes de pacientes. |
-| `agrupar_por` | `dados` de `tabela_generica` | 2026-11-10 | Só com exibição agrupada (hoje, `pacientes_por_profissional_nomes`, o plano de `plano_realocacao` e `panorama_enxugamento`). |
+| `agrupar_por` | `dados` de `tabela_generica` | 2026-11-10 | Só com exibição agrupada (hoje, `pacientes_por_profissional_nomes`, o plano de `plano_realocacao` e os passos de `panorama_enxugamento`; o quadro comparativo não agrupa). |
 | `unidade_grupo` | `dados` de `tabela_generica` | 2026-11-10 | Sempre junto com `agrupar_por`. |
 | `resposta_sensivel` | resposta de `POST /agenda/chat` (fora dos blocos) | 2026-11-23 | Sempre `true`, sempre que a rodada usou tool restrita, com ou sem bloco. Ver [`api-relatorios.md`](api-relatorios.md#resposta-do-chat-resposta_sensivel). |
 
@@ -503,6 +549,8 @@ tool não manda bloco (só o texto). A pergunta de profissional ambígua também
 
 | Data | Mudança | Compatibilidade |
 | --- | --- | --- |
+| 2026-11-23 | Detalhe de cenário não recomendado: só sai "apenas o que difere do Cenário 1" quando há passos que diferem e passos iguais. Subconjunto do Cenário 1, cenário idêntico ou sem passo igual saem com os passos completos, `titulo: "Passos do Cenário N"` e um aviso que compara com o Cenário 1 (só contagens). O bloco de passos nunca vem sem linhas. | Compatível: mesmo formato e colunas; muda só quais linhas vêm, o título e o aviso nesses casos. |
+| 2026-11-23 | Panorama de enxugamento (`relatorio: "panorama_enxugamento"`) em **dois blocos** `tabela_generica` na mesma resposta, ambos com o mesmo `relatorio` e `contem_dados_pacientes: true`: o **quadro comparativo** (`"Comparativo de cenários"`, uma linha por cenário, só números, `recomendado` booleano, sem `agrupar_por`, aba **Cenários**) e os **passos** dos cenários detalhados (por padrão só o recomendado; `agrupar_por: ["cenario"]` em um nível, aba **Passos**). Colunas dos passos: `alavanca` virou `tipo_de_movimento` (rótulos legíveis); `observacao` vazia no caso padrão. O rótulo do cenário não traz mais o código interno. A aba **Resumo dos cenários** saiu (substituída pelo quadro). Sem tipo de bloco novo, sem mudança de schema. | Quebra só para quem trata o panorama: o chatbot passa a guardar e desenhar os dois blocos (um cartão por bloco) e a aplicar a restrição aos dois pelo `relatorio`. `versao` continua `1`; schema igual. |
 | 2026-11-23 | Campo opcional novo **na resposta do chat** (fora de qualquer bloco): `resposta_sensivel: true` sempre que a rodada usou tool restrita (`planejar_enxugamento`, `planejar_realocacao`, `pacientes_por_plano`, `listar_pacientes_por_profissional` ou `gerar_relatorio` com `agenda_paciente`), com ou sem bloco; ausente nas demais. Só a flag, sem nome nem conteúdo. | Adição opcional: `versao` continua `1`; schema dos blocos igual (o campo não é do bloco). Quem não conhece o campo o ignora; para aplicar o texto fixo fora da coordenação, o chatbot passa a lê-lo. |
 | 2026-11-19 | Novo valor de `relatorio` em `tabela_generica`: `"panorama_enxugamento"` (tool `planejar_enxugamento`, só pelo chat), com `periodo` e `meta` `null`, agrupado em dois níveis (`agrupar_por: ["cenario", "turno_liberado"]`, `unidade_grupo: {"singular": "passo", "plural": "passos"}`) e abas de exportação **Passos** e **Resumo dos cenários**. **O bloco contém nomes de pacientes** (`contem_dados_pacientes: true`) **e é sensível de RH** (nomes de profissionais). Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual (usa só campos opcionais que já existem). Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; deve entrar na restrição ao grupo de coordenação; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |
 | 2026-11-16 | Novo valor de `relatorio` em `tabela_generica`: `"plano_realocacao"` (tool `planejar_realocacao`, só pelo chat), com `periodo` `null`, nos dois formatos: o plano (agrupado por opção, `agrupar_por: ["opcao"]`, `unidade_grupo: {"singular": "passo", "plural": "passos"}`) e a pergunta de nome ambíguo (sem agrupamento). **O bloco contém nomes de pacientes** (`contem_dados_pacientes: true`). Nenhum tipo de bloco, campo ou coluna existente mudou. | Compatível: `versao` continua `1`, schema igual (usa só campos opcionais que já existem). Quem trata `tabela_generica` pelo `relatorio` precisa conhecer o valor novo; deve entrar na restrição ao grupo de coordenação; a exportação em Excel/PDF desse bloco precisa de revisão antes de sair. |

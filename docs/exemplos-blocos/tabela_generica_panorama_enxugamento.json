@@ -1,44 +1,32 @@
 {
   "versao": 1,
   "tipo": "tabela_generica",
-  "titulo": "Panorama de enxugamento (grade semanal vigente)",
+  "titulo": "Passos do cenário recomendado",
   "periodo": null,
   "meta": null,
   "parcial": false,
   "dias_nao_lidos": [],
   "avisos": [
-    "Sugestão: considera apenas os atendimentos presentes na semana lida (terapias quinzenais ou fora desta semana não aparecem).",
-    "Não considera a disponibilidade dos pacientes.",
-    "Vagas livres na grade podem estar reservadas (reuniões, supervisão); confira antes de mudar.",
-    "Cada mudança precisa ser confirmada com a família e feita manualmente na planilha.",
-    "Cenário 1: 2 turnos de terapia ficariam sem nenhum profissional atendendo, num dia em que hoje tem.",
-    "Cenário 2: 2 turnos de terapia ficariam sem nenhum profissional atendendo, num dia em que hoje tem.",
-    "Cenário 3: 1 turno de terapia ficaria sem nenhum profissional atendendo, num dia em que hoje tem."
+    "Cada mudança precisa ser confirmada com a família e feita manualmente na planilha."
   ],
   "resumo": [
     {
-      "rotulo": "Cenários",
+      "rotulo": "Turnos liberados",
       "valor": 3,
       "formato": "inteiro",
       "exibicao": "3"
     },
     {
-      "rotulo": "Maior número de turnos liberados",
-      "valor": 3,
+      "rotulo": "Passos",
+      "valor": 4,
       "formato": "inteiro",
-      "exibicao": "3"
+      "exibicao": "4"
     },
     {
-      "rotulo": "Turnos com presença paga na semana",
-      "valor": 8,
+      "rotulo": "Pacientes movidos",
+      "valor": 4,
       "formato": "inteiro",
-      "exibicao": "8"
-    },
-    {
-      "rotulo": "Turnos presos por regra",
-      "valor": 0,
-      "formato": "inteiro",
-      "exibicao": "0"
+      "exibicao": "4"
     }
   ],
   "dados": {
@@ -83,8 +71,8 @@
         "formato": "texto"
       },
       {
-        "chave": "alavanca",
-        "rotulo": "Alavanca",
+        "chave": "tipo_de_movimento",
+        "rotulo": "Tipo de movimento",
         "formato": "texto"
       },
       {
@@ -95,132 +83,54 @@
     ],
     "linhas": [
       {
-        "cenario": "Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos",
+        "cenario": "Cenário 1 · equilibrado · libera 3 turnos",
         "turno_liberado": "Ter tarde · Ficticia Acacia · Terapia Alimentar",
         "passo": 1,
         "paciente": "Paciente Ficticio Figueira",
         "terapia": "Terapia Alimentar",
         "de": "Ter 13:00 às 14:00 · Ficticia Acacia · Sala 7",
         "para": "Ter 11:00 às 12:00 · Ficticia Acacia · Sala 7",
-        "alavanca": "L1 · outro turno",
-        "observacao": "mesma terapia e profissional"
+        "tipo_de_movimento": "Mesmo profissional · outro turno",
+        "observacao": ""
       },
       {
-        "cenario": "Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos",
+        "cenario": "Cenário 1 · equilibrado · libera 3 turnos",
         "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
         "passo": 2,
         "paciente": "Paciente Ficticio Aroeira",
         "terapia": "Terapia Alimentar",
         "de": "Seg 08:00 às 09:00 · Ficticia Acacia · Sala 7",
         "para": "Seg 08:00 às 09:00 · Ficticia Bromelia · Sala 8",
-        "alavanca": "L2 · outro profissional",
-        "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
+        "tipo_de_movimento": "Outra profissional da mesma terapia · mesmo turno",
+        "observacao": ""
       },
       {
-        "cenario": "Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos",
+        "cenario": "Cenário 1 · equilibrado · libera 3 turnos",
         "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
         "passo": 3,
         "paciente": "Paciente Ficticio Baoba",
         "terapia": "Terapia Alimentar",
         "de": "Seg 10:00 às 11:00 · Ficticia Acacia · Sala 7",
         "para": "Seg 10:00 às 11:00 · Ficticia Bromelia · Sala 8",
-        "alavanca": "L2 · outro profissional",
-        "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
+        "tipo_de_movimento": "Outra profissional da mesma terapia · mesmo turno",
+        "observacao": ""
       },
       {
-        "cenario": "Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos",
+        "cenario": "Cenário 1 · equilibrado · libera 3 turnos",
         "turno_liberado": "Qua tarde · Ficticia Bromelia · Terapia Alimentar",
         "passo": 4,
         "paciente": "Paciente Ficticio Hortela",
         "terapia": "Terapia Alimentar",
         "de": "Qua 13:00 às 14:00 · Ficticia Bromelia · Sala 8",
         "para": "Qua 11:00 às 12:00 · Ficticia Acacia · Sala 7",
-        "alavanca": "L3 · outro profissional e turno",
-        "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-      },
-      {
-        "cenario": "Cenário 2 (E-88EB) · mais turnos · libera 3 turnos",
-        "turno_liberado": "Ter tarde · Ficticia Acacia · Terapia Alimentar",
-        "passo": 1,
-        "paciente": "Paciente Ficticio Figueira",
-        "terapia": "Terapia Alimentar",
-        "de": "Ter 13:00 às 14:00 · Ficticia Acacia · Sala 7",
-        "para": "Ter 11:00 às 12:00 · Ficticia Acacia · Sala 7",
-        "alavanca": "L1 · outro turno",
-        "observacao": "mesma terapia e profissional"
-      },
-      {
-        "cenario": "Cenário 2 (E-88EB) · mais turnos · libera 3 turnos",
-        "turno_liberado": "Qua manhã · Ficticia Acacia · Terapia Alimentar",
-        "passo": 2,
-        "paciente": "Paciente Ficticio Goiabeira",
-        "terapia": "Terapia Alimentar",
-        "de": "Qua 08:00 às 09:00 · Ficticia Acacia · Sala 7",
-        "para": "Qua 14:00 às 15:00 · Ficticia Bromelia · Sala 8",
-        "alavanca": "L3 · outro profissional e turno",
-        "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-      },
-      {
-        "cenario": "Cenário 2 (E-88EB) · mais turnos · libera 3 turnos",
-        "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
-        "passo": 3,
-        "paciente": "Paciente Ficticio Aroeira",
-        "terapia": "Terapia Alimentar",
-        "de": "Seg 08:00 às 09:00 · Ficticia Acacia · Sala 7",
-        "para": "Seg 08:00 às 09:00 · Ficticia Bromelia · Sala 8",
-        "alavanca": "L2 · outro profissional",
-        "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-      },
-      {
-        "cenario": "Cenário 2 (E-88EB) · mais turnos · libera 3 turnos",
-        "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
-        "passo": 4,
-        "paciente": "Paciente Ficticio Baoba",
-        "terapia": "Terapia Alimentar",
-        "de": "Seg 10:00 às 11:00 · Ficticia Acacia · Sala 7",
-        "para": "Seg 10:00 às 11:00 · Ficticia Bromelia · Sala 8",
-        "alavanca": "L2 · outro profissional",
-        "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-      },
-      {
-        "cenario": "Cenário 3 (E-9DD6) · menos mudança · libera 2 turnos",
-        "turno_liberado": "Ter tarde · Ficticia Acacia · Terapia Alimentar",
-        "passo": 1,
-        "paciente": "Paciente Ficticio Figueira",
-        "terapia": "Terapia Alimentar",
-        "de": "Ter 13:00 às 14:00 · Ficticia Acacia · Sala 7",
-        "para": "Ter 11:00 às 12:00 · Ficticia Acacia · Sala 7",
-        "alavanca": "L1 · outro turno",
-        "observacao": "mesma terapia e profissional"
-      },
-      {
-        "cenario": "Cenário 3 (E-9DD6) · menos mudança · libera 2 turnos",
-        "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
-        "passo": 2,
-        "paciente": "Paciente Ficticio Aroeira",
-        "terapia": "Terapia Alimentar",
-        "de": "Seg 08:00 às 09:00 · Ficticia Acacia · Sala 7",
-        "para": "Seg 08:00 às 09:00 · Ficticia Bromelia · Sala 8",
-        "alavanca": "L2 · outro profissional",
-        "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-      },
-      {
-        "cenario": "Cenário 3 (E-9DD6) · menos mudança · libera 2 turnos",
-        "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
-        "passo": 3,
-        "paciente": "Paciente Ficticio Baoba",
-        "terapia": "Terapia Alimentar",
-        "de": "Seg 10:00 às 11:00 · Ficticia Acacia · Sala 7",
-        "para": "Seg 10:00 às 11:00 · Ficticia Bromelia · Sala 8",
-        "alavanca": "L2 · outro profissional",
-        "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
+        "tipo_de_movimento": "Outra profissional da mesma terapia · outro turno",
+        "observacao": ""
       }
     ],
     "total": {},
     "linhas_omitidas": 0,
     "agrupar_por": [
-      "cenario",
-      "turno_liberado"
+      "cenario"
     ],
     "unidade_grupo": {
       "singular": "passo",
@@ -267,8 +177,8 @@
           "formato": "texto"
         },
         {
-          "chave": "alavanca",
-          "rotulo": "Alavanca",
+          "chave": "tipo_de_movimento",
+          "rotulo": "Tipo de movimento",
           "formato": "texto"
         },
         {
@@ -279,242 +189,48 @@
       ],
       "linhas": [
         {
-          "cenario": "Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos",
+          "cenario": "Cenário 1 · equilibrado · libera 3 turnos",
           "turno_liberado": "Ter tarde · Ficticia Acacia · Terapia Alimentar",
           "passo": 1,
           "paciente": "Paciente Ficticio Figueira",
           "terapia": "Terapia Alimentar",
           "de": "Ter 13:00 às 14:00 · Ficticia Acacia · Sala 7",
           "para": "Ter 11:00 às 12:00 · Ficticia Acacia · Sala 7",
-          "alavanca": "L1 · outro turno",
-          "observacao": "mesma terapia e profissional"
+          "tipo_de_movimento": "Mesmo profissional · outro turno",
+          "observacao": ""
         },
         {
-          "cenario": "Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos",
+          "cenario": "Cenário 1 · equilibrado · libera 3 turnos",
           "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
           "passo": 2,
           "paciente": "Paciente Ficticio Aroeira",
           "terapia": "Terapia Alimentar",
           "de": "Seg 08:00 às 09:00 · Ficticia Acacia · Sala 7",
           "para": "Seg 08:00 às 09:00 · Ficticia Bromelia · Sala 8",
-          "alavanca": "L2 · outro profissional",
-          "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
+          "tipo_de_movimento": "Outra profissional da mesma terapia · mesmo turno",
+          "observacao": ""
         },
         {
-          "cenario": "Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos",
+          "cenario": "Cenário 1 · equilibrado · libera 3 turnos",
           "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
           "passo": 3,
           "paciente": "Paciente Ficticio Baoba",
           "terapia": "Terapia Alimentar",
           "de": "Seg 10:00 às 11:00 · Ficticia Acacia · Sala 7",
           "para": "Seg 10:00 às 11:00 · Ficticia Bromelia · Sala 8",
-          "alavanca": "L2 · outro profissional",
-          "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
+          "tipo_de_movimento": "Outra profissional da mesma terapia · mesmo turno",
+          "observacao": ""
         },
         {
-          "cenario": "Cenário 1 (E-5EB1) · equilibrado · libera 3 turnos",
+          "cenario": "Cenário 1 · equilibrado · libera 3 turnos",
           "turno_liberado": "Qua tarde · Ficticia Bromelia · Terapia Alimentar",
           "passo": 4,
           "paciente": "Paciente Ficticio Hortela",
           "terapia": "Terapia Alimentar",
           "de": "Qua 13:00 às 14:00 · Ficticia Bromelia · Sala 8",
           "para": "Qua 11:00 às 12:00 · Ficticia Acacia · Sala 7",
-          "alavanca": "L3 · outro profissional e turno",
-          "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-        },
-        {
-          "cenario": "Cenário 2 (E-88EB) · mais turnos · libera 3 turnos",
-          "turno_liberado": "Ter tarde · Ficticia Acacia · Terapia Alimentar",
-          "passo": 1,
-          "paciente": "Paciente Ficticio Figueira",
-          "terapia": "Terapia Alimentar",
-          "de": "Ter 13:00 às 14:00 · Ficticia Acacia · Sala 7",
-          "para": "Ter 11:00 às 12:00 · Ficticia Acacia · Sala 7",
-          "alavanca": "L1 · outro turno",
-          "observacao": "mesma terapia e profissional"
-        },
-        {
-          "cenario": "Cenário 2 (E-88EB) · mais turnos · libera 3 turnos",
-          "turno_liberado": "Qua manhã · Ficticia Acacia · Terapia Alimentar",
-          "passo": 2,
-          "paciente": "Paciente Ficticio Goiabeira",
-          "terapia": "Terapia Alimentar",
-          "de": "Qua 08:00 às 09:00 · Ficticia Acacia · Sala 7",
-          "para": "Qua 14:00 às 15:00 · Ficticia Bromelia · Sala 8",
-          "alavanca": "L3 · outro profissional e turno",
-          "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-        },
-        {
-          "cenario": "Cenário 2 (E-88EB) · mais turnos · libera 3 turnos",
-          "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
-          "passo": 3,
-          "paciente": "Paciente Ficticio Aroeira",
-          "terapia": "Terapia Alimentar",
-          "de": "Seg 08:00 às 09:00 · Ficticia Acacia · Sala 7",
-          "para": "Seg 08:00 às 09:00 · Ficticia Bromelia · Sala 8",
-          "alavanca": "L2 · outro profissional",
-          "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-        },
-        {
-          "cenario": "Cenário 2 (E-88EB) · mais turnos · libera 3 turnos",
-          "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
-          "passo": 4,
-          "paciente": "Paciente Ficticio Baoba",
-          "terapia": "Terapia Alimentar",
-          "de": "Seg 10:00 às 11:00 · Ficticia Acacia · Sala 7",
-          "para": "Seg 10:00 às 11:00 · Ficticia Bromelia · Sala 8",
-          "alavanca": "L2 · outro profissional",
-          "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-        },
-        {
-          "cenario": "Cenário 3 (E-9DD6) · menos mudança · libera 2 turnos",
-          "turno_liberado": "Ter tarde · Ficticia Acacia · Terapia Alimentar",
-          "passo": 1,
-          "paciente": "Paciente Ficticio Figueira",
-          "terapia": "Terapia Alimentar",
-          "de": "Ter 13:00 às 14:00 · Ficticia Acacia · Sala 7",
-          "para": "Ter 11:00 às 12:00 · Ficticia Acacia · Sala 7",
-          "alavanca": "L1 · outro turno",
-          "observacao": "mesma terapia e profissional"
-        },
-        {
-          "cenario": "Cenário 3 (E-9DD6) · menos mudança · libera 2 turnos",
-          "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
-          "passo": 2,
-          "paciente": "Paciente Ficticio Aroeira",
-          "terapia": "Terapia Alimentar",
-          "de": "Seg 08:00 às 09:00 · Ficticia Acacia · Sala 7",
-          "para": "Seg 08:00 às 09:00 · Ficticia Bromelia · Sala 8",
-          "alavanca": "L2 · outro profissional",
-          "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-        },
-        {
-          "cenario": "Cenário 3 (E-9DD6) · menos mudança · libera 2 turnos",
-          "turno_liberado": "Seg manhã · Ficticia Acacia · Terapia Alimentar",
-          "passo": 3,
-          "paciente": "Paciente Ficticio Baoba",
-          "terapia": "Terapia Alimentar",
-          "de": "Seg 10:00 às 11:00 · Ficticia Acacia · Sala 7",
-          "para": "Seg 10:00 às 11:00 · Ficticia Bromelia · Sala 8",
-          "alavanca": "L2 · outro profissional",
-          "observacao": "mesma terapia; outro profissional — confirmar; outra sala"
-        }
-      ]
-    },
-    {
-      "nome": "Resumo dos cenários",
-      "colunas": [
-        {
-          "chave": "cenario",
-          "rotulo": "Cenário",
-          "formato": "texto"
-        },
-        {
-          "chave": "codigo",
-          "rotulo": "Código",
-          "formato": "texto"
-        },
-        {
-          "chave": "perfil",
-          "rotulo": "Perfil",
-          "formato": "texto"
-        },
-        {
-          "chave": "turnos_liberados",
-          "rotulo": "Turnos liberados",
-          "formato": "inteiro"
-        },
-        {
-          "chave": "turnos_novos",
-          "rotulo": "Turnos novos",
-          "formato": "inteiro"
-        },
-        {
-          "chave": "trocam_profissional",
-          "rotulo": "Pacientes que trocam de profissional",
-          "formato": "inteiro"
-        },
-        {
-          "chave": "trocam_turno",
-          "rotulo": "Pacientes que trocam de turno",
-          "formato": "inteiro"
-        },
-        {
-          "chave": "trocam_dia",
-          "rotulo": "Pacientes que trocam de dia",
-          "formato": "inteiro"
-        },
-        {
-          "chave": "minutos_medio",
-          "rotulo": "Deslocamento médio (min)",
-          "formato": "decimal"
-        },
-        {
-          "chave": "minutos_maximo",
-          "rotulo": "Deslocamento máximo (min)",
-          "formato": "inteiro"
-        },
-        {
-          "chave": "ocupacao_absorventes",
-          "rotulo": "Ocupação de quem absorve",
-          "formato": "percentual"
-        },
-        {
-          "chave": "sem_presenca",
-          "rotulo": "Profissionais sem atendimento na semana",
-          "formato": "inteiro"
-        },
-        {
-          "chave": "sem_cobertura",
-          "rotulo": "Turnos de terapia sem profissional",
-          "formato": "inteiro"
-        }
-      ],
-      "linhas": [
-        {
-          "cenario": "Cenário 1",
-          "codigo": "E-5EB1",
-          "perfil": "equilibrado",
-          "turnos_liberados": 3,
-          "turnos_novos": 0,
-          "trocam_profissional": 3,
-          "trocam_turno": 2,
-          "trocam_dia": 0,
-          "minutos_medio": 60.0,
-          "minutos_maximo": 120,
-          "ocupacao_absorventes": 0.4,
-          "sem_presenca": 0,
-          "sem_cobertura": 2
-        },
-        {
-          "cenario": "Cenário 2",
-          "codigo": "E-88EB",
-          "perfil": "mais turnos",
-          "turnos_liberados": 3,
-          "turnos_novos": 0,
-          "trocam_profissional": 3,
-          "trocam_turno": 2,
-          "trocam_dia": 0,
-          "minutos_medio": 120.0,
-          "minutos_maximo": 360,
-          "ocupacao_absorventes": 0.6,
-          "sem_presenca": 0,
-          "sem_cobertura": 2
-        },
-        {
-          "cenario": "Cenário 3",
-          "codigo": "E-9DD6",
-          "perfil": "menos mudança",
-          "turnos_liberados": 2,
-          "turnos_novos": 0,
-          "trocam_profissional": 2,
-          "trocam_turno": 1,
-          "trocam_dia": 0,
-          "minutos_medio": 40.0,
-          "minutos_maximo": 120,
-          "ocupacao_absorventes": 0.8,
-          "sem_presenca": 0,
-          "sem_cobertura": 1
+          "tipo_de_movimento": "Outra profissional da mesma terapia · outro turno",
+          "observacao": ""
         }
       ]
     }

@@ -34,8 +34,10 @@ from pydantic import ValidationError
 
 from app.ai.catalogo import catalogo_ou_nada
 from app.ai.fundamentacao import (
+    codigos_de_cenario_na_resposta,
     nomes_de_paciente_na_resposta,
     nomes_de_profissional_no_panorama,
+    registrar_codigo_de_cenario,
     registrar_nome_de_paciente,
     registrar_nome_de_profissional,
     registrar_nova_geracao,
@@ -46,7 +48,7 @@ from app.ai.fundamentacao import (
 from app.ai.interpretador import Interpretador, contexto_para_o_agente, pergunta_das_lacunas
 from app.ai.prompts import prompt_de_sistema, resumo_da_equipe
 from app.ai.rastreamento import desligar_rastreamento_externo
-from app.ai.relatorios import BlocoRelatorio, chamada_restrita
+from app.ai.relatorios import BlocoRelatorio, artefatos_de_blocos, chamada_restrita
 from app.ai.tools import DIAS_DA_SEMANA, criar_tools
 from app.config import exigir, get_settings
 from app.data_sources.continuidade import ContinuidadeDataSource
@@ -221,21 +223,9 @@ def perguntar_com_mensagens(
     mensagens: list[BaseMessage] = _sem(resultado["messages"], contexto)
     resposta = _extrair_texto_da_resposta(mensagens[-1])
     blocos = extrair_blocos_do_turno(mensagens)
-    # Nome de paciente na resposta não ganha nova geração: o aviso teria de
-    # citar o nome para o modelo. Vai direto para o resumo, que não tem nomes.
-    if repetidos := nomes_de_paciente_na_resposta(
-        resposta, blocos, mensagens[len(historico_mensagens) :]
+    if _vai_direto_para_o_resumo(
+        resposta, blocos, mensagens[len(historico_mensagens) :], profissionais
     ):
-        registrar_nome_de_paciente(repetidos)
-        return (
-            resumo_deterministico(blocos, mensagens[len(historico_mensagens) :]),
-            mensagens,
-            blocos,
-        )
-    # Panorama de enxugamento (sensível de RH): nome de profissional também vai
-    # direto para o resumo, sem nova geração.
-    if citados := nomes_de_profissional_no_panorama(resposta, blocos, profissionais):
-        registrar_nome_de_profissional(citados)
         return (
             resumo_deterministico(blocos, mensagens[len(historico_mensagens) :]),
             mensagens,
@@ -257,11 +247,7 @@ def perguntar_com_mensagens(
     resposta = _extrair_texto_da_resposta(refeito[-1])
     blocos = extrair_blocos_do_turno(refeito) or blocos
     turno = refeito[len(historico_mensagens) :]
-    if repetidos := nomes_de_paciente_na_resposta(resposta, blocos, turno):
-        registrar_nome_de_paciente(repetidos)
-        return resumo_deterministico(blocos, turno), refeito, blocos
-    if citados := nomes_de_profissional_no_panorama(resposta, blocos, profissionais):
-        registrar_nome_de_profissional(citados)
+    if _vai_direto_para_o_resumo(resposta, blocos, turno, profissionais):
         return resumo_deterministico(blocos, turno), refeito, blocos
     problemas = verificar(
         resposta, turno, historico_mensagens, profissionais, com_tela=agente.com_tela
@@ -271,6 +257,31 @@ def perguntar_com_mensagens(
 
     registrar_resumo_deterministico(problemas)
     return resumo_deterministico(blocos, turno), refeito, blocos
+
+
+def _vai_direto_para_o_resumo(
+    resposta: str,
+    blocos: list[BlocoRelatorio],
+    turno: list[BaseMessage],
+    profissionais: Sequence[str],
+) -> bool:
+    """Violações que não ganham nova geração (o aviso teria de citar o nome ou o código
+    para o modelo): vão direto para o resumo determinístico, que não tem nenhum dos dois.
+
+    - nome de paciente de um relatório (ou do pedido);
+    - nome de profissional na rodada do panorama de enxugamento (sensível de RH);
+    - código opaco de cenário (`E-3F2A`), que é só para a ferramenta.
+    """
+    if repetidos := nomes_de_paciente_na_resposta(resposta, blocos, turno):
+        registrar_nome_de_paciente(repetidos)
+        return True
+    if citados := nomes_de_profissional_no_panorama(resposta, blocos, profissionais):
+        registrar_nome_de_profissional(citados)
+        return True
+    if codigos := codigos_de_cenario_na_resposta(resposta):
+        registrar_codigo_de_cenario(codigos)
+        return True
+    return False
 
 
 def _sem(mensagens: list[BaseMessage], retirar: BaseMessage | None) -> list[BaseMessage]:
@@ -308,19 +319,24 @@ def rodada_sensivel(mensagens: list[BaseMessage]) -> bool:
 
 
 def extrair_blocos_do_turno(mensagens: list[BaseMessage]) -> list[BlocoRelatorio]:
-    """Valida artifacts depois da última pergunta, em ordem, com limite de dez."""
+    """Valida artifacts depois da última pergunta, em ordem, com limite de dez.
+
+    O artifact de uma tool é um bloco ou uma lista de blocos (o panorama de
+    enxugamento manda o quadro comparativo e os passos na mesma resposta).
+    """
     blocos: list[BlocoRelatorio] = []
     for mensagem in mensagens[_inicio_do_turno(mensagens) :]:
-        if not isinstance(mensagem, ToolMessage) or mensagem.artifact is None:
+        if not isinstance(mensagem, ToolMessage):
             continue
-        try:
-            bloco = BlocoRelatorio.model_validate(mensagem.artifact)
-        except ValidationError:
-            # Não imprime o artifact nem os valores da falha de validação.
-            logger.warning("Artefato inválido de relatório ignorado.")
-            continue
-        if len(blocos) >= 10:
-            logger.warning("Limite de 10 blocos por turno excedido; bloco ignorado.")
-            continue
-        blocos.append(bloco)
+        for artefato in artefatos_de_blocos(mensagem.artifact):
+            try:
+                bloco = BlocoRelatorio.model_validate(artefato)
+            except ValidationError:
+                # Não imprime o artifact nem os valores da falha de validação.
+                logger.warning("Artefato inválido de relatório ignorado.")
+                continue
+            if len(blocos) >= 10:
+                logger.warning("Limite de 10 blocos por turno excedido; bloco ignorado.")
+                continue
+            blocos.append(bloco)
     return blocos

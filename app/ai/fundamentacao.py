@@ -14,6 +14,10 @@ Confere, no texto da resposta, o que dá para conferir sem interpretar:
   quando nenhum relatório da rodada traz nomes: os relatórios de contagem
   trazem as quantidades.
 
+Nome de paciente de um relatório, nome de profissional na rodada do panorama de
+enxugamento e código opaco de cenário (`E-3F2A`) não ganham nova geração: vão
+direto para o resumo determinístico (no panorama, `resumo_do_panorama`).
+
 Quem chama (`app.ai.agente.perguntar_com_mensagens`) tenta UMA nova geração
 com o aviso do que não bateu e, se ainda não bater, usa um resumo
 determinístico do relatório. O log registra só contagens: nunca o texto nem
@@ -29,9 +33,9 @@ from dataclasses import dataclass, field
 
 from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 
-from app.ai.blocos_enxugamento import nomes_de_profissionais_no_bloco
+from app.ai.blocos_enxugamento import nomes_de_profissionais_no_bloco, resumo_do_panorama
 from app.ai.blocos_gerais import nomes_de_pacientes_no_bloco
-from app.ai.relatorios import BlocoRelatorio
+from app.ai.relatorios import BlocoRelatorio, artefatos_de_blocos
 from app.domain.constants import (
     FIM_PAUSA,
     HORARIO_ABERTURA,
@@ -241,14 +245,15 @@ def afirma_nomes_na_tela(resposta: str) -> bool:
 def _rodada_com_nomes(mensagens_do_turno: Sequence[BaseMessage]) -> bool:
     """Se algum relatório da rodada leva nomes de pacientes (e só então a tela os mostra)."""
     for mensagem in mensagens_do_turno:
-        if not isinstance(mensagem, ToolMessage) or mensagem.artifact is None:
+        if not isinstance(mensagem, ToolMessage):
             continue
-        try:
-            bloco = BlocoRelatorio.model_validate(mensagem.artifact)
-        except ValueError:
-            continue
-        if nomes_de_pacientes_no_bloco(bloco):
-            return True
+        for artefato in artefatos_de_blocos(mensagem.artifact):
+            try:
+                bloco = BlocoRelatorio.model_validate(artefato)
+            except ValueError:
+                continue
+            if nomes_de_pacientes_no_bloco(bloco):
+                return True
     return False
 
 
@@ -316,6 +321,8 @@ def resumo_deterministico(
     blocos: Sequence[BlocoRelatorio], mensagens_do_turno: Sequence[BaseMessage]
 ) -> str:
     """Resposta montada pelo código quando a do modelo não passou na verificação."""
+    if (panorama := resumo_do_panorama(blocos)) is not None:
+        return panorama
     if blocos:
         frases = []
         for bloco in blocos[:3]:
@@ -432,6 +439,26 @@ def nomes_de_profissional_no_panorama(
     resposta_normalizada = _normalizar(resposta)
     return sum(
         1 for nome in nomes if re.search(rf"(?<!\w){re.escape(nome)}(?!\w)", resposta_normalizada)
+    )
+
+
+#: Código opaco de um cenário do panorama de enxugamento (`E-3F2A`): só para a
+#: ferramenta; nunca no texto para o usuário.
+_CODIGO_DE_CENARIO = re.compile(r"(?<![\w-])E-[0-9A-F]{4}(?![\w-])", re.IGNORECASE)
+
+
+def codigos_de_cenario_na_resposta(resposta: str) -> int:
+    """Quantos códigos de cenário (`E-3F2A`) a resposta cita. Só a contagem, para o log."""
+    return len(_CODIGO_DE_CENARIO.findall(resposta))
+
+
+def registrar_codigo_de_cenario(quantidade: int) -> None:
+    CONTADORES.resumos_deterministicos += 1
+    logger.warning(
+        "Fundamentação: a resposta citou %d código(s) de cenário do panorama de enxugamento; "
+        "resumo determinístico (total: %d).",
+        quantidade,
+        CONTADORES.resumos_deterministicos,
     )
 
 
